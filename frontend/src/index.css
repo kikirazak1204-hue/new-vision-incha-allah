@@ -1,0 +1,58 @@
+/* ✅ Activation des couches Tailwind */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ✅ Style global */
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #430fd1;
+    /* ton noir sacré */
+    color: rgb(19, 212, 132);
+    /* ton vert signature */
+    min-height: 100vh;
+}
+
+/* ✅ Sélection immersive */
+::selection {
+    background-color: rgb(19, 212, 132);
+    color: #ffffff;
+}
+
+/* ✅ Animation fadeIn */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fadeIn {
+    animation: fadeIn 0.4s ease-out;
+}
+
+/* ✅ Titres renforcés */
+h1,
+h2,
+h3 {
+    font-weight: bold;
+    color: #ffffff;
+}
+
+/* ✅ Classes utilitaires personnalisées (optionnelles) */
+.bg-tonNoir {
+    background-color: #430fd1;
+}
+
+.text-brandVert {
+    color: rgb(19, 212, 132);
+}
+
+.bg-fondTransparent {
+    background-color: rgba(255, 255, 255, 0.1);
+}
