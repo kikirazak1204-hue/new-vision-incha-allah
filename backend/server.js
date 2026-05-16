@@ -34,8 +34,10 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 sequelize.authenticate()
     .then(() => {
         console.log('✅ Base de données connectée.');
-        // ⏳ WhatsApp désactivé temporairement - Utilisez /api/whatsapp/qr-code quand prêt
-        // initWhatsApp().catch(err => console.error('⚠️ WhatsApp non disponible:', err));
+        return sequelize.sync({ alter: false });
+    })
+    .then(() => {
+        console.log('✅ Tables synchronisées.');
     })
     .catch(err => console.error('❌ Erreur BDD :', err));
 // ── Route de test ──────────────────────────────────────────────
