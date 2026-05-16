@@ -4,7 +4,7 @@
   "description": "Frontend React/Vite pour New Vision",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npx vite build",
     "preview": "vite preview"
   },
   "dependencies": {
