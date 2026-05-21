@@ -70,14 +70,14 @@ export default function ReservationPage({ handleRetour, setCurrentView, selected
             formData.append('telephone', telephone);
             formData.append('description', description || '');
             formData.append('clientNom', user.nom || 'Client anonyme');
-            
+
             // Ajouter les services sélectionnés
-            const serviceNames = selectedServices.length > 0 
+            const serviceNames = selectedServices.length > 0
                 ? selectedServices.map(s => s.nom).join(', ')
                 : 'Plomberie';
             formData.append('serviceNom', serviceNames);
             formData.append('servicesJSON', JSON.stringify(selectedServices));
-            
+
             formData.append('montantEstime', '0');
             if (photo) formData.append('photo', photo);
             if (audioBlob) formData.append('audio', audioBlob, 'message.webm');
@@ -108,10 +108,10 @@ export default function ReservationPage({ handleRetour, setCurrentView, selected
     };
 
     if (confirme) {
-        const serviceText = selectedServices.length > 0 
+        const serviceText = selectedServices.length > 0
             ? `Les prestataires en ${selectedServices.map(s => s.nom.toLowerCase()).join(', ')} vont vous contacter rapidement.`
             : 'Un prestataire va vous contacter rapidement.';
-        
+
         return (
             <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900 px-4 py-6">
                 <div className="max-w-lg mx-auto">

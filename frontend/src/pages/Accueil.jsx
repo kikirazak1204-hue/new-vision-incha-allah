@@ -283,10 +283,11 @@ export default function Accueil() {
                 className={`flex justify-between items-center mb-8 flex-wrap gap-3 ${!isOnline ? 'mt-8' : ''}`}
             >
                 <h1
-                    className="text-2xl font-bold cursor-pointer flex items-center gap-2"
+                    className="text-2xl font-bold cursor-pointer flex items-center gap-2 hover:text-purple-300 transition-colors"
                     onClick={() => setCurrentView('accueil')}
                 >
-                    🌍 New Vision
+                    <img src="/jupiter-logo.svg" alt="Jupiter" className="w-8 h-8" />
+                    Jupiter
                 </h1>
 
                 <nav className="flex items-center gap-4 flex-wrap">
@@ -345,7 +346,7 @@ export default function Accueil() {
             <main className="relative z-10">{renderMainView()}</main>
 
             <footer className="mt-12 text-center text-white/40 text-xs pb-6">
-                🌍 New Vision — Services de confiance en Afrique de l'Ouest
+                🪐 Jupiter — Services de confiance en Afrique de l'Ouest
                 {isInstalled && (
                     <span className="ml-2 text-green-400">● Application installée</span>
                 )}
