@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 
-export default function ReservationPage({ handleRetour, setCurrentView }) {
+export default function ReservationPage({ handleRetour, setCurrentView, selectedServices = [] }) {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [confirme, setConfirme] = useState(false);
@@ -70,7 +70,14 @@ export default function ReservationPage({ handleRetour, setCurrentView }) {
             formData.append('telephone', telephone);
             formData.append('description', description || '');
             formData.append('clientNom', user.nom || 'Client anonyme');
-            formData.append('serviceNom', 'Plomberie');
+            
+            // Ajouter les services sélectionnés
+            const serviceNames = selectedServices.length > 0 
+                ? selectedServices.map(s => s.nom).join(', ')
+                : 'Plomberie';
+            formData.append('serviceNom', serviceNames);
+            formData.append('servicesJSON', JSON.stringify(selectedServices));
+            
             formData.append('montantEstime', '0');
             if (photo) formData.append('photo', photo);
             if (audioBlob) formData.append('audio', audioBlob, 'message.webm');
@@ -101,6 +108,10 @@ export default function ReservationPage({ handleRetour, setCurrentView }) {
     };
 
     if (confirme) {
+        const serviceText = selectedServices.length > 0 
+            ? `Les prestataires en ${selectedServices.map(s => s.nom.toLowerCase()).join(', ')} vont vous contacter rapidement.`
+            : 'Un prestataire va vous contacter rapidement.';
+        
         return (
             <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900 px-4 py-6">
                 <div className="max-w-lg mx-auto">
@@ -108,7 +119,7 @@ export default function ReservationPage({ handleRetour, setCurrentView }) {
                         <div className="text-5xl mb-4">✅</div>
                         <h2 className="text-xl font-semibold text-white mb-2">Demande envoyée !</h2>
                         <p className="text-white/60 text-sm mb-6">
-                            Un plombier va vous contacter rapidement.
+                            {serviceText}
                         </p>
                         <button
                             onClick={() => setCurrentView?.('accueil')}
@@ -132,15 +143,36 @@ export default function ReservationPage({ handleRetour, setCurrentView }) {
                     ← Retour
                 </button>
 
-                <div className="bg-white/10 border border-white/15 rounded-2xl p-4 mb-6 flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-2xl">
-                        🚰
+                {/* Affichage des services sélectionnés */}
+                {selectedServices.length > 0 ? (
+                    <div className="bg-white/10 border border-white/15 rounded-2xl p-4 mb-6">
+                        <h3 className="text-white font-semibold mb-3">📋 Services sélectionnés</h3>
+                        <div className="flex flex-wrap gap-2">
+                            {selectedServices.map((service) => (
+                                <div
+                                    key={service.code}
+                                    className="inline-flex items-center gap-2 px-3 py-2 bg-purple-600/40 border border-purple-400/50 rounded-lg"
+                                >
+                                    <span className="text-lg">{service.emoji}</span>
+                                    <span className="text-white text-sm font-medium">{service.nom}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-indigo-200 text-xs mt-3">
+                            Veuillez entrer vos coordonnées pour réserver ces services.
+                        </p>
                     </div>
-                    <div>
-                        <h3 className="text-white font-semibold">Plomberie</h3>
-                        <p className="text-indigo-200 text-xs">Photo + numéro, et si possible un vocal.</p>
+                ) : (
+                    <div className="bg-white/10 border border-white/15 rounded-2xl p-4 mb-6 flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-2xl">
+                            🚰
+                        </div>
+                        <div>
+                            <h3 className="text-white font-semibold">Plomberie</h3>
+                            <p className="text-indigo-200 text-xs">Photo + numéro, et si possible un vocal.</p>
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Pas d'alerte - réservation publique */}
 

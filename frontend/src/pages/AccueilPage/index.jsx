@@ -13,6 +13,7 @@ const AccueilPage = ({
     setSelectedService,
     setCurrentView,
     onReservationDirecte,
+    onReservationServices,
 }) => {
     const isValidArray = Array.isArray(services) && services.length > 0;
 
@@ -32,23 +33,27 @@ const AccueilPage = ({
                 <div>
                     <p className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/10 text-xs text-white/70 mb-3">
                         <span className="text-green-400 text-base">●</span>
-                        Réservation rapide de plombier
+                        Réservation rapide de services
                     </p>
 
                     <h1 className="text-3xl md:text-4xl font-extrabold text-white leading-tight">
-                        Réserve un <span className="text-purple-300">plombier</span>,
+                        Réserve <span className="text-purple-300">tes services</span>
                         <br />
                         rapidement et simplement.
                     </h1>
 
                     <p className="mt-3 text-sm md:text-base text-white/70 max-w-md">
-                        New Vision commence par la plomberie pour te permettre de réserver
-                        vite un service utile, clair et proche de toi.
+                        Choisissez le service dont vous avez besoin et réservez un prestataire
+                        qualifié près de vous en quelques minutes.
                     </p>
 
                     <div className="mt-5 flex flex-wrap gap-3">
                         <button
                             onClick={() => {
+                                if (onReservationServices) {
+                                    onReservationServices();
+                                    return;
+                                }
                                 if (onReservationDirecte) {
                                     onReservationDirecte();
                                     return;
@@ -62,7 +67,7 @@ const AccueilPage = ({
                             }}
                             className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-sm md:text-base font-semibold text-white shadow-lg shadow-purple-900/40 transition-transform hover:scale-[1.02]"
                         >
-                            Réserver un plombier
+                            🔧 Réserver un service
                         </button>
 
                         <button
@@ -86,20 +91,18 @@ const AccueilPage = ({
                     <div className="absolute -inset-4 bg-purple-500/20 blur-3xl rounded-full pointer-events-none" />
                     <div className="relative bg-white/10 border border-white/15 backdrop-blur-xl rounded-3xl p-4 md:p-5 shadow-2xl">
                         <p className="text-xs uppercase tracking-wide text-white/50 mb-2">
-                            Services de départ
+                            Services disponibles
                         </p>
                         <div className="grid grid-cols-2 gap-3 text-sm">
-                            <TagService emoji="🚰" label="Plomberie" />
                             <TagService emoji="🔌" label="Électricité" />
+                            <TagService emoji="🚰" label="Plomberie" />
                             <TagService emoji="🚗" label="Mécanique" />
-                            <TagService emoji="🧹" label="Ménage" />
                             <TagService emoji="🍽️" label="Restauration" />
-                            <TagService emoji="🏥" label="Médecine" />
-                            <TagService emoji="🚚" label="Livraison" />
-                            <TagService emoji="🏗️" label="Bâtiment" />
+                            <TagService emoji="❄️" label="Climatisation" />
+                            <TagService emoji="🚚" label="Transports" />
                         </div>
                         <p className="mt-4 text-[11px] text-white/50">
-                            La plomberie est le point de départ du lancement.
+                            Et plus d'autres services à découvrir.
                         </p>
                     </div>
                 </div>

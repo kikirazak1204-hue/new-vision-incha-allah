@@ -14,6 +14,7 @@ import RegisterFournisseurPage from './Register.jsx';
 import RegisterUtilisateurPage from './RegisterUtilisateur.jsx';
 import CommandePage from './CommandePage';
 import ReservationPage from './ReservationPage';
+import ServiceSelectionPage from './ServiceSelectionPage';
 
 const backgrounds = [
     '/backgrounds/kiki1.jpg',
@@ -26,6 +27,7 @@ export default function Accueil() {
     const [currentView, setCurrentView] = useState('accueil');
     const [selectedService, setSelectedService] = useState(null);
     const [selectedFournisseur, setSelectedFournisseur] = useState(null);
+    const [selectedServices, setSelectedServices] = useState([]); // Services sélectionnés pour réservation
     const [backgroundIndex, setBackgroundIndex] = useState(0);
     const { nombreArticles } = usePanier();
     const navigate = useNavigate();
@@ -108,6 +110,19 @@ export default function Accueil() {
         }
     };
 
+    // Ouvrir la page de sélection des services pour la réservation
+    const ouvrirSelectionServices = () => {
+        setSelectedServices([]); // Réinitialiser la sélection
+        setCurrentView('serviceSelection');
+    };
+
+    // Continuer vers la réservation après la sélection des services
+    const handleContinueReservation = (selectedServicesList) => {
+        setSelectedServices(selectedServicesList);
+        setSelectedFournisseur(null);
+        setCurrentView('reservation');
+    };
+
     const renderMainView = () => {
         switch (currentView) {
             case 'services':
@@ -115,6 +130,14 @@ export default function Accueil() {
                     <ServicesPage
                         setSelectedService={setSelectedService}
                         setCurrentView={setCurrentView}
+                    />
+                );
+
+            case 'serviceSelection':
+                return (
+                    <ServiceSelectionPage
+                        handleRetour={() => setCurrentView('accueil')}
+                        handleContinue={handleContinueReservation}
                     />
                 );
 
@@ -158,6 +181,7 @@ export default function Accueil() {
                     <ReservationPage
                         fournisseur={selectedFournisseur}
                         service={selectedService}
+                        selectedServices={selectedServices}
                         handleRetour={() => setCurrentView('accueil')}
                         setCurrentView={setCurrentView}
                     />
@@ -195,6 +219,7 @@ export default function Accueil() {
                         setSelectedService={setSelectedService}
                         setCurrentView={setCurrentView}
                         onReservationDirecte={ouvrirReservationPlombier}
+                        onReservationServices={ouvrirSelectionServices}
                     />
                 );
         }
