@@ -1,0 +1,82 @@
+<svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <style>
+      @keyframes rotate {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .earth-rotate {
+        animation: rotate 60s linear infinite;
+        transform-origin: 400px 300px;
+      }
+    </style>
+    
+    <!-- Dégradé spatial -->
+    <radialGradient id="spaceBg" cx="50%" cy="50%">
+      <stop offset="0%" style="stop-color:#0a1a3a;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#051428;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#000814;stop-opacity:1" />
+    </radialGradient>
+    
+    <!-- Dégradé Terre -->
+    <radialGradient id="earthGradient" cx="35%" cy="35%">
+      <stop offset="0%" style="stop-color:#87ceeb;stop-opacity:1" />
+      <stop offset="40%" style="stop-color:#1e90ff;stop-opacity:1" />
+      <stop offset="70%" style="stop-color:#228b22;stop-opacity:1" />
+      <stop offset="85%" style="stop-color:#8b7355;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#000033;stop-opacity:1" />
+    </radialGradient>
+    
+    <!-- Brillance Terre -->
+    <radialGradient id="earthShine" cx="30%" cy="30%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.5" />
+      <stop offset="50%" style="stop-color:#ffffff;stop-opacity:0.1" />
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+  
+  <!-- Fond spatial -->
+  <rect width="800" height="600" fill="url(#spaceBg)" />
+  
+  <!-- Étoiles -->
+  <circle cx="100" cy="80" r="1.5" fill="white" opacity="0.9" />
+  <circle cx="200" cy="50" r="1" fill="white" opacity="0.7" />
+  <circle cx="350" cy="100" r="1.2" fill="white" opacity="0.8" />
+  <circle cx="500" cy="40" r="0.8" fill="white" opacity="0.6" />
+  <circle cx="700" cy="120" r="1.1" fill="white" opacity="0.7" />
+  <circle cx="750" cy="200" r="1" fill="white" opacity="0.8" />
+  <circle cx="80" cy="350" r="1.3" fill="white" opacity="0.9" />
+  <circle cx="650" cy="450" r="0.9" fill="white" opacity="0.7" />
+  <circle cx="150" cy="550" r="1.1" fill="white" opacity="0.8" />
+  <circle cx="700" cy="550" r="1" fill="white" opacity="0.6" />
+  
+  <!-- Groupe Terre en rotation -->
+  <g class="earth-rotate">
+    <circle cx="400" cy="300" r="120" fill="url(#earthGradient)" />
+    
+    <!-- Nuages -->
+    <ellipse cx="380" cy="270" rx="40" ry="25" fill="white" opacity="0.3" />
+    <ellipse cx="420" cy="320" rx="35" ry="20" fill="white" opacity="0.25" />
+    <ellipse cx="360" cy="340" rx="30" ry="18" fill="white" opacity="0.2" />
+    
+    <!-- Continents verts (stylisés) -->
+    <path d="M 370,280 Q 380,270 390,280 Q 385,285 375,285 Z" fill="#2d5016" opacity="0.6" />
+    <path d="M 410,320 Q 425,310 430,325 Q 420,335 405,330 Z" fill="#2d5016" opacity="0.6" />
+    <path d="M 350,350 Q 365,345 370,360 Q 360,365 345,360 Z" fill="#2d5016" opacity="0.6" />
+    
+    <!-- Brillance -->
+    <circle cx="400" cy="300" r="120" fill="url(#earthShine)" />
+  </g>
+  
+  <!-- Halo de lumière autour de la Terre -->
+  <circle cx="400" cy="300" r="125" fill="none" stroke="#87ceeb" stroke-width="2" opacity="0.3" />
+  <circle cx="400" cy="300" r="130" fill="none" stroke="#1e90ff" stroke-width="1" opacity="0.2" />
+  
+  <!-- Rayons lumineux -->
+  <line x1="400" y1="170" x2="400" y2="100" stroke="#87ceeb" stroke-width="2" opacity="0.2" />
+  <line x1="530" y1="240" x2="580" y2="190" stroke="#87ceeb" stroke-width="2" opacity="0.15" />
+  <line x1="530" y1="360" x2="580" y2="410" stroke="#1e90ff" stroke-width="2" opacity="0.15" />
+  <line x1="270" y1="360" x2="220" y2="410" stroke="#1e90ff" stroke-width="2" opacity="0.15" />
+  <line x1="270" y1="240" x2="220" y2="190" stroke="#87ceeb" stroke-width="2" opacity="0.15" />
+  <line x1="400" y1="430" x2="400" y2="500" stroke="#1e90ff" stroke-width="2" opacity="0.2" />
+</svg>
