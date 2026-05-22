@@ -59,31 +59,35 @@ export default function ReservationPage({ handleRetour, setCurrentView, selected
     const formatDuree = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
     const handleSubmit = async () => {
-        // Pas besoin de token - réservation publique
-        if (!telephone.trim()) return setMessage('Entrez votre numéro.');
+        // ✅ Validation stricte
+        if (!telephone || telephone.trim().length === 0) {
+            return setMessage('❌ Entrez un numéro de téléphone valide.');
+        }
+
+        if (telephone.trim().length < 8) {
+            return setMessage('❌ Le numéro doit avoir au moins 8 chiffres.');
+        }
 
         setLoading(true);
         setMessage('');
 
         try {
             const formData = new FormData();
-            formData.append('telephone', telephone);
-            formData.append('description', description || '');
-            formData.append('clientNom', user.nom || 'Client anonyme');
+            formData.append('telephone', telephone.trim());
+            formData.append('description', description?.trim() || '');
+            formData.append('clientNom', user?.nom || 'Client anonyme');
 
             // Ajouter les services sélectionnés
-            const serviceNames = selectedServices.length > 0
+            const serviceNames = selectedServices?.length > 0
                 ? selectedServices.map(s => s.nom).join(', ')
-                : 'Plomberie';
+                : 'Service non spécifié';
             formData.append('serviceNom', serviceNames);
-            formData.append('servicesJSON', JSON.stringify(selectedServices));
+            formData.append('servicesJSON', JSON.stringify(selectedServices || []));
 
             formData.append('montantEstime', '0');
             if (photo) formData.append('photo', photo);
             if (audioBlob) formData.append('audio', audioBlob, 'message.webm');
 
-            // ⚠️ NE PAS définir Content-Type pour FormData!
-            // Le navigateur le fait automatiquement avec multipart/form-data
             const headers = {};
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -98,10 +102,13 @@ export default function ReservationPage({ handleRetour, setCurrentView, selected
             if (res.ok && data.success) {
                 setConfirme(true);
             } else {
-                setMessage(data.message || 'Erreur lors de la réservation.');
+                // ✅ Afficher un message d'erreur descriptif
+                const errorMessage = data.message || 'Erreur lors de la réservation. Vérifiez votre connexion et réessayez.';
+                setMessage(`❌ ${errorMessage}`);
             }
-        } catch {
-            setMessage('Erreur de connexion au serveur.');
+        } catch (err) {
+            console.error('Erreur submission:', err);
+            setMessage('❌ Impossible de se connecter au serveur. Vérifiez votre connexion Internet.');
         } finally {
             setLoading(false);
         }

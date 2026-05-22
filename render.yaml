@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: incha-allah-backend
+    runtime: node
+    region: frankfurt
+    plan: free
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    env:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: DB_HOST
+        fromDatabase:
+          name: incha-allah-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: incha-allah-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: incha-allah-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: incha-allah-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: incha-allah-db
+          property: password
+      - key: JWT_SECRET
+        sync: false
+      - key: ADMIN_EMAIL_USER
+        sync: false
+      - key: EMAIL_PASSWORD
+        sync: false
+
+  - type: pserv
+    name: incha-allah-db
+    plan: free
+    dbName: incha_allah_prod
+    user: postgres

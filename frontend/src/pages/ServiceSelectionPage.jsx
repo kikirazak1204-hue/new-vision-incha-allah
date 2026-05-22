@@ -6,7 +6,7 @@ const SERVICES_DISPONIBLES = [
     { code: 'MECANIQUE', nom: 'Mecanique', image: '/backgrounds/mecanique.jpg' },
     { code: 'RESTAURATION', nom: 'Restauration', image: '/backgrounds/restauration.jpg' },
     { code: 'CLIMATISATION', nom: 'Climatisation', image: '/backgrounds/peinture.jpg' },
-    { code: 'TRANSPORTS', nom: 'Transports', emoji: '🚚', image: '/backgrounds/transport.jpg' },
+    { code: 'TRANSPORTS', nom: 'Transports', image: '/backgrounds/transport.jpg' },
 ];
 
 export default function ServiceSelectionPage({ handleRetour, handleContinue }) {
