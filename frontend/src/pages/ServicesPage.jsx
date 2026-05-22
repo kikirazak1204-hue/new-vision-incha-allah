@@ -1,7 +1,7 @@
 import React from 'react';
 
 const SERVICES_FIXES = [
-    { code: 'ELECTRICITE', nom: 'Électricité', emoji: '🔌', description: 'Installation, dépannage et maintenance électrique à domicile ou en entreprise.' },
+    { code: 'ELECTRICITE', nom: 'Électricité', emoji: '🔌', image: '/backgrounds/electricite.jpg', description: 'Installation, dépannage et maintenance électrique à domicile ou en entreprise.' },
     { code: 'PLOMBERIE', nom: 'Plomberie', emoji: '🚰', description: 'Fuites, évacuations bouchées, installation de sanitaires et robinets.' },
     { code: 'MECANIQUE', nom: 'Mécanique', emoji: '🚗', description: 'Réparation et entretien de véhicules, assistance dépannage.' },
     { code: 'RESTAURATION', nom: 'Restauration', emoji: '🍽️', description: 'Traiteurs, restaurants partenaires, commandes à emporter ou livrées.' },

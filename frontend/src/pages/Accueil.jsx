@@ -286,8 +286,8 @@ export default function Accueil() {
                     className="text-2xl font-bold cursor-pointer flex items-center gap-2 hover:text-purple-300 transition-colors"
                     onClick={() => setCurrentView('accueil')}
                 >
-                    <img src="/jupiter-logo.svg" alt="Jupiter" className="w-8 h-8" />
-                    Jupiter
+                    <img src="/jupiter-logo.svg" alt="New Vision" className="w-8 h-8" />
+                    New Vision
                 </h1>
 
                 <nav className="flex items-center gap-4 flex-wrap">
@@ -346,7 +346,7 @@ export default function Accueil() {
             <main className="relative z-10">{renderMainView()}</main>
 
             <footer className="mt-12 text-center text-white/40 text-xs pb-6">
-                🪐 Jupiter — Services de confiance en Afrique de l'Ouest
+                🌍 NEW VISION INCHA ALLAH — Services de confiance en Afrique de l'Ouest
                 {isInstalled && (
                     <span className="ml-2 text-green-400">● Application installée</span>
                 )}
