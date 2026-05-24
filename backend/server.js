@@ -74,6 +74,8 @@ app.use((req, res) => {
     res.status(404).json({ success: false, message: 'Route introuvable sur le serveur.' });
 });
 
+app.use('/api/seed', require('./routes/seedRoute'));
+
 // ── Lancement ──────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
