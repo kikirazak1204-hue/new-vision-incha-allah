@@ -5,15 +5,12 @@ const { sequelize } = require('./models');
 const fs = require('fs');
 const path = require('path');
 
-// ── Configuration initiale ─────────────────────────────────────
 dotenv.config();
 const app = express();
 
-// ── Création du dossier uploads ────────────────────────────────
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 
-// ── Configuration CORS ─────────────────────────────────────────
 app.use(cors({
     origin: [
         'http://localhost:5173',
@@ -23,14 +20,10 @@ app.use(cors({
     credentials: true
 }));
 
-// ── Middlewares ────────────────────────────────────────────────
-// ⚠️ IMPORTANT: JSON parser APRÈS multer routes pour les form-data
-// Pour l'instant, on applique partout mais multer gère /api/reservations
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ── Connexion BDD ──────────────────────────────────────────────
 sequelize.authenticate()
     .then(() => {
         console.log('✅ Base de données connectée.');
@@ -40,7 +33,7 @@ sequelize.authenticate()
         console.log('✅ Tables synchronisées.');
     })
     .catch(err => console.error('❌ Erreur BDD :', err));
-// ── Route de test ──────────────────────────────────────────────
+
 app.get('/', (req, res) => {
     res.json({
         message: '🌍 API New Vision Opérationnelle',
@@ -49,7 +42,6 @@ app.get('/', (req, res) => {
     });
 });
 
-// ── ROUTES API (toujours AVANT le 404) ────────────────────────
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/fournisseurs', require('./routes/fournisseurs'));
@@ -66,17 +58,13 @@ app.use('/api/soldes', require('./routes/soldes'));
 app.use('/api/paiements', require('./routes/paiement'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/whatsapp', require('./routes/whatsapp'));
+app.use('/api/seed', require('./routes/seedRoute'));  // ← déplacé AVANT le 404
 
-
-// ── 404 — toujours EN DERNIER ──────────────────────────────────
 app.use((req, res) => {
     console.log(`🚫 404 - Route non trouvée : ${req.method} ${req.originalUrl}`);
     res.status(404).json({ success: false, message: 'Route introuvable sur le serveur.' });
 });
 
-app.use('/api/seed', require('./routes/seedRoute'));
-
-// ── Lancement ──────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`🚀 Serveur New Vision démarré sur le port ${PORT}`);
