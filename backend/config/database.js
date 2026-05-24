@@ -20,7 +20,9 @@ const sequelize = new Sequelize(
         },
         dialectOptions: {
             connectTimeout: 60000,
-            keepAlive: true,
+            ssl: {
+                rejectUnauthorized: false
+            }
         },
         retry: {
             max: 3
@@ -28,7 +30,6 @@ const sequelize = new Sequelize(
     }
 );
 
-// Garder la connexion vivante toutes les 4 minutes
 setInterval(async () => {
     try {
         await sequelize.authenticate();
