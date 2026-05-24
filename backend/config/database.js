@@ -28,4 +28,13 @@ const sequelize = new Sequelize(
     }
 );
 
+// Garder la connexion vivante toutes les 4 minutes
+setInterval(async () => {
+    try {
+        await sequelize.authenticate();
+    } catch (e) {
+        console.error('⚠️ DB ping échoué:', e.message);
+    }
+}, 4 * 60 * 1000);
+
 module.exports = sequelize;
