@@ -16,19 +16,12 @@ import CommandePage from './CommandePage';
 import ReservationPage from './ReservationPage';
 import ServiceSelectionPage from './ServiceSelectionPage';
 
-const backgrounds = [
-    '/backgrounds/kiki1.jpg',
-    '/backgrounds/kiki2.jpg',
-    '/backgrounds/kiki3.jpg',
-];
-
 export default function Accueil() {
     const [services, setServices] = useState([]);
     const [currentView, setCurrentView] = useState('accueil');
     const [selectedService, setSelectedService] = useState(null);
     const [selectedFournisseur, setSelectedFournisseur] = useState(null);
-    const [selectedServices, setSelectedServices] = useState([]); // Services sélectionnés pour réservation
-    const [backgroundIndex, setBackgroundIndex] = useState(0);
+    const [selectedServices, setSelectedServices] = useState([]);
     const { nombreArticles } = usePanier();
     const navigate = useNavigate();
 
@@ -38,6 +31,20 @@ export default function Accueil() {
         window.matchMedia('(display-mode: standalone)').matches
     );
     const [showInstallBanner, setShowInstallBanner] = useState(true);
+
+    // FOND DYNAMIQUE JOUR/NUIT
+    const [fondStyle, setFondStyle] = useState(() => {
+        const h = new Date().getHours();
+        return h >= 8 && h < 16 ? 'jour' : 'nuit';
+    });
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const h = new Date().getHours();
+            setFondStyle(h >= 8 && h < 16 ? 'jour' : 'nuit');
+        }, 8 * 60 * 60 * 1000);
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         const handleOnline = () => setIsOnline(true);
@@ -51,19 +58,10 @@ export default function Accueil() {
     }, []);
 
     useEffect(() => {
-        const handler = (e) => {
-            e.preventDefault();
-            setInstallPrompt(e);
-        };
-
-        const installedHandler = () => {
-            setIsInstalled(true);
-            setInstallPrompt(null);
-        };
-
+        const handler = (e) => { e.preventDefault(); setInstallPrompt(e); };
+        const installedHandler = () => { setIsInstalled(true); setInstallPrompt(null); };
         window.addEventListener('beforeinstallprompt', handler);
         window.addEventListener('appinstalled', installedHandler);
-
         return () => {
             window.removeEventListener('beforeinstallprompt', handler);
             window.removeEventListener('appinstalled', installedHandler);
@@ -83,24 +81,13 @@ export default function Accueil() {
     useEffect(() => {
         getServices()
             .then((res) => setServices(res.data || []))
-            .catch((err) => {
-                console.error('Erreur chargement services:', err);
-                setServices([]);
-            });
-    }, []);
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setBackgroundIndex((prev) => (prev + 1) % backgrounds.length);
-        }, 8000);
-        return () => clearInterval(interval);
+            .catch((err) => { console.error('Erreur chargement services:', err); setServices([]); });
     }, []);
 
     const ouvrirReservationPlombier = () => {
         const servicePlomberie = services.find((s) =>
             (s.nom || s.name || '').toString().toLowerCase().includes('plomberie')
         );
-
         if (servicePlomberie) {
             setSelectedService(servicePlomberie);
             setSelectedFournisseur(null);
@@ -110,13 +97,11 @@ export default function Accueil() {
         }
     };
 
-    // Ouvrir la page de sélection des services pour la réservation
     const ouvrirSelectionServices = () => {
-        setSelectedServices([]); // Réinitialiser la sélection
+        setSelectedServices([]);
         setCurrentView('serviceSelection');
     };
 
-    // Continuer vers la réservation après la sélection des services
     const handleContinueReservation = (selectedServicesList) => {
         setSelectedServices(selectedServicesList);
         setSelectedFournisseur(null);
@@ -126,56 +111,28 @@ export default function Accueil() {
     const renderMainView = () => {
         switch (currentView) {
             case 'services':
-                return (
-                    <ServicesPage
-                        setSelectedService={setSelectedService}
-                        setCurrentView={setCurrentView}
-                    />
-                );
-
+                return <ServicesPage setSelectedService={setSelectedService} setCurrentView={setCurrentView} />;
             case 'serviceSelection':
-                return (
-                    <ServiceSelectionPage
-                        handleRetour={() => setCurrentView('accueil')}
-                        handleContinue={handleContinueReservation}
-                    />
-                );
-
+                return <ServiceSelectionPage handleRetour={() => setCurrentView('accueil')} handleContinue={handleContinueReservation} />;
             case 'serviceDetail':
-                if (!selectedService) {
-                    return <div className="p-4">Service introuvable.</div>;
-                }
+                if (!selectedService) return <div className="p-4">Service introuvable.</div>;
                 return (
                     <ServiceDetailPage
                         selectedService={selectedService}
-                        handleFournisseurClick={(f) => {
-                            setSelectedFournisseur(f);
-                            setCurrentView('fournisseurProfile');
-                        }}
-                        handleCommanderClick={(f) => {
-                            setSelectedFournisseur(f);
-                            setCurrentView('reservation');
-                        }}
-                        handleVoirProduitsClick={(f) => {
-                            setSelectedFournisseur(f || null);
-                            setCurrentView('voirProduits');
-                        }}
+                        handleFournisseurClick={(f) => { setSelectedFournisseur(f); setCurrentView('fournisseurProfile'); }}
+                        handleCommanderClick={(f) => { setSelectedFournisseur(f); setCurrentView('reservation'); }}
+                        handleVoirProduitsClick={(f) => { setSelectedFournisseur(f || null); setCurrentView('voirProduits'); }}
                     />
                 );
-
             case 'fournisseurProfile':
                 return (
                     <FournisseurProfilePage
                         fournisseur={selectedFournisseur}
                         handleRetour={() => setCurrentView('serviceDetail')}
-                        handleCommanderClick={(f) => {
-                            setSelectedFournisseur(f);
-                            setCurrentView('reservation');
-                        }}
+                        handleCommanderClick={(f) => { setSelectedFournisseur(f); setCurrentView('reservation'); }}
                         handleVoirProduitsClick={() => setCurrentView('voirProduits')}
                     />
                 );
-
             case 'reservation':
                 return (
                     <ReservationPage
@@ -186,31 +143,18 @@ export default function Accueil() {
                         setCurrentView={setCurrentView}
                     />
                 );
-
             case 'voirProduits':
-                return (
-                    <VoirProduitsPage
-                        service={selectedService}
-                        fournisseur={selectedFournisseur}
-                        handleRetour={() => setCurrentView('serviceDetail')}
-                    />
-                );
-
+                return <VoirProduitsPage service={selectedService} fournisseur={selectedFournisseur} handleRetour={() => setCurrentView('serviceDetail')} />;
             case 'panier':
                 return <PanierPage setCurrentView={setCurrentView} />;
-
             case 'commande':
                 return <CommandePage />;
-
             case 'login':
                 return <LoginPage />;
-
             case 'registerFournisseur':
                 return <RegisterFournisseurPage />;
-
             case 'registerUtilisateur':
                 return <RegisterUtilisateurPage />;
-
             case 'accueil':
             default:
                 return (
@@ -226,10 +170,7 @@ export default function Accueil() {
     };
 
     const token = localStorage.getItem('token');
-    let userRole = null;
-    try {
-        userRole = JSON.parse(localStorage.getItem('user'))?.role;
-    } catch { }
+    try { } catch { }
 
     const handleDeconnexion = () => {
         localStorage.removeItem('token');
@@ -237,16 +178,22 @@ export default function Accueil() {
         setCurrentView('accueil');
     };
 
+    const isJour = fondStyle === 'jour';
+
     return (
-        <div className="relative min-h-screen text-white p-6">
-            <div
-                className="fixed inset-0 w-full h-full bg-cover bg-center -z-10 transition-all duration-1000"
-                style={{
-                    backgroundImage: `url(${backgrounds[backgroundIndex]})`,
-                    backgroundColor: '#0A0A0F',
-                }}
-            />
-            <div className="fixed inset-0 bg-black/40 -z-10" />
+        <div className={`relative min-h-screen p-6 transition-colors duration-1000 ${isJour ? 'text-gray-800' : 'text-white'}`}>
+
+            {/* FOND DYNAMIQUE JOUR/NUIT */}
+            <div className="fixed inset-0 -z-10 transition-all duration-[3000ms]" style={{
+                background: isJour
+                    ? 'linear-gradient(135deg, #fefefe 0%, #dbeafe 30%, #f3e8ff 60%, #fef9c3 100%)'
+                    : 'linear-gradient(135deg, #0a0a1a 0%, #1a1000 30%, #0d0800 60%, #050d1f 100%)',
+            }} />
+            <div className="fixed inset-0 -z-10 transition-all duration-[3000ms]" style={{
+                background: isJour
+                    ? 'radial-gradient(ellipse at 20% 20%, rgba(139,92,246,0.15) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(59,130,246,0.15) 0%, transparent 50%)'
+                    : 'radial-gradient(ellipse at 20% 20%, rgba(212,160,23,0.2) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(180,120,10,0.15) 0%, transparent 50%)',
+            }} />
 
             {!isOnline && (
                 <div className="fixed top-0 left-0 right-0 z-50 bg-red-600 text-white text-center py-2 text-sm font-semibold animate-pulse">
@@ -258,98 +205,50 @@ export default function Accueil() {
                 <div className="fixed bottom-4 left-4 right-4 z-50 bg-purple-700/95 backdrop-blur rounded-2xl p-4 flex items-center justify-between shadow-2xl border border-purple-500/30">
                     <div>
                         <p className="font-bold text-white text-sm">📱 Installer New Vision</p>
-                        <p className="text-white/60 text-xs mt-0.5">
-                            Accès rapide depuis votre écran d'accueil
-                        </p>
+                        <p className="text-white/60 text-xs mt-0.5">Accès rapide depuis votre écran d'accueil</p>
                     </div>
                     <div className="flex gap-2">
-                        <button
-                            onClick={() => setShowInstallBanner(false)}
-                            className="text-white/40 hover:text-white text-xs px-2"
-                        >
-                            ✕
-                        </button>
-                        <button
-                            onClick={installerApp}
-                            className="bg-white text-purple-700 font-bold px-4 py-2 rounded-xl text-sm hover:scale-105 transition-all"
-                        >
-                            Installer
-                        </button>
+                        <button onClick={() => setShowInstallBanner(false)} className="text-white/40 hover:text-white text-xs px-2">✕</button>
+                        <button onClick={installerApp} className="bg-white text-purple-700 font-bold px-4 py-2 rounded-xl text-sm hover:scale-105 transition-all">Installer</button>
                     </div>
                 </div>
             )}
 
-            <header
-                className={`flex justify-between items-center mb-8 flex-wrap gap-3 ${!isOnline ? 'mt-8' : ''}`}
-            >
+            <header className={`flex justify-between items-center mb-8 flex-wrap gap-3 ${!isOnline ? 'mt-8' : ''}`}>
                 <h1
-                    className="text-2xl font-bold cursor-pointer flex items-center gap-2 hover:text-purple-300 transition-colors"
+                    className={`text-2xl font-bold cursor-pointer flex items-center gap-2 transition-colors ${isJour ? 'hover:text-purple-700' : 'hover:text-yellow-400'}`}
                     onClick={() => setCurrentView('accueil')}
                 >
-                    <img src="/jupiter-logo.svg" alt="New Vision" className="w-8 h-8" />
+                    <img src="/logo.png" alt="New Vision" className="w-10 h-10 object-contain rounded-full" />
                     New Vision
                 </h1>
-
                 <nav className="flex items-center gap-4 flex-wrap">
-                    <button
-                        onClick={() => setCurrentView('accueil')}
-                        className="hover:text-purple-400 transition-colors"
-                    >
-                        Accueil
-                    </button>
-
-                    <button
-                        onClick={() => setCurrentView('services')}
-                        className="hover:text-purple-400 transition-colors"
-                    >
-                        Services
-                    </button>
-
-                    <button
-                        onClick={() => setCurrentView('panier')}
-                        className="relative hover:text-purple-400 transition-colors"
-                    >
+                    <button onClick={() => setCurrentView('accueil')} className={`transition-colors ${isJour ? 'hover:text-purple-700' : 'hover:text-yellow-400'}`}>Accueil</button>
+                    <button onClick={() => setCurrentView('services')} className={`transition-colors ${isJour ? 'hover:text-purple-700' : 'hover:text-yellow-400'}`}>Services</button>
+                    <button onClick={() => setCurrentView('panier')} className={`relative transition-colors ${isJour ? 'hover:text-purple-700' : 'hover:text-yellow-400'}`}>
                         🛒 Panier
                         {nombreArticles > 0 && (
-                            <span className="absolute -top-2 -right-3 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
-                                {nombreArticles}
-                            </span>
+                            <span className="absolute -top-2 -right-3 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{nombreArticles}</span>
                         )}
                     </button>
-
                     {!token ? (
                         <>
-                            <button
-                                onClick={() => setCurrentView('login')}
-                                className="hover:underline"
-                            >
-                                Connexion
-                            </button>
-                            <button
-                                onClick={() => setCurrentView('registerUtilisateur')}
-                                className="bg-white/10 px-3 py-1 rounded-lg hover:bg-white/20"
-                            >
+                            <button onClick={() => setCurrentView('login')} className="hover:underline">Connexion</button>
+                            <button onClick={() => setCurrentView('registerUtilisateur')} className={`px-3 py-1 rounded-lg transition-colors ${isJour ? 'bg-black/10 hover:bg-black/20' : 'bg-white/10 hover:bg-white/20'}`}>
                                 S'inscrire
                             </button>
                         </>
                     ) : (
-                        <button
-                            onClick={handleDeconnexion}
-                            className="bg-red-600/80 hover:bg-red-600 px-3 py-1 rounded-lg text-sm transition-all"
-                        >
-                            Déconnexion
-                        </button>
+                        <button onClick={handleDeconnexion} className="bg-red-600/80 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-sm transition-all">Déconnexion</button>
                     )}
                 </nav>
             </header>
 
             <main className="relative z-10">{renderMainView()}</main>
 
-            <footer className="mt-12 text-center text-white/40 text-xs pb-6">
+            <footer className={`mt-12 text-center text-xs pb-6 ${isJour ? 'text-gray-400' : 'text-white/40'}`}>
                 🌍 NEW VISION INCHA ALLAH — Services de confiance en Afrique de l'Ouest
-                {isInstalled && (
-                    <span className="ml-2 text-green-400">● Application installée</span>
-                )}
+                {isInstalled && <span className="ml-2 text-green-500">● Application installée</span>}
             </footer>
         </div>
     );

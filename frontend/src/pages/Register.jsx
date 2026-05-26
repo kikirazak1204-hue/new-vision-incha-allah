@@ -2,6 +2,39 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { getServices, registerUser } from '../util/api';
 
+const SERVICES_FALLBACK = [
+    { id: 'ELECTRICITE', nom: 'Électricité', emoji: '🔌' },
+    { id: 'PLOMBERIE', nom: 'Plomberie', emoji: '🚰' },
+    { id: 'MECANIQUE', nom: 'Mécanique', emoji: '🚗' },
+    { id: 'TRANSPORTS', nom: 'Transports', emoji: '🚚' },
+    { id: 'MENAGE', nom: 'Ménage', emoji: '🧹' },
+    { id: 'COUTURE', nom: 'Couture', emoji: '👗' },
+    { id: 'COUIFFURE', nom: 'Coiffure / Beauté', emoji: '💇‍♀️' },
+    { id: 'BATIMENT', nom: 'Bâtiment', emoji: '🏗️' },
+    { id: 'REPARATION', nom: 'Réparation', emoji: '🛠️' },
+    { id: 'LIVRAISION', nom: 'Livraison', emoji: '🚴‍♂️' },
+    { id: 'ALIMENTATION', nom: 'Alimentation', emoji: '🛒' },
+    { id: 'EDUCTION', nom: 'Éducation', emoji: '📚' },
+    { id: 'MEDECINE', nom: 'Médecine', emoji: '🏥' },
+    { id: 'SECURITE', nom: 'Sécurité', emoji: '🛡️' },
+    { id: 'SPORT', nom: 'Sport', emoji: '🏋️‍♂️' },
+    { id: 'DIVERTISSEMENT', nom: 'Divertissement', emoji: '🎉' },
+    { id: 'HOTELLERIE', nom: 'Hôtellerie', emoji: '🏨' },
+    { id: 'LOCATION', nom: 'Location', emoji: '🔑' },
+    { id: 'AVOCAT', nom: 'Avocat / Juridique', emoji: '⚖️' },
+    { id: 'ARTISANAT', nom: 'Artisanat', emoji: '🧵' },
+    { id: 'FLEURISTE', nom: 'Fleuriste', emoji: '🌸' },
+    { id: 'ACCESOIRE', nom: 'Accessoires', emoji: '🎒' },
+    { id: 'FOURNISSEUR_PRODUIT', nom: 'Fournisseur de produits', emoji: '📦' },
+    { id: 'MISSION', nom: 'Mission / Freelance', emoji: '💼' },
+    { id: 'RENCONTRE', nom: 'Rencontre / Réseau', emoji: '🤝' },
+    { id: 'ASSSURENCE', nom: 'Assurance', emoji: '📄' },
+    { id: 'PRISE', nom: 'Prise de rendez-vous', emoji: '📅' },
+    { id: 'CAISSE', nom: 'Caisse / Paiement', emoji: '💳' },
+    { id: 'BENEVOLLA', nom: 'Bénévolat', emoji: '🤲' },
+    { id: 'CLIMATISATION', nom: 'Climatisation', emoji: '❄️' },
+];
+
 const ETAPES = [
     { id: 1, label: 'Infos personnelles', icon: '👤' },
     { id: 2, label: 'Documents identité', icon: '📄' },
@@ -11,7 +44,7 @@ const ETAPES = [
 
 export default function Register() {
     const [etape, setEtape] = useState(1);
-    const [services, setServices] = useState([]);
+    const [services, setServices] = useState(SERVICES_FALLBACK);
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -31,8 +64,11 @@ export default function Register() {
 
     useEffect(() => {
         getServices()
-            .then(res => setServices(res.data || []))
-            .catch(err => console.error(err));
+            .then(res => {
+                const data = res.data || [];
+                setServices(data.length > 0 ? data : SERVICES_FALLBACK);
+            })
+            .catch(() => setServices(SERVICES_FALLBACK));
     }, []);
 
     const handleChange = (e) => {
@@ -160,8 +196,7 @@ export default function Register() {
                     className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
                 {previews[docKey] ? (
                     <div className="space-y-2">
-                        <img src={previews[docKey]} alt={label}
-                            className="w-full h-32 object-cover rounded-lg" />
+                        <img src={previews[docKey]} alt={label} className="w-full h-32 object-cover rounded-lg" />
                         <p className="text-green-400 text-xs font-semibold">✅ {docs[docKey]?.name}</p>
                     </div>
                 ) : (
@@ -177,8 +212,12 @@ export default function Register() {
 
     return (
         <div className="relative min-h-screen px-4 py-10 text-white">
-            <div className="fixed inset-0 bg-cover bg-center z-[-1] opacity-30 blur-sm"
-                style={{ backgroundImage: `url('/backgrounds/kiki3.jpg')` }} />
+            <div className="fixed inset-0 -z-10" style={{
+                background: 'linear-gradient(135deg, #0a0a1a 0%, #0d1b3e 30%, #1e0a3e 60%, #050d1f 100%)',
+            }} />
+            <div className="fixed inset-0 -z-10" style={{
+                background: 'radial-gradient(ellipse at 20% 20%, rgba(59,130,246,0.15) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(139,92,246,0.2) 0%, transparent 50%)',
+            }} />
 
             <div className="max-w-3xl mx-auto space-y-6">
                 <div className="text-center">
@@ -214,8 +253,8 @@ export default function Register() {
 
                     {message && (
                         <div className={`text-center font-semibold p-3 rounded-xl border ${message.startsWith('✅')
-                                ? 'text-green-400 bg-green-900/30 border-green-500/30'
-                                : 'text-red-400 bg-red-900/30 border-red-500/30'}`}>
+                            ? 'text-green-400 bg-green-900/30 border-green-500/30'
+                            : 'text-red-400 bg-red-900/30 border-red-500/30'}`}>
                             {message}
                         </div>
                     )}
@@ -259,9 +298,7 @@ export default function Register() {
                         <div className="space-y-6">
                             <div>
                                 <h2 className="text-2xl font-bold">📄 Documents d'identité</h2>
-                                <p className="text-white/50 text-sm mt-1">
-                                    Confidentiels — utilisés uniquement pour vérifier votre identité.
-                                </p>
+                                <p className="text-white/50 text-sm mt-1">Confidentiels — utilisés uniquement pour vérifier votre identité.</p>
                             </div>
                             <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4">
                                 <p className="text-red-400 font-semibold text-sm mb-4">🔴 Documents obligatoires</p>
@@ -272,9 +309,7 @@ export default function Register() {
                                 </div>
                             </div>
                             <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                                <p className="text-white/60 font-semibold text-sm mb-4">
-                                    🟡 Documents optionnels — accélèrent votre validation
-                                </p>
+                                <p className="text-white/60 font-semibold text-sm mb-4">🟡 Documents optionnels — accélèrent votre validation</p>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <UploadDoc label="Diplôme / Certificat" docKey="diplome" obligatoire={false} />
                                     <UploadDoc label="Carte professionnelle" docKey="carteProf" obligatoire={false} />
@@ -291,24 +326,29 @@ export default function Register() {
                         <div className="space-y-6">
                             <h2 className="text-2xl font-bold">🛠️ Services & Équipement</h2>
                             <div>
-                                <h3 className="text-lg font-semibold mb-3">
-                                    Vos services <span className="text-red-400">*</span>
-                                </h3>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                    {services.map(service => (
-                                        <label key={service.id}
-                                            className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border transition-all
-                                                ${servicesChoisis.includes(service.id)
-                                                    ? 'bg-purple-600/30 border-purple-500 text-white'
-                                                    : 'bg-white/5 border-white/10 hover:border-white/30 text-white/70'}`}>
-                                            <input type="checkbox"
-                                                checked={servicesChoisis.includes(service.id)}
-                                                onChange={() => toggleService(service.id)}
-                                                className="accent-purple-500" />
-                                            <span>{service.emoji} {service.nom}</span>
-                                        </label>
-                                    ))}
+                                <h3 className="text-lg font-semibold mb-1">Vos services <span className="text-red-400">*</span></h3>
+                                <p className="text-white/50 text-xs mb-3">Sélectionnez tous les services que vous proposez.</p>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-80 overflow-y-auto pr-1">
+                                    {services.map(service => {
+                                        const sid = service.id || service.code || service.nom;
+                                        return (
+                                            <label key={sid}
+                                                className={`flex items-center gap-2 p-3 rounded-xl cursor-pointer border transition-all
+                                                    ${servicesChoisis.includes(sid)
+                                                        ? 'bg-purple-600/30 border-purple-500 text-white'
+                                                        : 'bg-white/5 border-white/10 hover:border-white/30 text-white/70'}`}>
+                                                <input type="checkbox"
+                                                    checked={servicesChoisis.includes(sid)}
+                                                    onChange={() => toggleService(sid)}
+                                                    className="accent-purple-500" />
+                                                <span className="text-sm">{service.emoji} {service.nom}</span>
+                                            </label>
+                                        );
+                                    })}
                                 </div>
+                                {servicesChoisis.length > 0 && (
+                                    <p className="mt-2 text-xs text-purple-300">{servicesChoisis.length} service(s) sélectionné(s)</p>
+                                )}
                             </div>
                             <div>
                                 <h3 className="text-lg font-semibold mb-3">Vos capacités logistiques</h3>
@@ -332,11 +372,6 @@ export default function Register() {
                                         </label>
                                     ))}
                                 </div>
-                                {(!form.hasTransport || !form.hasMateriel) && (
-                                    <div className="mt-3 bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-3 text-yellow-300 text-sm">
-                                        ⚠️ Pas de souci ! New Vision peut vous mettre en relation avec des partenaires transport et matériel.
-                                    </div>
-                                )}
                             </div>
                         </div>
                     )}
@@ -373,9 +408,12 @@ export default function Register() {
                                     ))}
                                 </div>
                                 <div className="bg-white/5 rounded-xl p-5 border border-white/10 space-y-2">
-                                    <h3 className="font-bold text-purple-400">🛠️ Services & Équipement</h3>
+                                    <h3 className="font-bold text-purple-400">🛠️ Services</h3>
                                     <p><span className="text-white/50">Services :</span>{' '}
-                                        {services.filter(s => servicesChoisis.includes(s.id)).map(s => s.nom).join(', ')}
+                                        {servicesChoisis.map(id => {
+                                            const s = services.find(s => (s.id || s.code || s.nom) === id);
+                                            return s ? `${s.emoji} ${s.nom}` : id;
+                                        }).join(', ')}
                                     </p>
                                     <p><span className="text-white/50">Transport :</span>{' '}
                                         {form.hasTransport ? <span className="text-green-400">✅ Oui</span> : <span className="text-yellow-400">⚠️ Non</span>}
@@ -394,8 +432,7 @@ export default function Register() {
                             </div>
                             <button onClick={handleSubmit} disabled={loading}
                                 className={`w-full font-bold py-4 rounded-xl text-white text-lg transition-all
-                                    ${loading ? 'bg-white/20 cursor-not-allowed' :
-                                        'bg-gradient-to-r from-purple-600 to-green-500 hover:scale-105'}`}>
+                                    ${loading ? 'bg-white/20 cursor-not-allowed' : 'bg-gradient-to-r from-purple-600 to-green-500 hover:scale-105'}`}>
                                 {loading ? '⏳ Envoi du dossier...' : '🚀 Soumettre mon dossier'}
                             </button>
                         </div>
@@ -404,14 +441,10 @@ export default function Register() {
                     {/* Navigation */}
                     <div className="flex justify-between pt-2">
                         {etape > 1
-                            ? <button onClick={precedent}
-                                className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl transition-colors">
-                                ← Précédent
-                            </button>
+                            ? <button onClick={precedent} className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl transition-colors">← Précédent</button>
                             : <div />}
                         {etape < 4 &&
-                            <button onClick={suivant}
-                                className="px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:scale-105 rounded-xl font-bold transition-all">
+                            <button onClick={suivant} className="px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:scale-105 rounded-xl font-bold transition-all">
                                 Suivant →
                             </button>}
                     </div>
