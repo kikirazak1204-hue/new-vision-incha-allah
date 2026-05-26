@@ -1,9 +1,11 @@
-const { Fournisseur, User, Service, Produit, Facture, Commande, Reservation } = require('../models');
+const { Fournisseur, User, Service, Produit, Facture, Commande } = require('../models');
 
-// ── Récupérer le fournisseur connecté
+// ── 🔹 Récupérer le fournisseur connecté
 const getFournisseurConnecte = async (req, res) => {
     try {
-        if (!req.user?.id) return res.status(401).json({ success: false, message: 'Non authentifié' });
+        if (!req.user?.id) {
+            return res.status(401).json({ success: false, message: 'Non authentifié.' });
+        }
 
         const fournisseur = await Fournisseur.findOne({
             where: { userId: req.user.id },
@@ -21,15 +23,18 @@ const getFournisseurConnecte = async (req, res) => {
             ]
         });
 
-        if (!fournisseur) return res.status(404).json({ success: false, message: 'Fournisseur non trouvé' });
-        res.json({ success: true, data: fournisseur });
+        if (!fournisseur) {
+            return res.status(404).json({ success: false, message: 'Profil fournisseur introuvable.' });
+        }
+
+        return res.status(200).json({ success: true, data: fournisseur });
     } catch (err) {
-        console.error('❌ getFournisseurConnecte:', err);
-        res.status(500).json({ success: false, message: 'Erreur serveur', error: err.message });
+        console.error('❌ Erreur getFournisseurConnecte:', err.message);
+        return res.status(500).json({ success: false, message: 'Erreur serveur lors de la récupération du profil.' });
     }
 };
 
-// ── Créer un fournisseur
+// ── 🔹 Créer un fournisseur (Inscription prestataires)
 const createFournisseur = async (req, res) => {
     try {
         const {
@@ -37,9 +42,11 @@ const createFournisseur = async (req, res) => {
             telephone, description, hasTransport, hasMateriel
         } = req.body;
 
-        if (!userId || !serviceId) return res.status(400).json({ success: false, message: 'userId et serviceId requis' });
+        if (!userId || !serviceId) {
+            return res.status(400).json({ success: false, message: 'Les champs userId et serviceId sont obligatoires.' });
+        }
 
-        // ✅ Documents uploadés via multer
+        // ✅ Récupération sécurisée des fichiers Multer
         const cniRecto = req.files?.cniRecto?.[0]?.filename || null;
         const cniVerso = req.files?.cniVerso?.[0]?.filename || null;
         const selfie = req.files?.selfie?.[0]?.filename || null;
@@ -52,33 +59,43 @@ const createFournisseur = async (req, res) => {
             hasTransport: hasTransport === 'true' || hasTransport === true,
             hasMateriel: hasMateriel === 'true' || hasMateriel === true,
             userId, serviceId,
-            statut: 'EN_ATTENTE',
+            statut: 'EN_ATTENTE', // Standardisation de la validation admin
             cniRecto, cniVerso, selfie, diplome, carteProf
         });
 
-        res.status(201).json({ success: true, data: fournisseur });
+        return res.status(201).json({ success: true, data: fournisseur });
     } catch (err) {
-        console.error('❌ createFournisseur:', err);
-        res.status(500).json({ success: false, message: 'Erreur serveur', error: err.message });
+        console.error('❌ Erreur createFournisseur:', err.message);
+        return res.status(500).json({ success: false, message: 'Erreur serveur lors de la création du profil fournisseur.' });
     }
 };
 
-// ── Ajouter un produit
+// ── 🔹 Ajouter un produit au catalogue fournisseur
 const ajouterProduit = async (req, res) => {
     try {
         const { nom, description, prix, stock } = req.body;
-        const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
-        if (!fournisseur) return res.status(404).json({ success: false, message: 'Fournisseur non trouvé' });
 
-        const produit = await Produit.create({ nom, description, prix, stock, fournisseurId: fournisseur.id });
-        res.status(201).json({ success: true, data: produit });
+        const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
+        if (!fournisseur) {
+            return res.status(404).json({ success: false, message: 'Fournisseur non trouvé pour cet utilisateur.' });
+        }
+
+        const produit = await Produit.create({
+            nom,
+            description,
+            prix: parseFloat(prix) || 0,
+            stock: parseInt(stock) || 0,
+            fournisseurId: fournisseur.id
+        });
+
+        return res.status(201).json({ success: true, data: produit });
     } catch (err) {
-        console.error('❌ ajouterProduit:', err);
-        res.status(500).json({ success: false, message: 'Erreur serveur', error: err.message });
+        console.error('❌ Erreur ajouterProduit:', err.message);
+        return res.status(500).json({ success: false, message: 'Erreur serveur lors de l\'ajout du produit.' });
     }
 };
 
-// ── Récupérer tous les fournisseurs
+// ── 🔹 Récupérer tous les fournisseurs (Vue Admin globale)
 const getAllFournisseurs = async (req, res) => {
     try {
         const fournisseurs = await Fournisseur.findAll({
@@ -87,31 +104,30 @@ const getAllFournisseurs = async (req, res) => {
                 { model: Service, as: 'serviceFournisseur' }
             ]
         });
-        res.json({ success: true, count: fournisseurs.length, data: fournisseurs });
+        return res.status(200).json({ success: true, count: fournisseurs.length, data: fournisseurs });
     } catch (err) {
-        console.error('❌ getAllFournisseurs:', err);
-        res.status(500).json({ success: false, message: 'Erreur serveur', error: err.message });
+        console.error('❌ Erreur getAllFournisseurs:', err.message);
+        return res.status(500).json({ success: false, message: 'Erreur serveur lors de la récupération de la liste globale.' });
     }
 };
 
-// ── ✅ Récupérer fournisseurs par service — avec TOUS les nouveaux champs
+// ── 🔹 Récupérer les fournisseurs par service (Filtre Frontend avec nouveaux champs)
 const getFournisseursParService = async (req, res) => {
     try {
         const serviceId = parseInt(req.params.id);
+        if (isNaN(serviceId)) {
+            return res.status(400).json({ success: false, message: 'ID de service invalide.' });
+        }
 
         const fournisseurs = await Fournisseur.findAll({
             where: {
                 serviceId,
-                statut: ['EN_ATTENTE', 'EN_EVALUATION', 'CONFORME'] // ✅ exclut SUSPENDU
+                statut: ['EN_ATTENTE', 'EN_EVALUATION', 'CONFORME'] // Filtre de sécurité : Exclut les profils 'SUSPENDU'
             },
             attributes: [
                 'id', 'nomEntreprise', 'adresse', 'quartier', 'secteur',
                 'telephone', 'description', 'note', 'nombreAvis',
-                'statut',           // ✅ nouveau
-                'hasTransport',     // ✅ nouveau
-                'hasMateriel',      // ✅ nouveau
-                'latitude',         // ✅ nouveau
-                'longitude',        // ✅ nouveau
+                'statut', 'hasTransport', 'hasMateriel', 'latitude', 'longitude'
             ],
             include: [
                 {
@@ -125,10 +141,10 @@ const getFournisseursParService = async (req, res) => {
             ]
         });
 
-        res.json({ success: true, data: fournisseurs });
+        return res.status(200).json({ success: true, data: fournisseurs });
     } catch (err) {
-        console.error('❌ getFournisseursParService:', err);
-        res.status(500).json({ success: false, message: 'Erreur serveur', error: err.message });
+        console.error('❌ Erreur getFournisseursParService:', err.message);
+        return res.status(500).json({ success: false, message: 'Erreur serveur lors du filtrage par service.' });
     }
 };
 

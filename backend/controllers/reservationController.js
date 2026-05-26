@@ -1,6 +1,16 @@
 const { Reservation, Service, Fournisseur } = require('../models');
-const { sendAdminNotificationEmail, sendAdminNotificationSMS } = require('../services/notificationService');
+const { sendAdminNotificationSMS } = require('../services/notificationService');
 const adminConfig = require('../config/admin.json');
+const nodemailer = require('nodemailer'); // 👈 Ajout de Nodemailer
+
+// 🎯 Configuration directe du transporteur avec vos variables de production
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.ADMIN_EMAIL_USER, // kikirazak1204@gmail.com
+        pass: process.env.EMAIL_PASSWORD   // xmimjczdeqyfteys
+    }
+});
 
 exports.creerReservation = async (req, res) => {
     try {
@@ -56,19 +66,35 @@ exports.creerReservation = async (req, res) => {
         // 📱 Envoyer notifications SMS + Email à l'admin (asynchrone, non-bloquant)
         setImmediate(async () => {
             try {
-                const adminEmail = process.env.ADMIN_EMAIL || adminConfig?.adminEmail || 'admin@incha-allah.com';
+                const adminEmail = process.env.ADMIN_EMAIL || adminConfig?.adminEmail || 'admin@newvision.com';
                 const adminPhone = adminConfig?.adminPhone;
 
-                // Email
+                // 📧 Envoi direct par l'e-mail configuré en production
                 if (adminEmail && adminEmail !== '') {
                     try {
-                        await sendAdminNotificationEmail(adminEmail, reservation);
+                        await transporter.sendMail({
+                            from: `"New Vision 👀" <${process.env.ADMIN_EMAIL_USER}>`,
+                            to: adminEmail,
+                            subject: `🚨 Nouvelle réservation n°${reservation.id} reçue !`,
+                            html: `
+                                <h3>Une nouvelle réservation vient d'être effectuée</h3>
+                                <hr/>
+                                <p><b>Nom du client :</b> ${reservation.clientNom}</p>
+                                <p><b>Téléphone :</b> ${reservation.telephone}</p>
+                                <p><b>Service demandé :</b> ${reservation.serviceNom}</p>
+                                <p><b>Adresse :</b> ${reservation.adresseIntervention}</p>
+                                <p><b>Montant estimé :</b> ${reservation.montantTotal} FCFA</p>
+                                <br />
+                                <p>Connectez-vous à votre tableau de bord d'administration pour gérer cette demande.</p>
+                            `
+                        });
+                        console.log(`✅ Email de notification envoyé à l'admin (${adminEmail})`);
                     } catch (emailErr) {
-                        console.error('⚠️ Erreur email:', emailErr.message);
+                        console.error('⚠️ Erreur envoi email direct:', emailErr.message);
                     }
                 }
 
-                // SMS
+                // SMS (Reste inchangé)
                 if (adminPhone && adminPhone !== '') {
                     try {
                         await sendAdminNotificationSMS(adminPhone, reservation);
@@ -78,7 +104,6 @@ exports.creerReservation = async (req, res) => {
                 }
             } catch (err) {
                 console.error('⚠️ Erreur lors des notifications:', err.message);
-                // N'interrompt pas la réponse - les notifications sont optionnelles
             }
         });
 
