@@ -1,5 +1,5 @@
-const express = require('express');
 const cors = require('cors');
+const express = require('express');
 const dotenv = require('dotenv');
 const { sequelize } = require('./models');
 const fs = require('fs');
@@ -15,10 +15,16 @@ app.use(cors({
     origin: [
         'http://localhost:5173',
         'http://127.0.0.1:5173',
-        'https://incha-allah-v2.vercel.app'
+        'https://incha-allah-v2.vercel.app',
+        'https://new-vision-incha-allah.vercel.app'  // ✅ domaine ajouté
     ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
 }));
+
+// Preflight pour toutes les routes
+app.options('*', cors());
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -58,7 +64,7 @@ app.use('/api/soldes', require('./routes/soldes'));
 app.use('/api/paiements', require('./routes/paiement'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/whatsapp', require('./routes/whatsapp'));
-app.use('/api/seed', require('./routes/seedRoute'));  // ← déplacé AVANT le 404
+app.use('/api/seed', require('./routes/seedRoute'));
 
 app.use((req, res) => {
     console.log(`🚫 404 - Route non trouvée : ${req.method} ${req.originalUrl}`);
