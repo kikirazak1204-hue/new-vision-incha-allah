@@ -255,8 +255,8 @@ export function VoirDevis({ mission, onAccepte, onRefuse, onAnnuler }) {
                             <p style={{ color: '#f87171', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>⚠️ Confirmer l'annulation ?</p>
                             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginBottom: '10px', lineHeight: '1.5' }}>
                                 {mission.statut === 'EN_ATTENTE'
-                                    ? 'Vous récupérerez 1 250 FCFA. New Vision garde 250 FCFA.'
-                                    : 'Vous récupérerez 750 FCFA. 750 FCFA partagés entre New Vision et le prestataire.'
+                                    ? 'Vous récupérerez 1 250 FCFA. Kanari Service garde 250 FCFA.'
+                                    : 'Vous récupérerez 750 FCFA. 750 FCFA partagés entre Kanari Service et le prestataire.'
                                 }
                             </p>
                             <div style={{ display: 'flex', gap: '8px' }}>

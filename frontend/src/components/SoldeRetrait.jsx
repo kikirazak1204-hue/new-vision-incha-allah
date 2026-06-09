@@ -58,7 +58,7 @@ export default function SoldeRetrait() {
             });
             const data = await res.json();
             if (data.success) {
-                setSucces(`✅ Demande envoyée ! New Vision va traiter votre retrait sous 24h.`);
+                setSucces(`✅ Demande envoyée ! Kanari Service va traiter votre retrait sous 24h.`);
                 setShowForm(false);
                 setForm({ montant: '', operateur: '', telephone: '' });
                 charger();

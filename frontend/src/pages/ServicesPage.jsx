@@ -38,7 +38,7 @@ const ServicesPage = ({ setSelectedService, setCurrentView }) => {
             <section className="max-w-5xl mx-auto mt-4 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
                 <div>
                     <h1 className="text-2xl md:text-3xl font-extrabold text-white">
-                        Tous les services New Vision
+                        Tous les services Kanari Service
                     </h1>
                     <p className="mt-2 text-sm md:text-base text-white/70 max-w-xl">
                         Choisissez un domaine pour voir les prestataires disponibles,

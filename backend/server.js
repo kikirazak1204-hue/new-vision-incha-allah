@@ -11,13 +11,27 @@ const app = express();
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 
+const allowedOrigins = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'https://incha-allah-v2.vercel.app',
+    'https://new-vision-incha-allah.vercel.app'
+];
+
+const extraOrigins = process.env.CORS_ALLOWED_ORIGINS
+    ? process.env.CORS_ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean)
+    : [];
+
+const trustedOrigins = [...new Set([...allowedOrigins, ...extraOrigins])];
+const allowAllOrigins = process.env.ALLOW_ALL_ORIGINS === 'true';
+
 app.use(cors({
-    origin: [
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-        'https://incha-allah-v2.vercel.app',
-        'https://new-vision-incha-allah.vercel.app'  // ✅ domaine ajouté
-    ],
+    origin: (origin, callback) => {
+        if (!origin || allowAllOrigins || trustedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        callback(new Error(`CORS origin non autorisé : ${origin}`));
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true

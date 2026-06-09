@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { getFournisseursParService } from '../../util/api.js';
 
 const BADGE = {
-    CONFORME: { label: '🛡️ Garanti New Vision', bg: 'bg-green-500', text: 'text-white' },
+    CONFORME: { label: '🛡️ Garanti Kanari Service', bg: 'bg-green-500', text: 'text-white' },
     EN_EVALUATION: { label: '🔍 En évaluation', bg: 'bg-blue-500', text: 'text-white' },
     EN_ATTENTE: { label: '🆕 Nouveau', bg: 'bg-gray-500', text: 'text-white' },
 };
@@ -264,7 +264,7 @@ const ServiceDetailPage = ({
                 </div>
 
                 <div className="flex justify-between items-center text-[11px] text-white/50">
-                    <span>Statut “Garanti New Vision” mis en avant en premier.</span>
+                    <span>Statut “Garanti Kanari Service” mis en avant en premier.</span>
                     <button
                         onClick={() => {
                             setRecherche('');

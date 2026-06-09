@@ -17,7 +17,7 @@ const STATUT = {
 const BADGE_PROFIL = {
     EN_ATTENTE: { label: '⏳ En attente de validation', bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/30' },
     EN_EVALUATION: { label: "🔍 En cours d'évaluation", bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/30' },
-    CONFORME: { label: '🛡️ Garanti New Vision', bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/30' },
+    CONFORME: { label: '🛡️ Garanti Kanari Service', bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/30' },
     SUSPENDU: { label: '🚫 Compte suspendu', bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30' },
 };
 
@@ -180,7 +180,7 @@ export default function DashboardFournisseur() {
         const desc = window.prompt('Décrivez le matériel manquant :');
         if (!desc) return;
         await callAction(id, 'materiel', 'EN_PREPARATION', { descriptionMateriel: desc, manqueMateriel: true });
-        alert('✅ New Vision a été notifié.');
+        alert('✅ Kanari Service a été notifié.');
     };
 
     if (!token) return <Navigate to="/login" replace />;
@@ -215,7 +215,7 @@ export default function DashboardFournisseur() {
             {/* ── Sidebar desktop ── */}
             <aside className="hidden md:flex w-64 bg-purple-950/80 backdrop-blur p-6 flex-col gap-2 shadow-xl border-r border-purple-800/50">
                 <div className="mb-5">
-                    <h2 className="text-xl font-bold">🌍 New Vision</h2>
+                    <h2 className="text-xl font-bold">🌍 Kanari Service</h2>
                     <p className="text-xs text-purple-400 mt-1">Espace prestataire</p>
                 </div>
                 <div className={`rounded-xl p-3 border mb-4 ${badgeProfil.bg} ${badgeProfil.border}`}>
@@ -254,7 +254,7 @@ export default function DashboardFournisseur() {
 
             {/* ── Header mobile ── */}
             <div className="md:hidden fixed top-0 inset-x-0 z-50 bg-purple-950/95 backdrop-blur border-b border-purple-800/60 px-4 py-3 flex justify-between items-center">
-                <span className="font-bold">🌍 New Vision</span>
+                <span className="font-bold">🌍 Kanari Service</span>
                 <button onClick={() => setMenuOuvert(!menuOuvert)} className="p-2 rounded-lg bg-purple-800/50 text-sm">
                     {menuOuvert ? '✕' : '☰'}
                 </button>
@@ -377,7 +377,7 @@ export default function DashboardFournisseur() {
                                                     <div className="bg-orange-900/20 border border-orange-500/30 rounded-xl p-3">
                                                         <p className="text-orange-400 font-semibold text-sm">🔧 Matériel manquant signalé</p>
                                                         <p className="text-white/50 text-xs mt-0.5">{mission.descriptionMateriel}</p>
-                                                        <p className="text-orange-300/60 text-xs mt-1">New Vision contacte un fournisseur partenaire...</p>
+                                                        <p className="text-orange-300/60 text-xs mt-1">Kanari Service contacte un fournisseur partenaire...</p>
                                                     </div>
                                                 )}
 

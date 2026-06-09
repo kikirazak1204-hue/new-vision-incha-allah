@@ -16,6 +16,39 @@ import CommandePage from './CommandePage';
 import ReservationPage from './ReservationPage';
 import ServiceSelectionPage from './ServiceSelectionPage';
 
+function RegisterChoicePage({ onBack, onSelect }) {
+    return (
+        <div className="max-w-4xl mx-auto rounded-3xl bg-black/60 border border-white/10 p-8 shadow-2xl">
+            <div className="text-center space-y-4 mb-8">
+                <h2 className="text-4xl font-bold">S'inscrire</h2>
+                <p className="text-white/70 text-base">Choisissez votre profil pour continuer : client ou fournisseur.</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 mb-6">
+                <button
+                    onClick={() => onSelect('registerUtilisateur')}
+                    className="rounded-3xl border border-blue-500/30 bg-blue-500/10 px-8 py-6 text-left text-white transition hover:bg-blue-500/15"
+                >
+                    <p className="text-2xl font-bold">Utilisateur</p>
+                    <p className="text-sm text-white/60 mt-2">Créer un compte client pour réserver des services et accéder à votre espace personnel.</p>
+                </button>
+                <button
+                    onClick={() => onSelect('registerFournisseur')}
+                    className="rounded-3xl border border-green-500/30 bg-emerald-500/10 px-8 py-6 text-left text-white transition hover:bg-emerald-500/15"
+                >
+                    <p className="text-2xl font-bold">Fournisseur</p>
+                    <p className="text-sm text-white/60 mt-2">Créer un compte prestataire pour proposer vos services et soumettre un dossier.</p>
+                </button>
+            </div>
+            <button
+                onClick={onBack}
+                className="w-full rounded-3xl border border-white/20 bg-white/5 py-4 text-sm font-semibold text-white/80 transition hover:bg-white/10"
+            >
+                Retour à l'accueil
+            </button>
+        </div>
+    );
+}
+
 export default function Accueil() {
     const [services, setServices] = useState([]);
     const [currentView, setCurrentView] = useState('accueil');
@@ -151,6 +184,8 @@ export default function Accueil() {
                 return <CommandePage />;
             case 'login':
                 return <LoginPage />;
+            case 'registerChoice':
+                return <RegisterChoicePage onBack={() => setCurrentView('accueil')} onSelect={setCurrentView} />;
             case 'registerFournisseur':
                 return <RegisterFournisseurPage />;
             case 'registerUtilisateur':
@@ -204,7 +239,7 @@ export default function Accueil() {
             {installPrompt && !isInstalled && showInstallBanner && (
                 <div className="fixed bottom-4 left-4 right-4 z-50 bg-purple-700/95 backdrop-blur rounded-2xl p-4 flex items-center justify-between shadow-2xl border border-purple-500/30">
                     <div>
-                        <p className="font-bold text-white text-sm">📱 Installer New Vision</p>
+                        <p className="font-bold text-white text-sm">📱 Installer Kanari Service</p>
                         <p className="text-white/60 text-xs mt-0.5">Accès rapide depuis votre écran d'accueil</p>
                     </div>
                     <div className="flex gap-2">
@@ -219,8 +254,8 @@ export default function Accueil() {
                     className={`text-2xl font-bold cursor-pointer flex items-center gap-2 transition-colors ${isJour ? 'hover:text-purple-700' : 'hover:text-yellow-400'}`}
                     onClick={() => setCurrentView('accueil')}
                 >
-                    <img src="/logo.png" alt="New Vision" className="w-10 h-10 object-contain rounded-full" />
-                    New Vision
+                    <img src="/logo.png" alt="Kanari Service" className="w-10 h-10 object-contain rounded-full" />
+                    Kanari Service
                 </h1>
                 <nav className="flex items-center gap-4 flex-wrap">
                     <button onClick={() => setCurrentView('accueil')} className={`transition-colors ${isJour ? 'hover:text-purple-700' : 'hover:text-yellow-400'}`}>Accueil</button>
@@ -234,7 +269,7 @@ export default function Accueil() {
                     {!token ? (
                         <>
                             <button onClick={() => setCurrentView('login')} className="hover:underline">Connexion</button>
-                            <button onClick={() => setCurrentView('registerUtilisateur')} className={`px-3 py-1 rounded-lg transition-colors ${isJour ? 'bg-black/10 hover:bg-black/20' : 'bg-white/10 hover:bg-white/20'}`}>
+                            <button onClick={() => setCurrentView('registerChoice')} className={`px-3 py-1 rounded-lg transition-colors ${isJour ? 'bg-black/10 hover:bg-black/20' : 'bg-white/10 hover:bg-white/20'}`}>
                                 S'inscrire
                             </button>
                         </>
@@ -247,7 +282,7 @@ export default function Accueil() {
             <main className="relative z-10">{renderMainView()}</main>
 
             <footer className={`mt-12 text-center text-xs pb-6 ${isJour ? 'text-gray-400' : 'text-white/40'}`}>
-                🌍 NEW VISION INCHA ALLAH — Services de confiance en Afrique de l'Ouest
+                🌍 KANARI SERVICE — Services de confiance en Afrique de l'Ouest
                 {isInstalled && <span className="ml-2 text-green-500">● Application installée</span>}
             </footer>
         </div>

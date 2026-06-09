@@ -88,7 +88,7 @@ function NotifFournisseur({ notifs, nom, onGoTo, onDismiss }) {
                             </div>
                             <div>
                                 <p style={{ color: 'white', fontWeight: '700', fontSize: '13px', margin: 0, lineHeight: 1.2 }}>
-                                    🌍 New Vision
+                                    🌍 Kanari Service
                                 </p>
                                 <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', margin: 0 }}>
                                     Activités récentes
@@ -305,7 +305,7 @@ export default function Login() {
                         N
                     </div>
                     <h2 className="text-3xl font-bold">Connexion</h2>
-                    <p className="text-white/40 text-sm">Bienvenue sur New Vision</p>
+                    <p className="text-white/40 text-sm">Bienvenue sur Kanari Service</p>
                 </div>
 
                 {/* Succès */}

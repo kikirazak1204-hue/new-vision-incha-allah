@@ -274,7 +274,7 @@ export default function DashboardClient() {
             <aside className="hidden md:flex w-72 bg-white/5 backdrop-blur-xl p-6 flex-col gap-2 border-r border-white/10">
                 <div className="mb-6">
                     <h2 className="text-2xl font-bold bg-gradient-to-r from-sky-400 to-cyan-300 bg-clip-text text-transparent">
-                        🌍 New Vision
+                        🌍 Kanari Service
                     </h2>
                     <p className="text-xs text-sky-300 mt-1">Espace client</p>
                 </div>
@@ -324,7 +324,7 @@ export default function DashboardClient() {
 
             <div className="md:hidden fixed top-0 inset-x-0 z-50 bg-slate-950/90 backdrop-blur-xl border-b border-white/10 px-4 py-3 flex justify-between items-center">
                 <span className="font-bold bg-gradient-to-r from-sky-400 to-cyan-300 bg-clip-text text-transparent">
-                    🌍 New Vision
+                    🌍 Kanari Service
                 </span>
                 <button onClick={() => setMenuOuvert(!menuOuvert)} className="p-2 rounded-xl bg-white/8 text-sm">
                     {menuOuvert ? '✕' : '☰'}
@@ -505,7 +505,7 @@ export default function DashboardClient() {
                                                     <div className="bg-orange-500/10 border border-orange-400/20 rounded-2xl p-3">
                                                         <p className="text-orange-300 font-semibold text-sm">🔧 En attente de matériel</p>
                                                         <p className="text-white/50 text-xs mt-0.5">
-                                                            Le prestataire a signalé un besoin en matériel. New Vision s'en occupe.
+                                                            Le prestataire a signalé un besoin en matériel. Kanari Service s'en occupe.
                                                         </p>
                                                     </div>
                                                 )}
