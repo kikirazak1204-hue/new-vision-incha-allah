@@ -22,4 +22,8 @@ const Service = sequelize.define('Service', {
     timestamps: true
 });
 
+// ⚠️ Association supprimée d'ici — elle est déjà définie dans models/index.js
+// avec le même alias 'fournisseursService'. Garder les deux créait un risque
+// de conflit Sequelize au démarrage.
+
 module.exports = Service;

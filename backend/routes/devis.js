@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
-const { Devis, Reservation } = require('../models');
+const { Devis, Reservation, Fournisseur } = require('../models');
+const { Op } = require('sequelize');
 
-const RETOUR_CLIENT = 1350;
-
-// ── POST /api/devis ────────────────────────────────────────────
+// ── POST /api/devis — Presta envoie son devis ─────────────
 router.post('/', protect, authorize('fournisseur'), async (req, res) => {
     try {
         const { reservationId, montant, description } = req.body;
@@ -13,12 +12,29 @@ router.post('/', protect, authorize('fournisseur'), async (req, res) => {
             return res.status(400).json({ success: false, message: 'Données manquantes.' });
 
         const reservation = await Reservation.findByPk(reservationId);
-        if (!reservation) return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
+        if (!reservation)
+            return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
 
-        // Remplacer l'ancien devis EN_ATTENTE
-        await Devis.update({ statut: 'REFUSE' }, { where: { reservationId, statut: 'EN_ATTENTE' } });
+        const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
+        if (!fournisseur)
+            return res.status(404).json({ success: false, message: 'Profil fournisseur introuvable.' });
 
-        const devis = await Devis.create({ reservationId, montant, description });
+        const devisExistant = await Devis.findOne({ where: { reservationId, fournisseurId: fournisseur.id } });
+        if (devisExistant)
+            return res.status(400).json({ success: false, message: 'Devis déjà envoyé.' });
+
+        const totalDevis = await Devis.count({ where: { reservationId, statut: 'EN_ATTENTE' } });
+        if (totalDevis >= 3)
+            return res.status(400).json({ success: false, message: 'Limite de 3 devis atteinte.' });
+
+        const devis = await Devis.create({
+            reservationId,
+            fournisseurId: fournisseur.id,
+            montant,
+            description,
+            statut: 'EN_ATTENTE'
+        });
+
         res.status(201).json({ success: true, data: devis });
     } catch (err) {
         console.error(err);
@@ -26,44 +42,13 @@ router.post('/', protect, authorize('fournisseur'), async (req, res) => {
     }
 });
 
-// ── PUT /api/devis/:id/accepter ────────────────────────────────
-router.put('/:id/accepter', protect, async (req, res) => {
-    try {
-        const devis = await Devis.findByPk(req.params.id);
-        if (!devis) return res.status(404).json({ success: false, message: 'Devis introuvable.' });
-
-        await devis.update({ statut: 'ACCEPTE' });
-
-        const resteAPayer = Math.max(0, Number(devis.montant) - RETOUR_CLIENT);
-        await Reservation.update(
-            { montantTotal: devis.montant, statut: 'ACCEPTEE' },
-            { where: { id: devis.reservationId } }
-        );
-
-        res.json({ success: true, data: devis, resteAPayer });
-    } catch (err) {
-        res.status(500).json({ success: false, message: 'Erreur serveur.' });
-    }
-});
-
-// ── PUT /api/devis/:id/refuser ─────────────────────────────────
-router.put('/:id/refuser', protect, async (req, res) => {
-    try {
-        const devis = await Devis.findByPk(req.params.id);
-        if (!devis) return res.status(404).json({ success: false, message: 'Devis introuvable.' });
-        await devis.update({ statut: 'REFUSE' });
-        res.json({ success: true, message: 'Devis refusé.' });
-    } catch (err) {
-        res.status(500).json({ success: false, message: 'Erreur serveur.' });
-    }
-});
-
-// ── GET /api/devis/reservation/:id ────────────────────────────
+// ── GET /api/devis/reservation/:id — Client voit les devis ─
 router.get('/reservation/:id', protect, async (req, res) => {
     try {
         const devis = await Devis.findAll({
             where: { reservationId: req.params.id },
-            order: [['createdAt', 'DESC']]
+            include: [{ model: Fournisseur, as: 'fournisseurDevis', attributes: ['id', 'nomEntreprise', 'telephone', 'note'] }],
+            order: [['createdAt', 'ASC']]
         });
         res.json({ success: true, data: devis });
     } catch (err) {
@@ -71,21 +56,41 @@ router.get('/reservation/:id', protect, async (req, res) => {
     }
 });
 
-// ── PUT /api/devis/annuler/:reservationId ──────────────────────
+// ── PUT /api/devis/:id/accepter — Client accepte un devis ──
+router.put('/:id/accepter', protect, async (req, res) => {
+    try {
+        const devis = await Devis.findByPk(req.params.id);
+        if (!devis) return res.status(404).json({ success: false, message: 'Devis introuvable.' });
+
+        // 1. Accepter le devis choisi
+        await devis.update({ statut: 'ACCEPTE' });
+
+        // 2. Refuser les autres
+        await Devis.update({ statut: 'REFUSE' }, {
+            where: { reservationId: devis.reservationId, id: { [Op.ne]: devis.id } }
+        });
+
+        // 3. Mettre à jour la réservation
+        await Reservation.update(
+            { montantTotal: devis.montant, statut: 'ACCEPTEE', fournisseurId: devis.fournisseurId },
+            { where: { id: devis.reservationId } }
+        );
+
+        res.json({ success: true, message: 'Devis accepté avec succès.' });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Erreur serveur.' });
+    }
+});
+
+// ── PUT /api/devis/annuler/:reservationId ──────────────────
+// Nettoyé de la logique de remboursement financier (Phase 1/2)
 router.put('/annuler/:reservationId', protect, async (req, res) => {
     try {
         const reservation = await Reservation.findByPk(req.params.reservationId);
-        if (!reservation) return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
+        if (!reservation) return res.status(404).json({ success: false, message: 'Introuvable.' });
 
-        const dejaAcceptee = ['ACCEPTEE', 'EN_COURS', 'EN_PREPARATION'].includes(reservation.statut);
-
-        const remboursement = dejaAcceptee ? 750 : 1350;
-        const message = dejaAcceptee
-            ? `Remboursement 750 FCFA. New Vision garde 375 FCFA. Prestataire reçoit 375 FCFA.`
-            : `Remboursement 1 350 FCFA. New Vision garde 150 FCFA.`;
-
-        await reservation.update({ statut: 'ANNULEE', acompteStatut: 'REMBOURSE' });
-        res.json({ success: true, remboursement, message, dejaAcceptee });
+        await reservation.update({ statut: 'ANNULEE' });
+        res.json({ success: true, message: 'Réservation annulée.' });
     } catch (err) {
         res.status(500).json({ success: false, message: 'Erreur serveur.' });
     }

@@ -1,6 +1,7 @@
 const {
     Produit, Commande, Facture, Paiement,
-    Fournisseur, User, Service, CommandeProduit, Reservation
+    Fournisseur, User, Service, CommandeProduit,
+    Reservation, BonIntervention
 } = require('../models');
 
 // ===============================
@@ -14,14 +15,14 @@ exports.getDashboardClient = async (req, res) => {
             Commande.count({ where: { clientId } }),
             Facture.count({ where: { clientId } }),
             Facture.sum('montantTotal', { where: { clientId } }).then(v => v || 0),
-            // Utilisation des alias EXACTS de ton models/index.js
             Reservation.findAll({
                 where: { clientId },
                 include: [
-                    { model: Fournisseur, as: 'prestataire', attributes: ['nomEntreprise', 'telephone'] },
-                    { model: Service, as: 'service', attributes: ['nom', 'emoji'] }
+                    { model: Fournisseur, as: 'prestataire', attributes: ['id', 'nomEntreprise', 'telephone', 'note'] },
+                    { model: Service, as: 'service', attributes: ['nom', 'emoji'] },
+                    { model: BonIntervention, as: 'bonIntervention' }
                 ],
-                limit: 5,
+                limit: 10,
                 order: [['createdAt', 'DESC']]
             }),
             Facture.findAll({
@@ -41,7 +42,7 @@ exports.getDashboardClient = async (req, res) => {
             }
         });
     } catch (err) {
-        console.error('❌ Erreur Dashboard Client:', err);
+        console.error('❌ Erreur Dashboard Client:', err.message);
         res.status(500).json({ success: false, message: 'Erreur serveur dashboard client', error: err.message });
     }
 };
@@ -61,8 +62,11 @@ exports.getDashboardFournisseur = async (req, res) => {
             Facture.sum('montantTotal', { where: { fournisseurId: fId } }).then(v => v || 0),
             Reservation.findAll({
                 where: { fournisseurId: fId },
-                include: [{ model: User, as: 'client', attributes: ['nom', 'email'] }],
-                limit: 8,
+                include: [
+                    { model: User, as: 'client', attributes: ['nom', 'email'] },
+                    { model: BonIntervention, as: 'bonIntervention' }
+                ],
+                limit: 10,
                 order: [['createdAt', 'DESC']]
             }),
             Commande.findAll({
@@ -76,13 +80,14 @@ exports.getDashboardFournisseur = async (req, res) => {
         res.json({
             success: true,
             data: {
+                profil: fournisseur,
                 stats: { totalProduits, totalRevenus, totalMissions: missions.length },
                 missions,
                 commandesRecentes
             }
         });
     } catch (err) {
-        console.error('❌ Erreur Dashboard Fournisseur:', err);
+        console.error('❌ Erreur Dashboard Fournisseur:', err.message);
         res.status(500).json({ success: false, message: 'Erreur serveur dashboard fournisseur' });
     }
 };

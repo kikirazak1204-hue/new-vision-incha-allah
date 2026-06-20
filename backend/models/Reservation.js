@@ -7,107 +7,99 @@ const Reservation = sequelize.define('Reservation', {
         primaryKey: true,
         autoIncrement: true
     },
-    clientId: {
-        type: DataTypes.INTEGER,
-        allowNull: true, // ✅ V1 sans compte
-        references: { model: 'users', key: 'id' },
-        onDelete: 'CASCADE'
-    },
-    fournisseurId: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        references: { model: 'fournisseurs', key: 'id' },
-        onDelete: 'CASCADE'
-    },
-    serviceId: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        references: { model: 'services', key: 'id' },
-        onDelete: 'SET NULL'
-    },
-
-    description: {
+    // ── Infos du besoin ──────────────────────────────
+    besoin: {
         type: DataTypes.TEXT,
-        allowNull: true // ✅ vocal uniquement = pas de description écrite
+        allowNull: false
     },
-    dateSouhaitee: {
-        type: DataTypes.DATE,
-        allowNull: true
-    },
-    adresseIntervention: {
+    adresse: {
         type: DataTypes.STRING,
-        allowNull: true // ✅ front V1 n'envoie plus ce champ
+        allowNull: false
     },
-
     telephone: {
         type: DataTypes.STRING,
-        allowNull: true
+        allowNull: false
     },
     clientNom: {
         type: DataTypes.STRING,
+        allowNull: true // client peut réserver sans compte
+    },
+    dateIntervention: {
+        type: DataTypes.DATE,
+        allowNull: true // utile pour type 'planifie' et 'contrat'
+    },
+
+    // ── Type de réservation ──────────────────────────
+    type: {
+        type: DataTypes.ENUM('classique', 'planifie', 'contrat'),
+        defaultValue: 'classique'
+    },
+
+    // ── Parcours d'origine ───────────────────────────
+    parcours: {
+        type: DataTypes.ENUM('assignation', 'direct'),
+        defaultValue: 'assignation'
+        // 'assignation' = Parcours 1 (Kanari choisit le presta)
+        // 'direct' = Parcours 2 (client a choisi un presta précis)
+    },
+
+    // ── Statut de suivi ───────────────────────────────
+    statut: {
+        type: DataTypes.ENUM(
+            'en_attente',
+            'assigne',
+            'accepte',
+            'en_cours',
+            'termine',
+            'valide',
+            'annule'
+        ),
+        defaultValue: 'en_attente'
+    },
+
+    // ── Paiement / Commission ─────────────────────────
+    modePaiement: {
+        type: DataTypes.ENUM('direct_prestataire', 'depot_kanari'),
         allowNull: true
+        // direct_prestataire : client paie le presta, qui reverse 15% à Kanari
+        // depot_kanari : client paie Kanari, qui reverse 85% au presta
+    },
+    codePrestataireUtilise: {
+        type: DataTypes.STRING,
+        allowNull: true // code unique du presta utilisé pour tracer le dépôt
+    },
+    commissionStatut: {
+        type: DataTypes.ENUM('en_attente', 'recue', 'en_retard'),
+        defaultValue: 'en_attente'
+    },
+    commissionDateLimite: {
+        type: DataTypes.DATE,
+        allowNull: true // se calcule à la validation : +48h ou +72h
+    },
+
+    // ── Relations ──────────────────────────────────────
+    clientId: {
+        type: DataTypes.INTEGER,
+        allowNull: true // peut réserver sans compte
+    },
+    fournisseurId: {
+        type: DataTypes.INTEGER,
+        allowNull: true // null si parcours 'assignation' tant que non assigné
+    },
+    serviceId: {
+        type: DataTypes.INTEGER,
+        allowNull: false
     },
     serviceNom: {
         type: DataTypes.STRING,
         allowNull: true
     },
-    photo: {
-        type: DataTypes.STRING,
-        allowNull: true
-    },
-    audio: {
-        type: DataTypes.STRING,
-        allowNull: true
-    },
 
-    statut: {
-        type: DataTypes.ENUM(
-            'EN_ATTENTE',
-            'ACCEPTEE',
-            'EN_PREPARATION',
-            'EN_COURS',
-            'TERMINEE',
-            'VALIDEE',
-            'ANNULEE'
-        ),
-        defaultValue: 'EN_ATTENTE'
-    },
-
-    montantTotal: {
-        type: DataTypes.FLOAT,
-        allowNull: true
-    },
-    acompte: {
-        type: DataTypes.FLOAT,
-        allowNull: true
-    },
-    acomptePaye: {
+    // ── Validation automatique ────────────────────────
+    valideAutomatiquement: {
         type: DataTypes.BOOLEAN,
         defaultValue: false
     },
-    paiementLibere: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false
-    },
-
-    manqueMateriel: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false
-    },
-    descriptionMateriel: {
-        type: DataTypes.TEXT,
-        allowNull: true
-    },
-
-    noteClient: {
-        type: DataTypes.INTEGER,
-        allowNull: true
-    },
-    commentaireClient: {
-        type: DataTypes.TEXT,
-        allowNull: true
-    },
-
 }, {
     tableName: 'reservations',
     timestamps: true
