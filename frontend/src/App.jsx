@@ -11,6 +11,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 // Importations des pages
 import Accueil from './pages/Accueil';
 import ServiceDetailPage from './pages/ServiceDetailPage';
+import Register from './pages/Register'; // <-- AJOUTÉ ICI
 import RegisterPrestataire from './pages/RegisterPrestataire';
 import RegisterUtilisateur from './pages/RegisterUtilisateur';
 import Login from './pages/Login';
@@ -18,7 +19,7 @@ import DashboardClient from './pages/DashboardClient';
 import DashboardFournisseur from './pages/DashboardFournisseur';
 import DashboardAdmin from './pages/AdminDashboard';
 import ReservationPage from './pages/ReservationPage';
-import ProduitsParFournisseur from './pages/Produitsparfournisseur';
+import ProduitsParFournisseur from './pages/ProduitsParFournisseur';
 
 export default function App() {
     return (
@@ -29,6 +30,7 @@ export default function App() {
                         {/* Pages Publiques */}
                         <Route path="/" element={<Accueil />} />
                         <Route path="/login" element={<Login />} />
+                        <Route path="/register" element={<Register />} /> {/* <-- AJOUTÉ ICI */}
                         <Route path="/register-utilisateur" element={<RegisterUtilisateur />} />
                         <Route path="/register-prestataire" element={<RegisterPrestataire />} />
                         

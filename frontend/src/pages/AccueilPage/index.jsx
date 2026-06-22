@@ -1,8 +1,8 @@
 import React from 'react';
-import { useNavigation } from "../../context/NavigationContext";
+import { useNavigate } from 'react-router-dom'; // 1. ON PREND LE VRAI ROUTEUR (Comme dans Login)
+
 const AccueilPage = ({ services, loading, setSelectedService }) => {
-    // 1. Initialisation du hook de navigation
-    const { navigateTo } = useNavigation();
+    const navigate = useNavigate(); // 2. On l'active
 
     const serviceIcons = {
         'Accessoires': '💍', 'Alimentation': '🍎', 'Artisanat': '🎨', 'Assurance': '🛡️',
@@ -20,14 +20,15 @@ const AccueilPage = ({ services, loading, setSelectedService }) => {
             
             {/* 🌐 NAVBAR MODERNE */}
             <nav className="sticky top-0 z-50 bg-[#131921] border-b border-slate-800 px-6 py-4 flex items-center justify-between shadow-xl">
-                <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigateTo('accueil')}>
+                <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate('/')}>
                     <div className="text-2xl font-black tracking-tighter">
                         KANARI<span className="text-purple-500">SERVICE</span>
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
-                    <button onClick={() => navigateTo('login')} className="text-sm font-medium hover:text-purple-400 transition">Connexion</button>
-                    <button onClick={() => navigateTo('register-utilisateur')} className="bg-purple-600 hover:bg-purple-700 px-5 py-2 rounded-full font-bold text-sm transition-all shadow-lg shadow-purple-900/20">S'inscrire</button>
+                    <button onClick={() => navigate('/login')} className="text-sm font-medium hover:text-purple-400 transition">Connexion</button>
+                    {/* LE VRAI LIEN OFFICIEL : navigate('/register') */}
+                    <button onClick={() => navigate('/register')} className="bg-purple-600 hover:bg-purple-700 px-5 py-2 rounded-full font-bold text-sm transition-all shadow-lg shadow-purple-900/20">S'inscrire</button>
                 </div>
             </nav>
 
@@ -48,7 +49,7 @@ const AccueilPage = ({ services, loading, setSelectedService }) => {
                 </div>
             </header>
 
-            {/* 🛠️ SECTION SERVICES AVEC LOADING EFFET ONDES */}
+            {/* 🛠️ SECTION SERVICES */}
             <main className="max-w-7xl mx-auto px-6 pb-20">
                 <div className="flex items-center justify-between mb-8">
                     <h2 className="text-2xl font-bold">Explorer nos expertises</h2>
@@ -56,7 +57,6 @@ const AccueilPage = ({ services, loading, setSelectedService }) => {
 
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-20">
-                        {/* Cercle qui tourne avec effet */}
                         <div className="relative w-16 h-16">
                             <div className="absolute top-0 left-0 w-full h-full border-4 border-purple-900/30 rounded-full animate-ping"></div>
                             <div className="absolute top-0 left-0 w-full h-full border-t-4 border-purple-500 rounded-full animate-spin"></div>
