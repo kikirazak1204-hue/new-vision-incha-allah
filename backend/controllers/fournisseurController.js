@@ -48,13 +48,11 @@ const createFournisseur = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Les champs userId et serviceId sont obligatoires.' });
         }
 
-        // Vérifie qu'un profil n'existe pas déjà pour cet utilisateur
         const exist = await Fournisseur.findOne({ where: { userId } });
         if (exist) {
             return res.status(409).json({ success: false, message: 'Vous avez déjà un profil prestataire.' });
         }
 
-        // Fichiers uploadés
         const cniRecto      = req.files?.cniRecto?.[0]?.filename || null;
         const cniVerso      = req.files?.cniVerso?.[0]?.filename || null;
         const selfie        = req.files?.selfie?.[0]?.filename || null;
@@ -74,18 +72,15 @@ const createFournisseur = async (req, res) => {
             hasTransport: hasTransport === 'true' || hasTransport === true,
             hasMateriel: hasMateriel === 'true' || hasMateriel === true,
             statut: 'EN_ATTENTE',
-            // Documents
             cniRecto,
             cniVerso,
             selfie,
             diplome,
             carteProf,
-            // Champs enrichis inscription
             anneesExperience: anneesExperience || null,
             saitLireEcrire: saitLireEcrire || null,
             referenceClient: referenceClient || null,
             immatriculation: immatriculation || null,
-            // codeUnique généré automatiquement par le hook beforeCreate du modèle
         });
 
         return res.status(201).json({
@@ -151,7 +146,7 @@ const getFournisseursParService = async (req, res) => {
             attributes: [
                 'id', 'nomEntreprise', 'adresse', 'quartier', 'secteur',
                 'telephone', 'description', 'note', 'nombreAvis',
-                'statut', 'hasTransport', 'hasMateriel', 'latitude', 'longitude'
+                'statut', 'hasTransport', 'hasMateriel', 'latitude', 'longitude','selfie'
             ],
             include: [
                 { model: Produit, as: 'produitsFournisseur', attributes: ['id', 'nom', 'description', 'prix', 'image'] },
@@ -165,10 +160,24 @@ const getFournisseursParService = async (req, res) => {
     }
 };
 
+// ── NOUVEAU : Récupérer produits par ID fournisseur ───────
+const getProduitsByFournisseurId = async (req, res) => {
+    try {
+        const produits = await Produit.findAll({ 
+            where: { fournisseurId: req.params.id } 
+        });
+        return res.status(200).json({ success: true, data: produits });
+    } catch (err) {
+        console.error('❌ Erreur getProduitsByFournisseurId:', err.message);
+        return res.status(500).json({ success: false, message: 'Erreur serveur.' });
+    }
+};
+
 module.exports = {
     getFournisseurConnecte,
     createFournisseur,
     ajouterProduit,
     getAllFournisseurs,
-    getFournisseursParService
+    getFournisseursParService,
+    getProduitsByFournisseurId
 };

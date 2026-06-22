@@ -7,6 +7,7 @@ const { getDashboardClient, getDashboardFournisseur } = require('../controllers/
 router.get('/client', protect, authorize('utilisateur'), getDashboardClient);
 
 // Route pour les fournisseurs
-router.get('/fournisseur', protect, authorize('fournisseur'), getDashboardFournisseur);
+// On accepte 'fournisseur' OU 'prestataire' pour éviter le blocage par le middleware
+router.get('/fournisseur', protect, authorize('fournisseur', 'prestataire'), getDashboardFournisseur);
 
 module.exports = router;

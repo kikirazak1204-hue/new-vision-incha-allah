@@ -3,10 +3,10 @@ const router = express.Router();
 const multer = require('multer');
 const { protect } = require('../middleware/auth');
 
-// ✅ Import corrigé : createFournisseur (pas registerFournisseur)
 const {
     createFournisseur,
-    getAllFournisseurs
+    getAllFournisseurs,
+    getProduitsByFournisseurId // Import ajouté ici
 } = require('../controllers/fournisseurController');
 
 // =======================
@@ -38,6 +38,11 @@ router.post(
     ]),
     createFournisseur
 );
+
+// =======================
+// 📦 GET PRODUITS FOURNISSEUR (La route corrigée)
+// =======================
+router.get('/:id/produits', getProduitsByFournisseurId);
 
 // =======================
 // 📦 GET ALL FOURNISSEURS (SAFE)

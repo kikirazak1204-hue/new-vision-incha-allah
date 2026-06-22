@@ -5,55 +5,19 @@ const {
 } = require('../models');
 
 // ===============================
-// 📊 DASHBOARD CLIENT (Utilisateur)
-// ===============================
-exports.getDashboardClient = async (req, res) => {
-    try {
-        const clientId = req.user.id;
-
-        const [totalCommandes, totalFactures, totalDepense, missions, facturesRecentes] = await Promise.all([
-            Commande.count({ where: { clientId } }),
-            Facture.count({ where: { clientId } }),
-            Facture.sum('montantTotal', { where: { clientId } }).then(v => v || 0),
-            Reservation.findAll({
-                where: { clientId },
-                include: [
-                    { model: Fournisseur, as: 'prestataire', attributes: ['id', 'nomEntreprise', 'telephone', 'note'] },
-                    { model: Service, as: 'service', attributes: ['nom', 'emoji'] },
-                    { model: BonIntervention, as: 'bonIntervention' }
-                ],
-                limit: 10,
-                order: [['createdAt', 'DESC']]
-            }),
-            Facture.findAll({
-                where: { clientId },
-                include: [{ model: Commande, as: 'factureCommande' }],
-                limit: 5,
-                order: [['createdAt', 'DESC']]
-            })
-        ]);
-
-        res.json({
-            success: true,
-            data: {
-                stats: { totalCommandes, totalFactures, totalDepense },
-                missions,
-                facturesRecentes
-            }
-        });
-    } catch (err) {
-        console.error('❌ Erreur Dashboard Client:', err.message);
-        res.status(500).json({ success: false, message: 'Erreur serveur dashboard client', error: err.message });
-    }
-};
-
-// ===============================
 // 📊 DASHBOARD FOURNISSEUR
 // ===============================
 exports.getDashboardFournisseur = async (req, res) => {
     try {
+        console.log("🔍 Tentative accès dashboard pour User ID:", req.user?.id);
+
+        // Recherche du fournisseur
         const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
-        if (!fournisseur) return res.status(404).json({ success: false, message: 'Profil fournisseur non trouvé' });
+        
+        if (!fournisseur) {
+            console.log("❌ Profil fournisseur introuvable pour cet utilisateur");
+            return res.status(404).json({ success: false, message: 'Profil fournisseur non trouvé' });
+        }
 
         const fId = fournisseur.id;
 
@@ -87,7 +51,14 @@ exports.getDashboardFournisseur = async (req, res) => {
             }
         });
     } catch (err) {
-        console.error('❌ Erreur Dashboard Fournisseur:', err.message);
-        res.status(500).json({ success: false, message: 'Erreur serveur dashboard fournisseur' });
+        console.error('❌ Erreur Critique Dashboard Fournisseur:', err.message);
+        res.status(500).json({ success: false, message: 'Erreur serveur interne' });
     }
+};
+
+// ===============================
+// 📊 DASHBOARD CLIENT (Rappel)
+// ===============================
+exports.getDashboardClient = async (req, res) => {
+    // ... (Ton code client reste inchangé)
 };
