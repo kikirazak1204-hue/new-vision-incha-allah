@@ -18,7 +18,7 @@ import DashboardClient from './pages/DashboardClient';
 import DashboardFournisseur from './pages/DashboardFournisseur';
 import DashboardAdmin from './pages/AdminDashboard';
 import ReservationPage from './pages/ReservationPage';
-import ProduitsParFournisseur from './pages/ProduitsParFournisseur';
+import ProduitsParFournisseur from './pages/ProduitsparFournisseur';
 
 export default function App() {
     return (
