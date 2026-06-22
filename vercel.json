@@ -3,9 +3,9 @@
     "outputDirectory": "frontend/dist",
     "framework": "vite",
     "env": {
-        "VITE_API_URL": "@vite_api_url",
-        "VITE_APP_NAME": "Incha-Allah",
-        "VITE_APP_VERSION": "1.0.0"
+        "VITE_APP_NAME": "Kanari Service",
+        "VITE_APP_VERSION": "1.0.0",
+        "VITE_API_URL": "https://newvision-backend.onrender.com"
     },
     "headers": [
         {

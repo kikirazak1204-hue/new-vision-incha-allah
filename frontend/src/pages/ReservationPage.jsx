@@ -1,303 +1,247 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, CalendarClock, Zap, FileSignature } from 'lucide-react';
 
-export default function ReservationPage({ handleRetour, setCurrentView, selectedServices = [] }) {
-    const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState('');
-    const [confirme, setConfirme] = useState(false);
+const normalize = (s = '') => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-    const [telephone, setTelephone] = useState('');
-    const [description, setDescription] = useState('');
-    const [photo, setPhoto] = useState(null);
+const SERVICES_CLASSIQUE = [
+    'plomberie', 'electricite', 'menage', 'transport', 'securite',
+    'menuiserie', 'jardinage', 'maconnerie', 'mecanique', 'climatisation',
+    'reparation', 'livraison', 'coiffure', 'beaute', 'couture'
+];
+const SERVICES_PLANIFIE = ['medecine', 'education', 'avocat', 'juridique', 'assurance', 'sport'];
+const SERVICES_CONTRAT = ['divertissement', 'mission', 'freelance', 'location', 'hotellerie'];
 
-    const [enregistrement, setEnregistrement] = useState(false);
-    const [audioBlob, setAudioBlob] = useState(null);
-    const [audioURL, setAudioURL] = useState(null);
-    const [duree, setDuree] = useState(0);
+const detecterType = (nomService = '') => {
+    const n = normalize(nomService);
+    if (SERVICES_CONTRAT.some((s) => n.includes(s))) return 'contrat';
+    if (SERVICES_PLANIFIE.some((s) => n.includes(s))) return 'planifie';
+    return 'classique';
+};
 
-    const mediaRecorderRef = useRef(null);
-    const chunksRef = useRef([]);
-    const timerRef = useRef(null);
+const LABEL_TYPE = {
+    classique: { label: 'Intervention rapide', icon: Zap, desc: 'Un prestataire intervient dès que possible.' },
+    planifie: { label: 'Rendez-vous', icon: CalendarClock, desc: 'Choisissez une date et heure précise.' },
+    contrat: { label: 'Devis & Contrat', icon: FileSignature, desc: 'Détails complets requis, acompte possible.' },
+};
 
-    const token = localStorage.getItem('token');
+export default function ReservationPage({ setCurrentView }) {
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    // ✅ Récupère les vraies données transmises depuis FournisseursParService ou ServiceDetailPage
+    const { service, fournisseur } = location.state || {};
+
     let user = {};
     try { user = JSON.parse(localStorage.getItem('user')) || {}; } catch { }
 
-    const demarrerAudio = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const recorder = new MediaRecorder(stream);
-            chunksRef.current = [];
-            recorder.ondataavailable = (e) => chunksRef.current.push(e.data);
-            recorder.onstop = () => {
-                const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-                setAudioBlob(blob);
-                setAudioURL(URL.createObjectURL(blob));
-                stream.getTracks().forEach((t) => t.stop());
-            };
-            recorder.start();
-            mediaRecorderRef.current = recorder;
-            setEnregistrement(true);
-            setDuree(0);
-            timerRef.current = setInterval(() => setDuree((d) => d + 1), 1000);
-        } catch {
-            setMessage('Micro non disponible. Vérifiez les permissions.');
-        }
-    };
+    const typeDetecte = detecterType(service?.nom);
 
-    const arreterAudio = () => {
-        mediaRecorderRef.current?.stop();
-        setEnregistrement(false);
-        clearInterval(timerRef.current);
-    };
+    const [formData, setFormData] = useState({
+        besoin: '',
+        adresse: '',
+        telephone: '',
+        clientNom: user?.nom || '',
+        dateIntervention: '',
+        type: typeDetecte,
+        modePaiement: 'depot_kanari',
+        statut: 'en_attente',
+        parcours: fournisseur ? 'direct' : 'assignation',
+    });
 
-    const supprimerAudio = () => {
-        setAudioBlob(null);
-        setAudioURL(null);
-        setDuree(0);
-    };
+    const [loading, setLoading] = useState(false);
+    const [message, setMessage] = useState('');
 
-    const formatDuree = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    useEffect(() => {
+        if (!service) return;
+        setFormData((prev) => ({ ...prev, type: detecterType(service.nom) }));
+    }, [service]);
+
+    const handleChange = (field) => (e) => {
+        setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+    };
 
     const handleSubmit = async () => {
-        // ✅ Validation stricte
-        if (!telephone || telephone.trim().length === 0) {
-            return setMessage('❌ Entrez un numéro de téléphone valide.');
-        }
+        setMessage('');
 
-        if (telephone.trim().length < 8) {
-            return setMessage('❌ Le numéro doit avoir au moins 8 chiffres.');
+        if (!service?.id) {
+            setMessage('❌ Aucun service sélectionné. Retournez à la liste des services.');
+            return;
+        }
+        if (!formData.telephone || !formData.adresse || !formData.besoin) {
+            setMessage('❌ Merci de remplir téléphone, adresse et description du besoin.');
+            return;
+        }
+        if ((formData.type === 'planifie' || formData.type === 'contrat') && !formData.dateIntervention) {
+            setMessage('❌ Merci de choisir une date pour ce type de service.');
+            return;
         }
 
         setLoading(true);
-        setMessage('');
+
+        const payload = {
+            besoin: formData.besoin,
+            adresse: formData.adresse,
+            telephone: formData.telephone,
+            clientNom: formData.clientNom || 'Client anonyme',
+            dateIntervention: formData.dateIntervention || null,
+            type: formData.type,
+            modePaiement: formData.modePaiement,
+            serviceId: service.id,
+            serviceNom: service.nom,
+            fournisseurId: fournisseur?.id || null,
+            parcours: fournisseur ? 'direct' : 'assignation',
+            clientId: user?.id || null,
+        };
 
         try {
-            const formData = new FormData();
-            formData.append('telephone', telephone.trim());
-            formData.append('description', description?.trim() || '');
-            formData.append('clientNom', user?.nom || 'Client anonyme');
-
-            // Ajouter les services sélectionnés
-            const serviceNames = selectedServices?.length > 0
-                ? selectedServices.map(s => s.nom).join(', ')
-                : 'Service non spécifié';
-            formData.append('serviceNom', serviceNames);
-            formData.append('servicesJSON', JSON.stringify(selectedServices || []));
-
-            formData.append('montantEstime', '0');
-            if (photo) formData.append('photo', photo);
-            if (audioBlob) formData.append('audio', audioBlob, 'message.webm');
-
-            const headers = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/reservations`, {
                 method: 'POST',
-                headers,
-                body: formData,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
             });
-
             const data = await res.json();
 
             if (res.ok && data.success) {
-                setConfirme(true);
+                setMessage('✅ Réservation transmise avec succès ! Redirection...');
+                setTimeout(() => navigate('/'), 1500);
             } else {
-                // ✅ Afficher un message d'erreur descriptif
-                const errorMessage = data.message || 'Erreur lors de la réservation. Vérifiez votre connexion et réessayez.';
-                setMessage(`❌ ${errorMessage}`);
+                setMessage('❌ ' + (data.message || "Échec de l'envoi de la réservation."));
             }
-        } catch (err) {
-            console.error('Erreur submission:', err);
-            setMessage('❌ Impossible de se connecter au serveur. Vérifiez votre connexion Internet.');
+        } catch (error) {
+            console.error('Erreur réservation:', error);
+            setMessage('❌ Erreur de connexion au serveur.');
         } finally {
             setLoading(false);
         }
     };
 
-    if (confirme) {
-        const serviceText = selectedServices.length > 0
-            ? `Les prestataires en ${selectedServices.map(s => s.nom.toLowerCase()).join(', ')} vont vous contacter rapidement.`
-            : 'Un prestataire va vous contacter rapidement.';
+    const typeInfo = LABEL_TYPE[formData.type];
+    const TypeIcon = typeInfo.icon;
 
+    // ✅ Garde-fou : si on arrive ici sans service (accès direct à l'URL), on guide l'utilisateur
+    if (!service) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900 px-4 py-6">
-                <div className="max-w-lg mx-auto">
-                    <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-10 text-center">
-                        <div className="text-5xl mb-4">✅</div>
-                        <h2 className="text-xl font-semibold text-white mb-2">Demande envoyée !</h2>
-                        <p className="text-white/60 text-sm mb-6">
-                            {serviceText}
-                        </p>
-                        <button
-                            onClick={() => setCurrentView?.('accueil')}
-                            className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-xl"
-                        >
-                            Retour à l'accueil
-                        </button>
-                    </div>
-                </div>
+            <div className="min-h-screen flex flex-col items-center justify-center text-center px-6" style={{ background: '#0B0F19' }}>
+                <p className="text-2xl font-black text-white mb-2">Aucun service sélectionné</p>
+                <p className="text-slate-400 mb-6">Choisissez d'abord un service ou un prestataire avant de réserver.</p>
+                <button
+                    onClick={() => navigate('/')}
+                    className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl font-bold active:scale-95 transition-all"
+                >
+                    Retour à l'accueil
+                </button>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900 px-4 py-6">
-            <div className="max-w-lg mx-auto">
-                <button
-                    onClick={handleRetour}
-                    className="mb-4 inline-flex items-center gap-2 text-white/60 hover:text-white text-sm transition-all"
-                >
-                    ← Retour
+        <div className="min-h-screen text-white p-6 animate-in fade-in duration-300" style={{ background: '#0B0F19' }}>
+            <div className="max-w-2xl mx-auto">
+                <button onClick={() => navigate(-1)} className="text-slate-500 hover:text-white mb-6 transition flex items-center gap-2 active:scale-95">
+                    <ArrowLeft size={18} /> Retour
                 </button>
 
-                {/* Affichage des services sélectionnés */}
-                {selectedServices.length > 0 ? (
-                    <div className="bg-white/10 border border-white/15 rounded-2xl p-4 mb-6">
-                        <h3 className="text-white font-semibold mb-3">📋 Services sélectionnés</h3>
-                        <div className="flex flex-wrap gap-2">
-                            {selectedServices.map((service) => (
-                                <div
-                                    key={service.code}
-                                    className="inline-flex items-center gap-2 px-3 py-2 bg-purple-600/40 border border-purple-400/50 rounded-lg"
-                                >
-                                    <span className="text-lg">{service.emoji}</span>
-                                    <span className="text-white text-sm font-medium">{service.nom}</span>
-                                </div>
-                            ))}
-                        </div>
-                        <p className="text-indigo-200 text-xs mt-3">
-                            Veuillez entrer vos coordonnées pour réserver ces services.
-                        </p>
+                <h1 className="text-3xl font-black mb-1 text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">
+                    Finaliser la demande
+                </h1>
+                <p className="text-slate-400 mb-1">
+                    Service : <span className="text-purple-400 font-semibold">{service?.emoji} {service?.nom}</span>
+                </p>
+                {fournisseur && (
+                    <p className="text-slate-400 mb-6 text-sm">
+                        Prestataire choisi : <span className="text-white font-semibold">{fournisseur.nomEntreprise}</span>
+                    </p>
+                )}
+
+                <div
+                    className="mb-8 rounded-2xl border border-purple-500/30 p-4 flex items-center gap-3"
+                    style={{ background: 'rgba(139,92,246,0.08)', backdropFilter: 'blur(12px)' }}
+                >
+                    <TypeIcon className="text-purple-400" size={28} />
+                    <div>
+                        <p className="font-black text-purple-300">{typeInfo.label}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{typeInfo.desc}</p>
                     </div>
-                ) : (
-                    <div className="bg-white/10 border border-white/15 rounded-2xl p-4 mb-6 flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-2xl">
-                            🚰
-                        </div>
-                        <div>
-                            <h3 className="text-white font-semibold">Plomberie</h3>
-                            <p className="text-indigo-200 text-xs">Photo + numéro, et si possible un vocal.</p>
-                        </div>
+                    <span className="ml-auto text-[10px] uppercase tracking-wider bg-purple-500/15 text-purple-300 px-2 py-1 rounded-full">
+                        Détecté automatiquement
+                    </span>
+                </div>
+
+                {message && (
+                    <div className={`mb-6 rounded-2xl p-4 text-center font-semibold text-sm border ${message.startsWith('✅') ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' : 'bg-rose-500/10 text-rose-300 border-rose-500/20'}`}>
+                        {message}
                     </div>
                 )}
 
-                {/* Pas d'alerte - réservation publique */}
+                <div className="space-y-4">
+                    <input
+                        placeholder="Votre nom"
+                        value={formData.clientNom}
+                        onChange={handleChange('clientNom')}
+                        className="w-full bg-white/[0.04] p-4 rounded-xl border border-white/[0.08] focus:border-purple-500 outline-none transition"
+                    />
+                    <input
+                        placeholder="Téléphone *"
+                        value={formData.telephone}
+                        onChange={handleChange('telephone')}
+                        className="w-full bg-white/[0.04] p-4 rounded-xl border border-white/[0.08] focus:border-purple-500 outline-none transition"
+                    />
+                    <input
+                        placeholder="Adresse d'intervention *"
+                        value={formData.adresse}
+                        onChange={handleChange('adresse')}
+                        className="w-full bg-white/[0.04] p-4 rounded-xl border border-white/[0.08] focus:border-purple-500 outline-none transition"
+                    />
 
-                <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-5 space-y-5">
+                    {(formData.type === 'planifie' || formData.type === 'contrat') && (
+                        <div>
+                            <label className="block text-slate-400 text-sm mb-2">
+                                {formData.type === 'planifie' ? '📅 Date et heure du rendez-vous *' : '📅 Date souhaitée pour l\'événement *'}
+                            </label>
+                            <input
+                                type="datetime-local"
+                                value={formData.dateIntervention}
+                                onChange={handleChange('dateIntervention')}
+                                className="w-full bg-white/[0.04] p-4 rounded-xl border border-white/[0.08] focus:border-purple-500 outline-none transition"
+                            />
+                        </div>
+                    )}
 
-                    {/* Téléphone */}
                     <div>
-                        <label className="block text-white/60 text-xs uppercase tracking-wide mb-1">
-                            Votre numéro *
-                        </label>
-                        <input
-                            type="tel"
-                            value={telephone}
-                            onChange={(e) => { setTelephone(e.target.value); setMessage(''); }}
-                            placeholder="+227 XX XX XX XX"
-                            className="w-full bg-white/10 border border-white/10 rounded-xl p-3 text-white placeholder-white/40 text-sm focus:border-purple-500 outline-none"
-                        />
+                        <label className="block text-slate-400 text-sm mb-2">💳 Mode de paiement</label>
+                        <select
+                            value={formData.modePaiement}
+                            onChange={handleChange('modePaiement')}
+                            className="w-full bg-white/[0.04] p-4 rounded-xl border border-white/[0.08] focus:border-purple-500 outline-none transition"
+                        >
+                            <option value="depot_kanari" className="bg-slate-900">Paiement sécurisé via dépôt Kanari</option>
+                            <option value="direct_prestataire" className="bg-slate-900">Paiement direct au prestataire</option>
+                        </select>
                     </div>
 
-                    {/* Audio */}
                     <div>
-                        <label className="block text-white/60 text-xs uppercase tracking-wide mb-2">
-                            🎙️ Message vocal
-                        </label>
-                        {!audioURL ? (
-                            <button
-                                onClick={enregistrement ? arreterAudio : demarrerAudio}
-                                className={`w-full py-5 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all
-                                    ${enregistrement
-                                        ? 'bg-red-500/20 border-red-500/50 text-red-300'
-                                        : 'bg-white/10 border-white/10 hover:bg-white/15 text-white'}`}
-                            >
-                                <span className={`text-4xl ${enregistrement ? 'animate-pulse' : ''}`}>
-                                    {enregistrement ? '⏹️' : '🎙️'}
-                                </span>
-                                <span className="font-semibold text-sm">
-                                    {enregistrement ? `Enregistrement… ${formatDuree(duree)}` : 'Appuyez pour parler'}
-                                </span>
-                            </button>
-                        ) : (
-                            <div className="bg-white/10 border border-white/10 rounded-2xl p-4 space-y-3">
-                                <div className="flex items-center gap-3">
-                                    <span className="text-green-400 text-xl">🎙️</span>
-                                    <div className="flex-1">
-                                        <p className="text-white text-sm font-semibold">Message enregistré</p>
-                                        <p className="text-white/50 text-xs">{formatDuree(duree)}</p>
-                                    </div>
-                                    <button
-                                        onClick={supprimerAudio}
-                                        className="text-white/40 hover:text-red-400 text-xs transition-colors"
-                                    >
-                                        ✕ Supprimer
-                                    </button>
-                                </div>
-                                <audio src={audioURL} controls className="w-full h-8 rounded-lg" />
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Description */}
-                    <div>
-                        <label className="block text-white/60 text-xs uppercase tracking-wide mb-1">
-                            Description courte
+                        <label className="block text-slate-400 text-sm mb-2">
+                            {formData.type === 'contrat' ? 'Décrivez votre événement / projet en détail *' : 'Décrivez votre besoin *'}
                         </label>
                         <textarea
-                            value={description}
-                            onChange={(e) => { setDescription(e.target.value); setMessage(''); }}
-                            placeholder="Ex : fuite, robinet cassé, tuyau bouché..."
-                            rows={3}
-                            className="w-full bg-white/10 border border-white/10 rounded-xl p-3 text-white placeholder-white/40 text-sm focus:border-purple-500 outline-none"
+                            placeholder={formData.type === 'contrat'
+                                ? 'Ex : Mariage le 15 juillet, 200 personnes, besoin d\'un DJ pour 6h...'
+                                : 'Ex : Fuite d\'eau sous l\'évier de la cuisine...'}
+                            value={formData.besoin}
+                            onChange={handleChange('besoin')}
+                            className="w-full h-32 bg-white/[0.04] p-4 rounded-xl border border-white/[0.08] focus:border-purple-500 outline-none transition"
                         />
                     </div>
-
-                    {/* Photo */}
-                    <div>
-                        <label className="block text-white/60 text-xs uppercase tracking-wide mb-1">
-                            Photo de la panne
-                        </label>
-                        <div
-                            onClick={() => document.getElementById('photo-input').click()}
-                            className="w-full bg-white/10 border border-white/10 rounded-xl p-4 text-center cursor-pointer hover:bg-white/15 transition-all"
-                        >
-                            {photo ? (
-                                <div className="flex items-center justify-center gap-2 text-green-400 text-sm">
-                                    <span>📎</span>
-                                    <span className="truncate max-w-xs">{photo.name}</span>
-                                </div>
-                            ) : (
-                                <p className="text-white/40 text-sm">📷 Appuyez pour ajouter une photo</p>
-                            )}
-                        </div>
-                        <input
-                            id="photo-input"
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => setPhoto(e.target.files[0])}
-                            className="hidden"
-                        />
-                    </div>
-
-                    {message && <p className="text-red-400 text-sm">{message}</p>}
-
-                    <button
-                        onClick={handleSubmit}
-                        disabled={loading}
-                        className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all"
-                    >
-                        {loading ? (
-                            <>
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                Envoi en cours…
-                            </>
-                        ) : (
-                            '🚀 Envoyer ma demande'
-                        )}
-                    </button>
-
                 </div>
+
+                <button
+                    onClick={handleSubmit}
+                    disabled={loading}
+                    className="w-full mt-8 py-5 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl font-black text-xl active:scale-95 hover:shadow-lg hover:shadow-purple-500/20 transition-all disabled:opacity-50"
+                >
+                    {loading ? 'Envoi en cours...' : 'CONFIRMER LA DEMANDE'}
+                </button>
             </div>
         </div>
     );

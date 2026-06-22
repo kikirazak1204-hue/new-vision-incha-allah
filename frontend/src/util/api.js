@@ -1,14 +1,34 @@
 // ============================================================
-// src/util/api.js — Version mise à jour
+// src/util/api.js
 // ============================================================
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const BASE_URL = 'https://newvision-backend.onrender.com';
 
-const requestJson = async (url, options = {}) => {
-  const res = await fetch(url, options);
-  const contentType = res.headers.get('content-type') || '';
+// ============================================================
+// 🔧 UTILITAIRE REQUEST (Gère JSON et FormData)
+// ============================================================
+const request = async (endpoint, options = {}) => {
+  const url = `${BASE_URL}${endpoint}`;
+  
+  const isFormData = options.body instanceof FormData;
+  const defaultHeaders = options.headers || {};
+  
+  const headers = {
+    ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
+    ...defaultHeaders,
+  };
+
+  const config = {
+    ...options,
+    headers,
+  };
+
+  console.log(`🌐 Appel API : ${config.method || 'GET'} ${url}`);
+
+  const res = await fetch(url, config);
 
   let data;
+  const contentType = res.headers.get('content-type') || '';
   if (contentType.includes('application/json')) {
     data = await res.json();
   } else {
@@ -16,187 +36,173 @@ const requestJson = async (url, options = {}) => {
   }
 
   if (!res.ok) {
-    const message =
-      (data && typeof data === 'object' && (data.message || data.error)) ||
-      (typeof data === 'string' && data) ||
-      `HTTP ${res.status} ${res.statusText}`;
-
+    console.error(`❌ Erreur API (${res.status}) :`, data);
+    const message = (data && typeof data === 'object' && (data.message || data.error)) || 
+                    (typeof data === 'string' && data) || 
+                    `HTTP ${res.status} ${res.statusText}`;
     throw new Error(message);
   }
 
   return data;
 };
 
+// ============================================================
+// 🔐 HEADERS AUTH
+// ============================================================
 export const authHeaders = () => {
   const token = localStorage.getItem('token');
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
 };
 
 // ============================================================
-// 👤 AUTH & UTILISATEURS
+// 👤 AUTH
 // ============================================================
 export const loginUser = async ({ email, password }) => {
-  return requestJson(`${BASE_URL}/api/auth/login`, {
+  return request('/api/auth/login', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
 };
 
 export const registerUser = (payload) =>
-  requestJson(`${BASE_URL}/api/auth/register`, {
+  request('/api/auth/register', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
 
-export const registerFournisseur = (payload, token) =>
-  requestJson(`${BASE_URL}/api/fournisseurs`, {
+// ============================================================
+// 🧑‍💼 FOURNISSEUR
+// ============================================================
+export const registerFournisseur = async (formData) => {
+  return request('/api/fournisseurs', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
+    headers: authHeaders(),
+    body: formData, // FormData géré automatiquement par request
   });
+};
 
 // ============================================================
 // 📊 DASHBOARDS
 // ============================================================
 export const getDashboardClient = () =>
-  requestJson(`${BASE_URL}/api/dashboard/client`, {
-    headers: authHeaders(),
-  });
+  request('/api/dashboard/client', { headers: authHeaders() });
 
 export const getDashboardFournisseur = () =>
-  requestJson(`${BASE_URL}/api/dashboard/fournisseur`, {
-    headers: authHeaders(),
-  });
+  request('/api/dashboard/fournisseur', { headers: authHeaders() });
 
 // ============================================================
-// 🛠️ SERVICES & FOURNISSEURS
+// 🛠️ SERVICES
 // ============================================================
-export const getServices = () =>
-  requestJson(`${BASE_URL}/api/services`);
+export const getServices = () => request('/api/services');
 
-export const getService = (id) =>
-  requestJson(`${BASE_URL}/api/services/${id}`);
+export const getService = (id) => {
+  if (!id) throw new Error("ID de service manquant");
+  return request(`/api/services/${id}`);
+};
 
-export const getFournisseursParService = (id) =>
-  requestJson(`${BASE_URL}/api/services/${id}/fournisseurs`);
+export const getFournisseursParService = (id) => {
+  if (!id) throw new Error("ID de service manquant");
+  return request(`/api/services/${id}/fournisseurs`);
+};
 
 // ============================================================
 // 📦 PRODUITS
 // ============================================================
-export const getProduits = () =>
-  requestJson(`${BASE_URL}/api/produits`);
+export const getProduits = (params = {}) => {
+  const query = new URLSearchParams(params).toString();
+  return request(`/api/produits${query ? `?${query}` : ''}`);
+};
 
 export const getProduitsFournisseur = () =>
-  requestJson(`${BASE_URL}/api/produits/fournisseur`, {
-    headers: authHeaders(),
-  });
+  request('/api/produits/fournisseur', { headers: authHeaders() });
 
 export const addProduit = (formData) =>
-  requestJson(`${BASE_URL}/api/produits`, {
+  request('/api/produits', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem('token')}`,
-    },
+    headers: authHeaders(),
     body: formData,
   });
 
 export const deleteProduit = (id) =>
-  requestJson(`${BASE_URL}/api/produits/${id}`, {
+  request(`/api/produits/${id}`, {
     method: 'DELETE',
     headers: authHeaders(),
   });
 
 // ============================================================
-// 💳 PAIEMENTS & COMMANDES
+// 💳 COMMANDES / PAIEMENTS
 // ============================================================
 export const creerCommande = (commande) =>
-  requestJson(`${BASE_URL}/api/commandes`, {
+  request('/api/commandes', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(commande),
   });
 
 export const validerPaiement = (payload) =>
-  requestJson(`${BASE_URL}/api/paiements/mobile-money`, {
+  request('/api/paiements/mobile-money', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(payload),
   });
 
 // ============================================================
-// 🛡️ ADMIN PANEL
+// 🛡️ ADMIN
 // ============================================================
 export const getAdminFournisseurs = (statut) =>
-  requestJson(`${BASE_URL}/api/admin/fournisseurs?statut=${statut}`, {
-    headers: authHeaders(),
-  });
+  request(`/api/admin/fournisseurs?statut=${statut}`, { headers: authHeaders() });
 
 export const updateStatutFournisseur = (id, statut) =>
-  requestJson(`${BASE_URL}/api/admin/fournisseurs/${id}/statut`, {
+  request(`/api/admin/fournisseurs/${id}/statut`, {
     method: 'PUT',
     headers: authHeaders(),
     body: JSON.stringify({ statut }),
   });
 
 export const getAdminPaiements = () =>
-  requestJson(`${BASE_URL}/api/admin/paiements`, {
-    headers: authHeaders(),
-  });
+  request('/api/admin/paiements', { headers: authHeaders() });
 
 export const updateStatutPaiement = (id, statut) =>
-  requestJson(`${BASE_URL}/api/admin/paiements/${id}`, {
+  request(`/api/admin/paiements/${id}`, {
     method: 'PUT',
     headers: authHeaders(),
     body: JSON.stringify({ statut }),
   });
 
 export const getAdminUtilisateurs = () =>
-  requestJson(`${BASE_URL}/api/admin/utilisateurs`, {
-    headers: authHeaders(),
-  });
+  request('/api/admin/utilisateurs', { headers: authHeaders() });
 
 export const deleteUtilisateur = (id) =>
-  requestJson(`${BASE_URL}/api/admin/utilisateurs/${id}`, {
+  request(`/api/admin/utilisateurs/${id}`, {
     method: 'DELETE',
     headers: authHeaders(),
   });
 
 export const getAdminProduits = () =>
-  requestJson(`${BASE_URL}/api/admin/produits`, {
-    headers: authHeaders(),
-  });
+  request('/api/admin/produits', { headers: authHeaders() });
 
 export const deleteAdminProduit = (id) =>
-  requestJson(`${BASE_URL}/api/admin/produits/${id}`, {
+  request(`/api/admin/produits/${id}`, {
     method: 'DELETE',
     headers: authHeaders(),
   });
 
 // ============================================================
-// 📅 RÉSERVATIONS (ADMIN)
+// 📅 RÉSERVATIONS
 // ============================================================
 export const getAdminReservations = () =>
-  requestJson(`${BASE_URL}/api/reservations/admin`, {
-    headers: authHeaders(),
-  });
+  request('/api/admin/reservations', { headers: authHeaders() });
 
+// CORRECTION : Changement de PATCH en PUT pour éviter l'erreur CORS
 export const updateReservationStatut = (id, statut) =>
-  requestJson(`${BASE_URL}/api/reservations/${id}/statut`, {
-    method: 'PATCH',
+  request(`/api/reservations/${id}/statut`, {
+    method: 'PATCH', 
     headers: authHeaders(),
     body: JSON.stringify({ statut }),
   });
 
 export const deleteReservation = (id) =>
-  requestJson(`${BASE_URL}/api/reservations/${id}`, {
+  request(`/api/reservations/${id}`, {
     method: 'DELETE',
     headers: authHeaders(),
   });

@@ -18,7 +18,7 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 // =====================
-// 🌐 CORS CONFIG FIXÉ
+// 🌐 CORS CONFIG FIXÉ (Avec PATCH ajouté)
 // =====================
 const corsOptions = {
     origin: function (origin, callback) {
@@ -37,15 +37,16 @@ const corsOptions = {
             return callback(null, true);
         }
 
-        return callback(null, true); // 🔥 TEMP SAFE MODE (évite Failed to fetch)
+        return callback(null, true); 
     },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    // ✅ ICI : 'PATCH' est ajouté, le blocage CORS va disparaître
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+app.options('*', cors(corsOptions)); // Important pour le preflight
 
 // =====================
 // 🧠 MIDDLEWARES
@@ -118,5 +119,4 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
     console.log(`🚀 Serveur démarré sur le port ${PORT}`);
-    console.log(`📡 URL : http://localhost:${PORT}`);
 });

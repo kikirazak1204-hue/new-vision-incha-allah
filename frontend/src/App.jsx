@@ -1,73 +1,64 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
+
+// Providers et Contexts
 import { PanierProvider } from './context/PanierContext';
+import { NavigationProvider } from './context/NavigationContext';
 
+// Composants de protection
+import ProtectedRoute from './components/ProtectedRoute';
+
+// Importations des pages
 import Accueil from './pages/Accueil';
-import Login from './pages/Login';
-import Register from './pages/Register';
+import ServiceDetailPage from './pages/ServiceDetailPage';
+import RegisterPrestataire from './pages/RegisterPrestataire';
 import RegisterUtilisateur from './pages/RegisterUtilisateur';
-import FournisseursParService from './pages/FournisseursParService';
-import PaiementPage from './pages/PaiementPage';
-import DashboardFournisseur from './pages/DashboardFournisseur';
+import Login from './pages/Login';
 import DashboardClient from './pages/DashboardClient';
-import AjouterProduit from './pages/AjouterProduit';
-import VoirProduits from './pages/VoirProduitsPage';
-import HistoriquePaiements from './pages/HistoriquePaiements';
-import ModifierProduit from './pages/ModifierProduit';
-import AdminDashboard from './pages/AdminDashboard';
-import WhatsAppSetup from './pages/WhatsAppSetup';
-
-function PrivateRoute({ children, role }) {
-    const token = localStorage.getItem('token');
-    if (!token) return <Navigate to="/login" replace />;
-    if (role) {
-        try {
-            const user = JSON.parse(localStorage.getItem('user')) || {};
-            if (user.role !== role) return <Navigate to="/accueil" replace />;
-        } catch {
-            return <Navigate to="/login" replace />;
-        }
-    }
-    return children;
-}
+import DashboardFournisseur from './pages/DashboardFournisseur';
+import DashboardAdmin from './pages/AdminDashboard';
+import ReservationPage from './pages/ReservationPage';
+import ProduitsParFournisseur from './pages/ProduitsParFournisseur';
 
 export default function App() {
     return (
-        <Router>
-            <PanierProvider>
-                <Routes>
-                    {/* Publiques */}
-                    <Route path="/accueil" element={<Accueil />} />
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/register" element={<Register />} />
-                    <Route path="/register-utilisateur" element={<RegisterUtilisateur />} />
-                    <Route path="/services/:id" element={<FournisseursParService />} />
-                    <Route path="/voir-produitsPage" element={<VoirProduits />} />
-
-                    {/* Client */}
-                    <Route path="/dashboard-client" element={<PrivateRoute role="utilisateur"><DashboardClient /></PrivateRoute>} />
-                    <Route path="/mes-paiements" element={<PrivateRoute><HistoriquePaiements /></PrivateRoute>} />
-                    <Route path="/paiement" element={<PrivateRoute><PaiementPage /></PrivateRoute>} />
-
-                    {/* Fournisseur */}
-                    <Route path="/dashboard-fournisseur" element={<PrivateRoute role="fournisseur"><DashboardFournisseur /></PrivateRoute>} />
-                    <Route path="/ajouter-produit" element={<PrivateRoute role="fournisseur"><AjouterProduit /></PrivateRoute>} />
-                    <Route path="/modifier-produit/:id" element={<PrivateRoute role="fournisseur"><ModifierProduit /></PrivateRoute>} />
-
-                    {/* ✅ Admin protégé — role admin uniquement */}
-                    <Route path="/admin" element={
-                        <PrivateRoute role="admin">
-                            <AdminDashboard />
-                        </PrivateRoute>
-                    } />
-
-                    {/* WhatsApp Setup */}
-                    <Route path="/whatsapp-setup" element={<WhatsAppSetup />} />
-
-                    <Route path="/" element={<Navigate to="/accueil" replace />} />
-                    <Route path="*" element={<Navigate to="/accueil" replace />} />
-                </Routes>
-            </PanierProvider>
-        </Router>
+        <PanierProvider>
+            <NavigationProvider>
+                <div className="min-h-screen bg-slate-950 font-sans text-slate-100">
+                    <Routes>
+                        {/* Pages Publiques */}
+                        <Route path="/" element={<Accueil />} />
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/register-utilisateur" element={<RegisterUtilisateur />} />
+                        <Route path="/register-prestataire" element={<RegisterPrestataire />} />
+                        
+                        {/* Dashboards Sécurisés */}
+                        <Route path="/dashboard-client" element={
+                            <ProtectedRoute>
+                                <DashboardClient />
+                            </ProtectedRoute>
+                        } />
+                        <Route path="/dashboard-fournisseur" element={
+                            <ProtectedRoute>
+                                <DashboardFournisseur />
+                            </ProtectedRoute>
+                        } />
+                        <Route path="/admin" element={
+                            <ProtectedRoute role="admin">
+                                <DashboardAdmin />
+                            </ProtectedRoute>
+                        } />
+                        
+                        {/* Pages dynamiques */}
+                        <Route path="/service/:id" element={<ServiceDetailPage />} />
+                        <Route path="/produits/:fournisseurId" element={<ProduitsParFournisseur />} />
+                        <Route path="/reservation" element={<ReservationPage />} />
+                        
+                        {/* Redirection par défaut */}
+                        <Route path="*" element={<Navigate to="/" />} />
+                    </Routes>
+                </div>
+            </NavigationProvider>
+        </PanierProvider>
     );
 }

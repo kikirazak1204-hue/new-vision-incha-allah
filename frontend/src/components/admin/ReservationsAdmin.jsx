@@ -1,17 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import {
-    getAdminReservations,
-    updateReservationStatut,
-    deleteReservation,
-} from '../../util/api';
-
-const API_URL = import.meta.env.VITE_API_URL;
-
-const fileUrl = (filename) => {
-    if (!filename) return null;
-    if (filename.startsWith('http')) return filename;
-    return `${API_URL}/uploads/reservations/${filename}`;
-};
+import { getAdminReservations, updateReservationStatut } from '../../util/api';
+import { Check, X, Info, MapPin, Loader2, User, Phone, Home, AlertCircle } from 'lucide-react';
 
 export default function ReservationsAdmin() {
     const [reservations, setReservations] = useState([]);
@@ -21,191 +10,145 @@ export default function ReservationsAdmin() {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        let mounted = true;
-        async function load() {
-            setLoading(true);
-            setError(null);
-            try {
-                const res = await getAdminReservations();
-                if (!mounted) return;
-                setReservations(res.data || []);
-            } catch (err) {
-                console.error('Erreur chargement réservations', err);
-                setError(err.message || 'Erreur chargement réservations');
-            } finally {
-                if (mounted) setLoading(false);
-            }
-        }
-        load();
-        return () => { mounted = false; };
+        loadData();
     }, []);
 
+    const loadData = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await getAdminReservations();
+            setReservations(res.data || []);
+        } catch (e) {
+            console.error("Erreur chargement:", e);
+            setError("Impossible de charger les réservations.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleChangeStatut = async (id, statut) => {
-        if (!window.confirm(`Confirmer : passer la réservation ${id} à "${statut}" ?`)) return;
+        if (!window.confirm(`Confirmer le changement de statut vers : ${statut} ?`)) return;
+        
+        setProcessing(id);
         try {
-            setProcessing(id);
-            const res = await updateReservationStatut(id, statut);
-            setReservations(prev => prev.map(r => (r.id === id ? res.data : r)));
-            alert('Statut mis à jour.');
-        } catch (err) {
-            console.error(err);
-            alert(err.message || 'Erreur lors de la mise à jour');
+            await updateReservationStatut(id, statut);
+            // On recharge les données pour une UI propre et synchronisée
+            await loadData(); 
+            setSelected(null);
+        } catch (e) {
+            alert("Erreur lors de la mise à jour : " + e.message);
         } finally {
             setProcessing(null);
         }
     };
-
-    const handleSupprimer = async (id) => {
-        if (!window.confirm('Supprimer définitivement cette réservation ?')) return;
-        try {
-            setProcessing(id);
-            const res = await deleteReservation(id);
-            if (res.success) {
-                setReservations(prev => prev.filter(r => r.id !== id));
-                alert('Réservation supprimée.');
-            } else {
-                throw new Error(res.message || 'Erreur suppression');
-            }
-        } catch (err) {
-            console.error(err);
-            alert(err.message || 'Erreur lors de la suppression');
-        } finally {
-            setProcessing(null);
-        }
-    };
-
-    if (loading) return <div className="text-center py-10 animate-pulse">Chargement des réservations...</div>;
 
     return (
-        <div className="p-4">
-            <h3 className="text-xl font-semibold mb-4">Réservations - Plomberie</h3>
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex justify-between items-end border-b border-white/5 pb-6">
+                <div>
+                    <h2 className="text-3xl font-black text-white">Gestion des Missions</h2>
+                    <p className="text-slate-400">Suivi des interventions et localisation</p>
+                </div>
+                <button 
+                    onClick={loadData} 
+                    className="px-5 py-2.5 bg-white/5 hover:bg-white/10 rounded-2xl text-xs font-bold text-white border border-white/10 transition active:scale-95"
+                >
+                    🔄 Actualiser
+                </button>
+            </div>
 
-            {error && <div className="mb-4 text-red-400 text-sm">{error}</div>}
-
-            {reservations.length === 0 ? (
-                <div className="text-gray-400">Aucune réservation trouvée.</div>
-            ) : (
-                <div className="overflow-x-auto">
-                    <table className="w-full table-auto text-left">
-                        <thead>
-                            <tr className="text-sm text-gray-400">
-                                <th className="px-3 py-2">ID</th>
-                                <th className="px-3 py-2">Client</th>
-                                <th className="px-3 py-2">Téléphone</th>
-                                <th className="px-3 py-2">Service</th>
-                                <th className="px-3 py-2">Date</th>
-                                <th className="px-3 py-2">Statut</th>
-                                <th className="px-3 py-2">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {reservations.map(r => (
-                                <tr key={r.id} className="border-t border-white/5">
-                                    <td className="px-3 py-3 text-sm text-gray-200">{r.id}</td>
-                                    <td className="px-3 py-3 text-sm">{r.clientNom || r.client?.nom || '—'}</td>
-                                    <td className="px-3 py-3 text-sm text-gray-400">{r.telephone || r.client?.telephone || '—'}</td>
-                                    <td className="px-3 py-3 text-sm">{r.serviceNom || r.service?.nom || 'Plomberie'}</td>
-                                    <td className="px-3 py-3 text-sm text-gray-300">{new Date(r.date || r.createdAt).toLocaleString()}</td>
-                                    <td className="px-3 py-3 text-sm">
-                                        <span className={`px-2 py-1 rounded-full text-xs ${r.statut === 'ACCEPTEE' ? 'bg-emerald-600/20 text-emerald-300' :
-                                                r.statut === 'ANNULEE' ? 'bg-red-600/10 text-red-300' :
-                                                    'bg-yellow-500/10 text-yellow-300'
-                                            }`}>
-                                            {r.statut || 'EN_ATTENTE'}
-                                        </span>
-                                    </td>
-                                    <td className="px-3 py-3 text-sm flex gap-2">
-                                        <button
-                                            onClick={() => setSelected(r)}
-                                            className="px-2 py-1 bg-white/5 hover:bg-white/10 rounded text-sm"
-                                        >
-                                            Détails
-                                        </button>
-                                        <button
-                                            onClick={() => handleChangeStatut(r.id, r.statut === 'ACCEPTEE' ? 'EN_ATTENTE' : 'ACCEPTEE')}
-                                            disabled={processing === r.id}
-                                            className="px-2 py-1 bg-emerald-600/10 hover:bg-emerald-600/20 rounded text-sm text-emerald-300 disabled:opacity-50"
-                                        >
-                                            {processing === r.id ? '…' : 'Approuver'}
-                                        </button>
-                                        <button
-                                            onClick={() => handleChangeStatut(r.id, 'ANNULEE')}
-                                            disabled={processing === r.id}
-                                            className="px-2 py-1 bg-red-600/10 hover:bg-red-600/20 rounded text-sm text-red-300 disabled:opacity-50"
-                                        >
-                                            {processing === r.id ? '…' : 'Annuler'}
-                                        </button>
-                                        <button
-                                            onClick={() => handleSupprimer(r.id)}
-                                            disabled={processing === r.id}
-                                            className="px-2 py-1 bg-red-500/5 hover:bg-red-500/10 rounded text-sm text-red-400 disabled:opacity-50"
-                                        >
-                                            {processing === r.id ? '…' : 'Supprimer'}
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+            {error && (
+                <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-400 flex items-center gap-2">
+                    <AlertCircle size={18}/> {error}
                 </div>
             )}
 
-            {/* Modal détails */}
+            {/* Table */}
+            <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-3xl overflow-hidden">
+                <table className="w-full text-left">
+                    <thead>
+                        <tr className="border-b border-white/5 text-slate-500 text-[10px] uppercase tracking-widest">
+                            <th className="px-6 py-5">Client</th>
+                            <th className="px-6 py-5">Service</th>
+                            <th className="px-6 py-5">Localisation</th>
+                            <th className="px-6 py-5">Statut</th>
+                            <th className="px-6 py-5 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                        {loading ? (
+                            <tr><td colSpan="5" className="py-20 text-center text-slate-500">Chargement...</td></tr>
+                        ) : reservations.map(r => (
+                            <tr key={r.id} className="hover:bg-white/[0.02] transition">
+                                <td className="px-6 py-4">
+                                    <div className="font-bold text-white text-sm">{r.clientNom || 'Anonyme'}</div>
+                                    <div className="text-[11px] text-slate-500 flex items-center gap-1"><Phone size={10}/> {r.telephone || 'N/A'}</div>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <span className="text-sm text-purple-300 font-medium">{r.serviceNom}</span>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <div className="flex items-center gap-2 text-slate-300 text-sm">
+                                        <MapPin size={14} className="text-purple-500"/>
+                                        {r.adresse || r.adresseIntervention || <span className="text-slate-700 italic">Non renseigné</span>}
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <StatusBadge statut={r.statut} />
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                    <button 
+                                        onClick={() => setSelected(r)} 
+                                        className="p-2 bg-white/5 hover:bg-purple-500/20 rounded-xl text-slate-400 hover:text-purple-300 transition"
+                                    >
+                                        <Info size={18} />
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Modal Détails */}
             {selected && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black/60 p-4 z-50">
-                    <div className="bg-gray-900 rounded-2xl p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="flex justify-between items-start mb-4">
-                            <h4 className="text-lg font-semibold">Détails réservation #{selected.id}</h4>
-                            <button onClick={() => setSelected(null)} className="text-sm text-gray-400 hover:text-white">✕</button>
-                        </div>
-
-                        <div className="space-y-3 text-sm text-gray-200">
-                            <div><span className="text-gray-400">Client :</span> {selected.clientNom || selected.client?.nom || '—'}</div>
-                            <div><span className="text-gray-400">Téléphone :</span> {selected.telephone || selected.client?.telephone || '—'}</div>
-                            <div><span className="text-gray-400">Service :</span> {selected.serviceNom || selected.service?.nom || '—'}</div>
-                            <div><span className="text-gray-400">Date :</span> {new Date(selected.date || selected.createdAt).toLocaleString()}</div>
-                            <div><span className="text-gray-400">Statut :</span> {selected.statut || 'EN_ATTENTE'}</div>
-                            <div><span className="text-gray-400">Montant estimé :</span> {selected.montantTotal || '—'}</div>
-                            {selected.adresseIntervention && (
-                                <div><span className="text-gray-400">Adresse :</span> {selected.adresseIntervention}</div>
-                            )}
-                            {selected.description && (
-                                <div><span className="text-gray-400">Description :</span> {selected.description}</div>
-                            )}
-
-                            {/* ✅ Photo corrigée */}
-                            {selected.photo && (
-                                <div className="mt-3">
-                                    <p className="text-gray-400 mb-1">Photo :</p>
-                                    <img
-                                        src={fileUrl(selected.photo)}
-                                        alt="Photo de la panne"
-                                        className="max-h-48 rounded-xl border border-white/10"
-                                        onError={(e) => { e.target.style.display = 'none'; }}
-                                    />
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+                    <div className="bg-slate-900 border border-white/10 p-8 rounded-3xl max-w-lg w-full shadow-2xl relative">
+                        <h3 className="text-2xl font-black text-white mb-6 flex items-center gap-2">
+                            <MapPin className="text-purple-500"/> Dossier #{selected.id.toString().slice(-4)}
+                        </h3>
+                        
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                                <DetailItem icon={<User size={14}/>} label="Client" value={selected.clientNom} />
+                                <DetailItem icon={<Phone size={14}/>} label="Téléphone" value={selected.telephone} />
+                            </div>
+                            
+                            <div className="p-4 bg-purple-500/5 rounded-2xl border border-purple-500/10">
+                                <div className="text-[10px] uppercase tracking-wider text-purple-400/70 font-bold mb-1 flex items-center gap-1">
+                                    <MapPin size={12}/> Lieu d'intervention
                                 </div>
-                            )}
+                                <div className="text-white font-bold text-lg">{selected.adresse || selected.adresseIntervention || 'Non renseigné'}</div>
+                            </div>
 
-                            {/* ✅ Audio corrigé */}
-                            {selected.audio && (
-                                <div className="mt-3">
-                                    <p className="text-gray-400 mb-1">Message vocal :</p>
-                                    <audio
-                                        src={fileUrl(selected.audio)}
-                                        controls
-                                        className="w-full rounded-lg"
-                                    />
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="mt-6 flex justify-end gap-2">
-                            <button
-                                onClick={() => setSelected(null)}
-                                className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-sm"
-                            >
-                                Fermer
-                            </button>
+                            <DetailItem icon={<Home size={14}/>} label="Description" value={selected.besoin} isLong />
+                            
+                            <div className="flex gap-3 pt-4 border-t border-white/5">
+                                <button 
+                                    onClick={() => handleChangeStatut(selected.id, 'ACCEPTEE')} 
+                                    className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold transition flex items-center justify-center gap-2"
+                                >
+                                    {processing === selected.id ? <Loader2 className="animate-spin" size={18}/> : 'Valider'}
+                                </button>
+                                <button 
+                                    onClick={() => handleChangeStatut(selected.id, 'ANNULEE')} 
+                                    className="flex-1 py-3 bg-white/5 hover:bg-rose-500/20 text-white hover:text-rose-400 rounded-xl font-bold transition"
+                                >
+                                    Refuser
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -213,3 +156,23 @@ export default function ReservationsAdmin() {
         </div>
     );
 }
+
+const StatusBadge = ({ statut }) => {
+    const colors = {
+        ACCEPTEE: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+        ANNULEE: "text-rose-400 bg-rose-500/10 border-rose-500/20",
+        EN_ATTENTE: "text-amber-400 bg-amber-500/10 border-amber-500/20"
+    };
+    return (
+        <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border ${colors[statut] || colors.EN_ATTENTE}`}>
+            {statut?.replace('_', ' ') || 'En attente'}
+        </span>
+    );
+};
+
+const DetailItem = ({ icon, label, value, isLong }) => (
+    <div className={isLong ? "col-span-2" : ""}>
+        <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1 flex items-center gap-1">{icon} {label}</div>
+        <div className="text-white font-medium p-3 bg-white/5 rounded-xl border border-white/5">{value || '—'}</div>
+    </div>
+);

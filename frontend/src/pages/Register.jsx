@@ -1,16 +1,29 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 export default function Register() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-900 to-slate-800 text-white">
-      <div className="p-8 bg-black/60 rounded-lg shadow-lg text-center">
-        <h1 className="text-2xl font-bold mb-2">Inscription (temporaire)</h1>
-        <p className="text-sm text-white/70">Page d'inscription remplacée temporairement pour réparer la build.</p>
-        <div className="mt-4">
-          <Link to="/login" className="text-blue-400 hover:underline">Se connecter</Link>
+    const navigate = useNavigate();
+
+    return (
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 text-white">
+            <div className="max-w-md w-full bg-slate-900/50 backdrop-blur-xl p-8 rounded-3xl border border-slate-800 shadow-2xl">
+                <h1 className="text-3xl font-black text-center mb-2">Rejoignez Kanari</h1>
+                <p className="text-slate-400 text-center mb-8">Choisissez votre profil pour continuer</p>
+
+                <div className="space-y-4">
+                    <button onClick={() => navigate('/register-utilisateur')} 
+                        className="w-full p-6 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-2xl transition text-left">
+                        <h3 className="font-bold text-lg">Je suis un Client</h3>
+                        <p className="text-xs text-slate-400">Pour réserver vos services rapidement.</p>
+                    </button>
+
+                    <button onClick={() => navigate('/register-prestataire')} 
+                        className="w-full p-6 bg-slate-800 hover:bg-indigo-900/30 border border-slate-700 hover:border-indigo-500 transition text-left">
+                        <h3 className="font-bold text-lg">Je suis un Prestataire</h3>
+                        <p className="text-xs text-slate-400">Pour proposer vos services et être suivi.</p>
+                    </button>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 }
