@@ -7,7 +7,6 @@ const Reservation = sequelize.define('Reservation', {
         primaryKey: true,
         autoIncrement: true
     },
-    // ── Infos du besoin ──────────────────────────────
     besoin: {
         type: DataTypes.TEXT,
         allowNull: false
@@ -22,51 +21,43 @@ const Reservation = sequelize.define('Reservation', {
     },
     clientNom: {
         type: DataTypes.STRING,
-        allowNull: true // client peut réserver sans compte
+        allowNull: true
     },
     dateIntervention: {
         type: DataTypes.DATE,
-        allowNull: true // utile pour type 'planifie' et 'contrat'
+        allowNull: true
     },
-
-    // ── Type de réservation ──────────────────────────
     type: {
         type: DataTypes.ENUM('classique', 'planifie', 'contrat'),
         defaultValue: 'classique'
     },
-
-    // ── Parcours d'origine ───────────────────────────
     parcours: {
         type: DataTypes.ENUM('assignation', 'direct'),
         defaultValue: 'assignation'
-        // 'assignation' = Parcours 1 (Kanari choisit le presta)
-        // 'direct' = Parcours 2 (client a choisi un presta précis)
     },
 
-    // ── Statut de suivi ───────────────────────────────
+    // ── ✅ Statuts mis à jour avec double validation ──────
     statut: {
         type: DataTypes.ENUM(
-            'en_attente',
-            'assigne',
-            'accepte',
-            'en_cours',
-            'termine',
-            'valide',
-            'annule'
+            'en_attente',          // Réservation reçue, pas encore assignée
+            'assigne',              // Admin a assigné un prestataire
+            'en_validation_admin',  // Presta a accepté, attend ton feu vert
+            'accepte',              // Toi tu as autorisé le démarrage
+            'en_cours',             // Mission démarrée par le presta
+            'termine',              // Bon d'intervention rempli par le presta
+            'valide',               // Client a validé le bon d'intervention
+            'annule'                // Annulée à n'importe quelle étape
         ),
         defaultValue: 'en_attente'
     },
 
-    // ── Paiement / Commission ─────────────────────────
     modePaiement: {
         type: DataTypes.ENUM('direct_prestataire', 'depot_kanari'),
         allowNull: true
-        // direct_prestataire : client paie le presta, qui reverse 15% à Kanari
-        // depot_kanari : client paie Kanari, qui reverse 85% au presta
     },
     codePrestataireUtilise: {
         type: DataTypes.STRING,
-        allowNull: true // code unique du presta utilisé pour tracer le dépôt
+        allowNull: true
     },
     commissionStatut: {
         type: DataTypes.ENUM('en_attente', 'recue', 'en_retard'),
@@ -74,17 +65,16 @@ const Reservation = sequelize.define('Reservation', {
     },
     commissionDateLimite: {
         type: DataTypes.DATE,
-        allowNull: true // se calcule à la validation : +48h ou +72h
+        allowNull: true
     },
 
-    // ── Relations ──────────────────────────────────────
     clientId: {
         type: DataTypes.INTEGER,
-        allowNull: true // peut réserver sans compte
+        allowNull: true
     },
     fournisseurId: {
         type: DataTypes.INTEGER,
-        allowNull: true // null si parcours 'assignation' tant que non assigné
+        allowNull: true
     },
     serviceId: {
         type: DataTypes.INTEGER,
@@ -95,7 +85,16 @@ const Reservation = sequelize.define('Reservation', {
         allowNull: true
     },
 
-    // ── Validation automatique ────────────────────────
+    // ── ✅ Trace du refus presta pour réassignation ────────
+    refusePar: {
+        type: DataTypes.INTEGER,
+        allowNull: true // dernier fournisseurId ayant refusé, pour ne pas le réassigner par erreur
+    },
+    motifRefus: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+
     valideAutomatiquement: {
         type: DataTypes.BOOLEAN,
         defaultValue: false

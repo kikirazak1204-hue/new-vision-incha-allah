@@ -147,7 +147,7 @@ export const validerPaiement = (payload) =>
   });
 
 // ============================================================
-// 🛡️ ADMIN
+// 🛡️ ADMIN GENERAL
 // ============================================================
 export const getAdminFournisseurs = (statut) =>
   request(`/api/admin/fournisseurs?statut=${statut}`, { headers: authHeaders() });
@@ -188,12 +188,12 @@ export const deleteAdminProduit = (id) =>
   });
 
 // ============================================================
-// 📅 RÉSERVATIONS
+// 📅 RÉSERVATIONS (MISSIONS KANARI)
 // ============================================================
 export const getAdminReservations = () =>
   request('/api/admin/reservations', { headers: authHeaders() });
 
-// CORRECTION : Changement de PATCH en PUT pour éviter l'erreur CORS
+// Conservation de ta méthode PATCH d'origine
 export const updateReservationStatut = (id, statut) =>
   request(`/api/reservations/${id}/statut`, {
     method: 'PATCH', 
@@ -205,4 +205,26 @@ export const deleteReservation = (id) =>
   request(`/api/reservations/${id}`, {
     method: 'DELETE',
     headers: authHeaders(),
+  });
+
+// ── NOUVELLES ROUTES ADMIN (KANARI DOUBLE-VALIDATION) ───────
+
+export const assignerFournisseur = (id, fournisseurId) =>
+  request(`/api/reservations/${id}/assigner`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ fournisseurId }),
+  });
+
+export const autoriserDemarrage = (id) =>
+  request(`/api/reservations/${id}/autoriser`, {
+    method: 'PUT',
+    headers: authHeaders(),
+  });
+
+export const adminCreerReservation = (payload) =>
+  request('/api/reservations/admin-creer', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
   });

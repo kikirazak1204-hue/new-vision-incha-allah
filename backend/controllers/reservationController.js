@@ -5,8 +5,6 @@ const admin = require('../config/firebase-admin');
 exports.createReservation = async (req, res) => {
     try {
         const { fournisseurId, serviceId, serviceNom } = req.body;
-
-        // Détermine le parcours selon la présence d'un fournisseurId
         const parcours = fournisseurId ? 'direct' : 'assignation';
 
         const reservation = await Reservation.create({
@@ -15,38 +13,22 @@ exports.createReservation = async (req, res) => {
             statut: parcours === 'direct' ? 'assigne' : 'en_attente',
         });
 
-        // ── Notification ────────────────────────────────
         if (parcours === 'direct') {
-            // Parcours 2 : notifie uniquement le prestataire choisi
             const fournisseur = await Fournisseur.findByPk(fournisseurId);
             if (fournisseur?.fcmToken) {
-                const message = {
-                    notification: {
-                        title: '🔔 Nouvelle réservation directe',
-                        body: `Un client a réservé votre service : ${serviceNom || 'intervention'}`
-                    },
+                admin.messaging().send({
+                    notification: { title: '🔔 Nouvelle réservation directe', body: `Un client a réservé votre service : ${serviceNom || 'intervention'}` },
                     token: fournisseur.fcmToken
-                };
-                admin.messaging().send(message)
-                    .then(r => console.log('Notif presta envoyée:', r))
-                    .catch(e => console.error('Erreur notif presta:', e.message));
+                }).catch(e => console.error('Erreur notif presta:', e.message));
             }
         } else if (serviceId) {
-            // Parcours 1 : notifie tous les prestas abonnés au topic du service
-            const message = {
-                notification: {
-                    title: '🔔 Nouvelle demande Kanari',
-                    body: `Un client a besoin de : ${serviceNom || 'votre service'}`
-                },
+            admin.messaging().send({
+                notification: { title: '🔔 Nouvelle demande Kanari', body: `Un client a besoin de : ${serviceNom || 'votre service'}` },
                 topic: `service_${serviceId}`
-            };
-            admin.messaging().send(message)
-                .then(r => console.log('Notification topic envoyée:', r))
-                .catch(e => console.error('Erreur Firebase topic:', e.message));
+            }).catch(e => console.error('Erreur Firebase topic:', e.message));
         }
 
         res.status(201).json({ success: true, data: reservation });
-
     } catch (error) {
         console.error('Erreur création réservation:', error.message);
         res.status(500).json({ success: false, message: error.message });
@@ -62,23 +44,19 @@ exports.getMesReservations = async (req, res) => {
         });
         res.status(200).json({ success: true, data: reservations });
     } catch (error) {
-        console.error('Erreur lors du GET:', error.message);
         res.status(500).json({ success: false, message: error.message });
     }
 };
 
-// ── PUT /api/reservations/:id/statut ────────────────────────
+// ── PUT /api/reservations/:id/statut — usage générique admin ──
 exports.updateStatut = async (req, res) => {
     try {
         const reservation = await Reservation.findByPk(req.params.id);
-        if (!reservation) {
-            return res.status(404).json({ success: false, message: 'Réservation non trouvée' });
-        }
+        if (!reservation) return res.status(404).json({ success: false, message: 'Réservation non trouvée' });
         reservation.statut = req.body.statut;
         await reservation.save();
         res.status(200).json({ success: true, data: reservation });
     } catch (error) {
-        console.error('Erreur lors du PUT:', error.message);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -88,43 +66,166 @@ exports.assignerFournisseur = async (req, res) => {
     try {
         const { fournisseurId } = req.body;
         const reservation = await Reservation.findByPk(req.params.id);
-        if (!reservation) {
-            return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
-        }
+        if (!reservation) return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
 
-        await reservation.update({ fournisseurId, statut: 'assigne' });
+        await reservation.update({ fournisseurId, statut: 'assigne', refusePar: null, motifRefus: null });
 
         const fournisseur = await Fournisseur.findByPk(fournisseurId);
         if (fournisseur?.fcmToken) {
-            const message = {
-                notification: {
-                    title: '🔔 Mission assignée par Kanari',
-                    body: `Une nouvelle mission vous a été assignée : ${reservation.serviceNom || 'intervention'}`
-                },
+            admin.messaging().send({
+                notification: { title: '🔔 Mission assignée par Kanari', body: `Une nouvelle mission vous a été assignée : ${reservation.serviceNom || 'intervention'}` },
                 token: fournisseur.fcmToken
-            };
-            admin.messaging().send(message)
-                .then(r => console.log('Notif assignation envoyée:', r))
-                .catch(e => console.error('Erreur notif assignation:', e.message));
+            }).catch(e => console.error('Erreur notif assignation:', e.message));
         }
 
         res.json({ success: true, data: reservation });
     } catch (error) {
-        console.error('Erreur assignation:', error.message);
         res.status(500).json({ success: false, message: 'Erreur serveur' });
     }
 };
 
-// ── GET /api/reservations/disponibles — Admin voit les non assignées ──
+// ── PUT /api/reservations/:id/presta-accepter — Presta accepte ──
+// Passe en en_validation_admin : attend ton feu vert avant de démarrer réellement
+exports.prestaAccepter = async (req, res) => {
+    try {
+        const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
+        if (!fournisseur) return res.status(404).json({ success: false, message: 'Profil fournisseur introuvable.' });
+
+        const reservation = await Reservation.findByPk(req.params.id);
+        if (!reservation) return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
+        if (reservation.fournisseurId !== fournisseur.id) return res.status(403).json({ success: false, message: 'Cette mission ne vous est pas assignée.' });
+
+        await reservation.update({ statut: 'en_validation_admin' });
+        res.json({ success: true, data: reservation, message: 'Acceptation transmise. En attente de validation Kanari.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Erreur serveur' });
+    }
+};
+
+// ── PUT /api/reservations/:id/presta-refuser — Presta refuse ──
+// Repart en en_attente pour réassignation par l'admin
+exports.prestaRefuser = async (req, res) => {
+    try {
+        const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
+        if (!fournisseur) return res.status(404).json({ success: false, message: 'Profil fournisseur introuvable.' });
+
+        const reservation = await Reservation.findByPk(req.params.id);
+        if (!reservation) return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
+        if (reservation.fournisseurId !== fournisseur.id) return res.status(403).json({ success: false, message: 'Cette mission ne vous est pas assignée.' });
+
+        await reservation.update({
+            statut: 'en_attente',
+            fournisseurId: null,
+            refusePar: fournisseur.id,
+            motifRefus: req.body.motif || null,
+        });
+        res.json({ success: true, data: reservation, message: 'Mission refusée. Kanari va réassigner.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Erreur serveur' });
+    }
+};
+
+// ── PUT /api/reservations/:id/autoriser — Admin valide après acceptation presta ──
+exports.autoriserDemarrage = async (req, res) => {
+    try {
+        const reservation = await Reservation.findByPk(req.params.id);
+        if (!reservation) return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
+
+        await reservation.update({ statut: 'accepte' });
+
+        const fournisseur = await Fournisseur.findByPk(reservation.fournisseurId);
+        if (fournisseur?.fcmToken) {
+            admin.messaging().send({
+                notification: { title: '✅ Mission validée par Kanari', body: 'Vous pouvez démarrer l\'intervention.' },
+                token: fournisseur.fcmToken
+            }).catch(e => console.error('Erreur notif autorisation:', e.message));
+        }
+
+        res.json({ success: true, data: reservation, message: 'Démarrage autorisé.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Erreur serveur' });
+    }
+};
+
+// ── GET /api/reservations/disponibles — Presta voit ses missions assignées ──
 exports.getReservationsDisponibles = async (req, res) => {
     try {
+        const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
+        if (!fournisseur) return res.status(404).json({ success: false, message: 'Profil fournisseur introuvable.' });
+
         const reservations = await Reservation.findAll({
-            where: { statut: 'en_attente', parcours: 'assignation' },
-            order: [['createdAt', 'ASC']]
+            where: { fournisseurId: fournisseur.id },
+            order: [['createdAt', 'DESC']]
         });
         res.json({ success: true, data: reservations });
     } catch (error) {
-        console.error('Erreur récupération réservations disponibles:', error.message);
+        res.status(500).json({ success: false, message: 'Erreur serveur' });
+    }
+};
+
+// ── POST /api/reservations/admin-creer — Admin crée une réservation complète ──
+exports.adminCreerReservation = async (req, res) => {
+    try {
+        const { besoin, adresse, telephone, clientNom, serviceId, serviceNom, fournisseurId, type, dateIntervention } = req.body;
+
+        if (!besoin || !adresse || !telephone || !serviceId) {
+            return res.status(400).json({ success: false, message: 'Besoin, adresse, téléphone et service sont obligatoires.' });
+        }
+
+        const reservation = await Reservation.create({
+            besoin, adresse, telephone, clientNom,
+            serviceId, serviceNom,
+            fournisseurId: fournisseurId || null,
+            type: type || 'classique',
+            dateIntervention: dateIntervention || null,
+            parcours: fournisseurId ? 'direct' : 'assignation',
+            statut: fournisseurId ? 'assigne' : 'en_attente',
+        });
+
+        if (fournisseurId) {
+            const fournisseur = await Fournisseur.findByPk(fournisseurId);
+            if (fournisseur?.fcmToken) {
+                admin.messaging().send({
+                    notification: { title: '🔔 Mission créée par Kanari', body: `Nouvelle mission : ${serviceNom || 'intervention'}` },
+                    token: fournisseur.fcmToken
+                }).catch(e => console.error('Erreur notif:', e.message));
+            }
+        }
+
+        res.status(201).json({ success: true, data: reservation });
+    } catch (error) {
+        console.error('Erreur création admin réservation:', error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// ── GET /api/admin/reservations — Admin voit tout avec détails complets ──
+exports.getAdminReservations = async (req, res) => {
+    try {
+        const { Fournisseur, Service, User } = require('../models');
+        const reservations = await Reservation.findAll({
+            include: [
+                { model: Fournisseur, as: 'prestataire', attributes: ['id', 'nomEntreprise', 'telephone', 'note'] },
+                { model: Service, as: 'service', attributes: ['id', 'nom', 'emoji'] },
+                { model: User, as: 'client', attributes: ['id', 'nom', 'telephone', 'email'] },
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+        res.json({ success: true, data: reservations });
+    } catch (error) {
+        console.error('Erreur getAdminReservations:', error.message);
+        res.status(500).json({ success: false, message: 'Erreur serveur' });
+    }
+};
+
+// ── DELETE /api/reservations/:id ────────────────────────────
+exports.deleteReservation = async (req, res) => {
+    try {
+        const reservation = await Reservation.findByPk(req.params.id);
+        if (!reservation) return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
+        await reservation.destroy();
+        res.json({ success: true, message: 'Réservation supprimée.' });
+    } catch (error) {
         res.status(500).json({ success: false, message: 'Erreur serveur' });
     }
 };
