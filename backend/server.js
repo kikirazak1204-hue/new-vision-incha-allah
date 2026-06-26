@@ -61,7 +61,7 @@ app.use('/uploads', express.static(uploadDir));
 sequelize.authenticate()
     .then(() => {
         console.log('✅ Base de données connectée.');
-        return sequelize.sync({ alter: true });
+        return sequelize.sync({ alter: false });
     })
     .then(() => {
         console.log('✅ Tables synchronisées.');

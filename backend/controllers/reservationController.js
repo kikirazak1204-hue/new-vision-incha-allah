@@ -1,4 +1,4 @@
-const { Reservation, Fournisseur } = require('../models');
+const { Reservation, Fournisseur, Service, User } = require('../models');
 const admin = require('../config/firebase-admin');
 
 // ── POST /api/reservations ─────────────────────────────────
@@ -85,7 +85,6 @@ exports.assignerFournisseur = async (req, res) => {
 };
 
 // ── PUT /api/reservations/:id/presta-accepter — Presta accepte ──
-// Passe en en_validation_admin : attend ton feu vert avant de démarrer réellement
 exports.prestaAccepter = async (req, res) => {
     try {
         const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
@@ -103,7 +102,6 @@ exports.prestaAccepter = async (req, res) => {
 };
 
 // ── PUT /api/reservations/:id/presta-refuser — Presta refuse ──
-// Repart en en_attente pour réassignation par l'admin
 exports.prestaRefuser = async (req, res) => {
     try {
         const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
@@ -147,7 +145,7 @@ exports.autoriserDemarrage = async (req, res) => {
     }
 };
 
-// ── GET /api/reservations/disponibles — Presta voit ses missions assignées ──
+// ── GET /api/reservations/disponibles ──
 exports.getReservationsDisponibles = async (req, res) => {
     try {
         const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
@@ -163,7 +161,7 @@ exports.getReservationsDisponibles = async (req, res) => {
     }
 };
 
-// ── POST /api/reservations/admin-creer — Admin crée une réservation complète ──
+// ── POST /api/reservations/admin-creer ──
 exports.adminCreerReservation = async (req, res) => {
     try {
         const { besoin, adresse, telephone, clientNom, serviceId, serviceNom, fournisseurId, type, dateIntervention } = req.body;
@@ -199,10 +197,9 @@ exports.adminCreerReservation = async (req, res) => {
     }
 };
 
-// ── GET /api/admin/reservations — Admin voit tout avec détails complets ──
+// ── GET /api/admin/reservations ──
 exports.getAdminReservations = async (req, res) => {
     try {
-        const { Fournisseur, Service, User } = require('../models');
         const reservations = await Reservation.findAll({
             include: [
                 { model: Fournisseur, as: 'prestataire', attributes: ['id', 'nomEntreprise', 'telephone', 'note'] },
@@ -227,5 +224,42 @@ exports.deleteReservation = async (req, res) => {
         res.json({ success: true, message: 'Réservation supprimée.' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Erreur serveur' });
+    }
+};
+
+// ── NOUVEAU : POST /api/reservations/:id/terminer ────────
+exports.terminerMission = async (req, res) => {
+    try {
+        const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
+        if (!fournisseur) {
+            return res.status(404).json({ success: false, message: 'Profil fournisseur introuvable.' });
+        }
+
+        const reservation = await Reservation.findByPk(req.params.id);
+        if (!reservation) {
+            return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
+        }
+        
+        if (reservation.fournisseurId !== fournisseur.id) {
+            return res.status(403).json({ success: false, message: 'Action non autorisée.' });
+        }
+
+        const { descriptionTravail, montantMainOeuvre, piecesFournies } = req.body;
+        
+        await reservation.update({
+            descriptionTravail,
+            montantMainOeuvre,
+            piecesFournies,
+            statut: 'termine'
+        });
+
+        res.status(200).json({ 
+            success: true, 
+            message: 'Bon d\'intervention enregistré avec succès.', 
+            data: reservation 
+        });
+    } catch (error) {
+        console.error('Erreur terminaison mission:', error.message);
+        res.status(500).json({ success: false, message: 'Erreur serveur.' });
     }
 };
