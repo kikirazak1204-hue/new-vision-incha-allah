@@ -18,7 +18,7 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 // =====================
-// 🌐 CORS CONFIG FIXÉ (Avec PATCH ajouté)
+// 🌐 CORS CONFIG
 // =====================
 const corsOptions = {
     origin: function (origin, callback) {
@@ -29,24 +29,19 @@ const corsOptions = {
             'https://incha-allah-v2.vercel.app',
             'https://new-vision-incha-allah.vercel.app'
         ];
-
-        // allow tools like Postman / mobile apps
         if (!origin) return callback(null, true);
-
         if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
             return callback(null, true);
         }
-
         return callback(null, true); 
     },
-    // ✅ ICI : 'PATCH' est ajouté, le blocage CORS va disparaître
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Important pour le preflight
+app.options('*', cors(corsOptions));
 
 // =====================
 // 🧠 MIDDLEWARES
@@ -56,12 +51,27 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(uploadDir));
 
 // =====================
-// 🗄️ DATABASE
+// 🗄️ DATABASE & REPAIR
 // =====================
+const repairDatabase = async () => {
+    try {
+        await sequelize.query(`
+            ALTER TABLE reservations 
+            ADD COLUMN IF NOT EXISTS descriptionTravail TEXT,
+            ADD COLUMN IF NOT EXISTS montantMainOeuvre DECIMAL(10,2),
+            ADD COLUMN IF NOT EXISTS piecesFournies VARCHAR(255);
+        `);
+        console.log("✅ Colonnes vérifiées/créées avec succès.");
+    } catch (error) {
+        console.log("⚠️ Note: Les colonnes existent déjà ou erreur de structure:", error.message);
+    }
+};
+
 sequelize.authenticate()
-    .then(() => {
+    .then(async () => {
         console.log('✅ Base de données connectée.');
-        return sequelize.sync({ alter: false });
+        await repairDatabase(); // Force la structure avant le sync
+        return sequelize.sync({ alter: false }); 
     })
     .then(() => {
         console.log('✅ Tables synchronisées.');
@@ -69,19 +79,12 @@ sequelize.authenticate()
     .catch(err => console.error('❌ Erreur BDD :', err));
 
 // =====================
-// 🏠 TEST ROUTE
+// 🏠 TEST ROUTE & ROUTES API
 // =====================
 app.get('/', (req, res) => {
-    res.json({
-        message: '🌍 API New Vision Opérationnelle',
-        statut: '✅ Online',
-        timestamp: new Date()
-    });
+    res.json({ message: '🌍 API New Vision Opérationnelle', statut: '✅ Online' });
 });
 
-// =====================
-// 📦 ROUTES API
-// =====================
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/fournisseurs', require('./routes/fournisseurs'));
@@ -102,21 +105,9 @@ app.use('/api/whatsapp', require('./routes/whatsapp'));
 app.use('/api/seed', require('./routes/seedRoute'));
 
 // =====================
-// ❌ 404 HANDLER
-// =====================
-app.use((req, res) => {
-    console.log(`🚫 404 - ${req.method} ${req.originalUrl}`);
-    res.status(404).json({
-        success: false,
-        message: 'Route introuvable'
-    });
-});
-
-// =====================
 // 🚀 START SERVER
 // =====================
 const PORT = process.env.PORT || 5000;
-
 app.listen(PORT, () => {
     console.log(`🚀 Serveur démarré sur le port ${PORT}`);
 });
