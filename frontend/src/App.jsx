@@ -11,7 +11,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 // Importations des pages
 import Accueil from './pages/Accueil';
 import ServiceDetailPage from './pages/ServiceDetailPage';
-import Register from './pages/Register'; // <-- AJOUTÉ ICI
+import Register from './pages/Register';
 import RegisterPrestataire from './pages/RegisterPrestataire';
 import RegisterUtilisateur from './pages/RegisterUtilisateur';
 import Login from './pages/Login';
@@ -30,18 +30,22 @@ export default function App() {
                         {/* Pages Publiques */}
                         <Route path="/" element={<Accueil />} />
                         <Route path="/login" element={<Login />} />
-                        <Route path="/register" element={<Register />} /> {/* <-- AJOUTÉ ICI */}
+                        <Route path="/register" element={<Register />} />
                         <Route path="/register-utilisateur" element={<RegisterUtilisateur />} />
                         <Route path="/register-prestataire" element={<RegisterPrestataire />} />
                         
-                        {/* Dashboards Sécurisés */}
+                        {/* Pages dynamiques publiques */}
+                        <Route path="/service/:id" element={<ServiceDetailPage />} />
+                        <Route path="/produits/:fournisseurId" element={<ProduitsParFournisseur />} />
+                        
+                        {/* Dashboards Sécurisés par Rôle */}
                         <Route path="/dashboard-client" element={
-                            <ProtectedRoute>
+                            <ProtectedRoute role="client">
                                 <DashboardClient />
                             </ProtectedRoute>
                         } />
                         <Route path="/dashboard-fournisseur" element={
-                            <ProtectedRoute>
+                            <ProtectedRoute role="fournisseur">
                                 <DashboardFournisseur />
                             </ProtectedRoute>
                         } />
@@ -51,9 +55,7 @@ export default function App() {
                             </ProtectedRoute>
                         } />
                         
-                        {/* Pages dynamiques */}
-                        <Route path="/service/:id" element={<ServiceDetailPage />} />
-                        <Route path="/produits/:fournisseurId" element={<ProduitsParFournisseur />} />
+                        {/* ✅ CORRIGÉ : Route sans ProtectedRoute pour préserver l'état de navigation (service/fournisseur) */}
                         <Route path="/reservation" element={<ReservationPage />} />
                         
                         {/* Redirection par défaut */}

@@ -2,7 +2,11 @@
 // src/util/api.js
 // ============================================================
 
-const BASE_URL = 'https://newvision-backend.onrender.com';
+// 🟢 Détection automatique : utilise localhost si tu es sur ta machine, 
+// ou l'URL de Render si l'application est en ligne. Plus besoin de changer avant de push !
+const BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:5000' 
+  : 'https://newvision-backend.onrender.com';
 
 // ============================================================
 // 🔧 UTILITAIRE REQUEST (Gère JSON et FormData)
@@ -77,7 +81,7 @@ export const registerFournisseur = async (formData) => {
   return request('/api/fournisseurs', {
     method: 'POST',
     headers: authHeaders(),
-    body: formData, // FormData géré automatiquement par request
+    body: formData,
   });
 };
 
@@ -193,37 +197,38 @@ export const deleteAdminProduit = (id) =>
 export const getAdminReservations = () =>
   request('/api/admin/reservations', { headers: authHeaders() });
 
-// Conservation de ta méthode PATCH d'origine
+// 🟢 CORRIGÉ : Ajout de /admin pour correspondre à routes/admin.js du backend
 export const updateReservationStatut = (id, statut) =>
-  request(`/api/reservations/${id}/statut`, {
+  request(`/api/admin/reservations/${id}/statut`, { 
     method: 'PATCH', 
     headers: authHeaders(),
     body: JSON.stringify({ statut }),
   });
 
+// 🟢 CORRIGÉ : Ajout de /admin si la suppression est aussi gérée par le panel admin
 export const deleteReservation = (id) =>
-  request(`/api/reservations/${id}`, {
+  request(`/api/admin/reservations/${id}`, {
     method: 'DELETE',
     headers: authHeaders(),
   });
 
-// ── NOUVELLES ROUTES ADMIN (KANARI DOUBLE-VALIDATION) ───────
+// ── NOUVELLES ROUTES ADMIN CORRIGÉES (AVEC LE PRÉFIXE /api/admin) ───────
 
 export const assignerFournisseur = (id, fournisseurId) =>
-  request(`/api/reservations/${id}/assigner`, {
+  request(`/api/admin/reservations/${id}/assigner`, { 
     method: 'PUT',
     headers: authHeaders(),
     body: JSON.stringify({ fournisseurId }),
   });
 
 export const autoriserDemarrage = (id) =>
-  request(`/api/reservations/${id}/autoriser`, {
+  request(`/api/admin/reservations/${id}/autoriser`, { 
     method: 'PUT',
     headers: authHeaders(),
   });
 
 export const adminCreerReservation = (payload) =>
-  request('/api/reservations/admin-creer', {
+  request('/api/admin/reservations/admin-creer', { 
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(payload),
