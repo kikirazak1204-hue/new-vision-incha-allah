@@ -1,23 +1,35 @@
 const admin = require('firebase-admin');
 
-// ⚠️ TEMPORAIRE — Firebase pas encore configuré côté Kanari.
-// Le fichier serviceAccountKey.json doit être généré depuis
-// console.firebase.google.com puis placé dans backend/config/.
-// En attendant, on neutralise l'init pour ne pas faire planter le serveur.
-
+// Configuration dynamique : s'adapte entre ton PC (Local) et Render (Production)
 let firebaseReady = false;
 
 try {
-    const serviceAccount = require('./serviceAccountKey.json');
-    if (!admin.apps.length) {
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-        });
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        // 🌐 MODE PRODUCTION (Render) : Lecture depuis la variable d'environnement
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+        
+        if (!admin.apps.length) {
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount)
+            });
+        }
+        firebaseReady = true;
+        console.log('✅ Firebase Admin initialisé avec succès (Production / Render)');
+    } else {
+        // 💻 MODE LOCAL (Ton PC) : Lecture depuis le fichier JSON
+        const serviceAccount = require('./serviceAccountKey.json');
+        
+        if (!admin.apps.length) {
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount)
+            });
+        }
+        firebaseReady = true;
+        console.log('✅ Firebase Admin initialisé avec succès (Local / JSON)');
     }
-    firebaseReady = true;
-    console.log('✅ Firebase Admin initialisé');
 } catch (err) {
-    console.warn('⚠️ Firebase non configuré (serviceAccountKey.json manquant) — notifications désactivées pour le moment.');
+    console.warn('⚠️ Firebase non configuré ou erreur d\'initialisation — notifications désactivées pour le moment.');
+    console.log('💡 Raison :', err.message);
 }
 
 // Si Firebase n'est pas prêt, on exporte un objet "factice" qui ne plante
@@ -25,8 +37,8 @@ try {
 if (!firebaseReady) {
     module.exports = {
         messaging: () => ({
-            send: async () => {
-                console.log('🔕 Notification ignorée (Firebase non configuré encore)');
+            send: async (payload) => {
+                console.log('🔕 Notification ignorée (Firebase non activé) :', payload?.notification?.title || 'Pas de titre');
                 return null;
             }
         })
