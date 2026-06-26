@@ -1,8 +1,34 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom'; // 1. ON PREND LE VRAI ROUTEUR (Comme dans Login)
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const AccueilPage = ({ services, loading, setSelectedService }) => {
-    const navigate = useNavigate(); // 2. On l'active
+    const navigate = useNavigate();
+    const [deferredPrompt, setDeferredPrompt] = useState(null);
+    const [isInstallable, setIsInstallable] = useState(false);
+
+    useEffect(() => {
+        const handleBeforeInstallPrompt = (e) => {
+            e.preventDefault();
+            setDeferredPrompt(e);
+            setIsInstallable(true);
+        };
+
+        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+        return () => {
+            window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        };
+    }, []);
+
+    const handleInstallClick = async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            setIsInstallable(false);
+        }
+        setDeferredPrompt(null);
+    };
 
     const serviceIcons = {
         'Accessoires': '💍', 'Alimentation': '🍎', 'Artisanat': '🎨', 'Assurance': '🛡️',
@@ -18,21 +44,33 @@ const AccueilPage = ({ services, loading, setSelectedService }) => {
     return (
         <div className="min-h-screen bg-[#0f1111] text-slate-100 font-sans selection:bg-purple-500/30">
             
-            {/* 🌐 NAVBAR MODERNE */}
+            {/* 🌐 NAVBAR MODERNE (100% ton design d'origine) */}
             <nav className="sticky top-0 z-50 bg-[#131921] border-b border-slate-800 px-6 py-4 flex items-center justify-between shadow-xl">
                 <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate('/')}>
                     <div className="text-2xl font-black tracking-tighter">
                         KANARI<span className="text-purple-500">SERVICE</span>
                     </div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 sm:gap-4">
+                    
+                    {/* 📱 Bouton d'installation : Petit cercle sur mobile / Mini pilule sur PC */}
+                    {isInstallable && (
+                        <button 
+                            onClick={handleInstallClick}
+                            title="Installer l'application Kanari"
+                            className="flex items-center gap-1.5 text-xs font-medium text-slate-300 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-purple-500/60 p-2 sm:px-3 sm:py-1.5 rounded-full transition-all duration-200"
+                        >
+                            <svg className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            <span className="hidden sm:inline">Installer l'app</span>
+                        </button>
+                    )}
+
                     <button onClick={() => navigate('/login')} className="text-sm font-medium hover:text-purple-400 transition">Connexion</button>
-                    {/* LE VRAI LIEN OFFICIEL : navigate('/register') */}
                     <button onClick={() => navigate('/register')} className="bg-purple-600 hover:bg-purple-700 px-5 py-2 rounded-full font-bold text-sm transition-all shadow-lg shadow-purple-900/20">S'inscrire</button>
                 </div>
             </nav>
 
-            {/* 🚀 HERO SECTION */}
+            {/* 🚀 HERO SECTION (Intact) */}
             <header className="px-6 py-12">
                 <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-10">
                     <div className="flex-1 text-left">
@@ -49,7 +87,7 @@ const AccueilPage = ({ services, loading, setSelectedService }) => {
                 </div>
             </header>
 
-            {/* 🛠️ SECTION SERVICES */}
+            {/* 🛠️ SECTION SERVICES (Intact) */}
             <main className="max-w-7xl mx-auto px-6 pb-20">
                 <div className="flex items-center justify-between mb-8">
                     <h2 className="text-2xl font-bold">Explorer nos expertises</h2>
