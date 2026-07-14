@@ -1,5 +1,5 @@
 const {
-    Produit, Commande, Facture, 
+    Produit, Commande, Facture,
     Fournisseur, User, Reservation, BonIntervention
 } = require('../models');
 
@@ -32,13 +32,43 @@ exports.getDashboardFournisseur = async (req, res) => {
             })
         ]);
 
-        res.json({ success: true, data: { profil: fournisseur, stats: { totalProduits, totalRevenus, totalMissions: missions.length }, missions, commandesRecentes }});
+        res.json({ success: true, data: { profil: fournisseur, stats: { totalProduits, totalRevenus, totalMissions: missions.length }, missions, commandesRecentes } });
     } catch (err) {
         console.error('❌ Erreur Critique:', err);
         res.status(500).json({ success: false, message: 'Erreur serveur interne' });
     }
 };
 
+// ➕ IMPLÉMENTATION AJOUTÉE : la fonction était vide (aucune réponse envoyée),
+// ce qui provoquait un timeout côté serveur remonté en 503 côté frontend.
 exports.getDashboardClient = async (req, res) => {
-    // Ton code client
+    try {
+        const clientId = req.user.id;
+
+        const [missions, totalReservations] = await Promise.all([
+            Reservation.findAll({
+                where: { clientId },
+                attributes: ['id', 'besoin', 'adresse', 'telephone', 'clientNom', 'dateIntervention', 'type', 'parcours', 'statut', 'descriptionTravail', 'montantMainOeuvre', 'piecesFournies', 'createdAt'],
+                include: [
+                    // ✅ Alias corrigé d'après models/index.js : Reservation.belongsTo(Fournisseur, { as: 'prestataire' })
+                    { model: Fournisseur, as: 'prestataire', attributes: ['id', 'nomEntreprise', 'telephone'] },
+                    { model: BonIntervention, as: 'bonIntervention', attributes: { exclude: ['descriptionTravail', 'montantMainOeuvre'] } }
+                ],
+                limit: 20,
+                order: [['createdAt', 'DESC']]
+            }),
+            Reservation.count({ where: { clientId } })
+        ]);
+
+        res.json({
+            success: true,
+            data: {
+                stats: { totalReservations },
+                missions
+            }
+        });
+    } catch (err) {
+        console.error('❌ Erreur Critique (dashboard client):', err);
+        res.status(500).json({ success: false, message: 'Erreur serveur interne' });
+    }
 };
