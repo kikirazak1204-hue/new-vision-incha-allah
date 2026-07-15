@@ -43,7 +43,7 @@ const AccueilPage = ({ services, loading, setSelectedService }) => {
 
     return (
         <div className="min-h-screen bg-[#0f1111] text-slate-100 font-sans selection:bg-purple-500/30">
-            
+
             {/* 🌐 NAVBAR MODERNE (100% ton design d'origine) */}
             <nav className="sticky top-0 z-50 bg-[#131921] border-b border-slate-800 px-6 py-4 flex items-center justify-between shadow-xl">
                 <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate('/')}>
@@ -52,10 +52,9 @@ const AccueilPage = ({ services, loading, setSelectedService }) => {
                     </div>
                 </div>
                 <div className="flex items-center gap-3 sm:gap-4">
-                    
-                    {/* 📱 Bouton d'installation : Petit cercle sur mobile / Mini pilule sur PC */}
+
                     {isInstallable && (
-                        <button 
+                        <button
                             onClick={handleInstallClick}
                             title="Installer l'application Kanari"
                             className="flex items-center gap-1.5 text-xs font-medium text-slate-300 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 hover:border-purple-500/60 p-2 sm:px-3 sm:py-1.5 rounded-full transition-all duration-200"
@@ -70,7 +69,7 @@ const AccueilPage = ({ services, loading, setSelectedService }) => {
                 </div>
             </nav>
 
-            {/* 🚀 HERO SECTION (Intact) */}
+            {/* 🚀 HERO SECTION (Intact + bouton Réserver ajouté) */}
             <header className="px-6 py-12">
                 <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-10">
                     <div className="flex-1 text-left">
@@ -80,6 +79,14 @@ const AccueilPage = ({ services, loading, setSelectedService }) => {
                         <p className="text-slate-400 text-lg mb-8 max-w-lg">
                             Des experts certifiés, une qualité garantie. Trouvez tout ce dont vous avez besoin en un seul endroit.
                         </p>
+
+                        {/* ✅ NOUVEAU : bouton vers la sélection de service */}
+                        <button
+                            onClick={() => navigate('/selection')}
+                            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 px-7 py-3.5 rounded-2xl font-black text-sm sm:text-base shadow-lg shadow-purple-900/30 transition-all active:scale-95"
+                        >
+                            🔧 Réserver un service
+                        </button>
                     </div>
                     <div className="flex-shrink-0 w-64 h-64 md:w-80 md:h-80 bg-[#131921] rounded-3xl border border-slate-800 flex items-center justify-center p-6 shadow-2xl">
                         <img src="/logo.png" alt="Logo Kanari" className="w-full h-full object-contain" />

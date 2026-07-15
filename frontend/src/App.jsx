@@ -8,6 +8,8 @@ import { NavigationProvider } from './context/NavigationContext';
 // Composants de protection
 import ProtectedRoute from './components/ProtectedRoute';
 
+import ServiceSelectionPage from './pages/ServiceSelectionPage';
+
 // Importations des pages
 import Accueil from './pages/Accueil';
 import ServiceDetailPage from './pages/ServiceDetailPage';
@@ -26,18 +28,18 @@ export default function App() {
     const [showInstallBtn, setShowInstallBtn] = useState(false);
 
     useEffect(() => {
-        // 1. Enregistrement du Service Worker (Le sw.js qui est dans ton dossier dist)
+        // 1. Enregistrement du Service Worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js')
                 .then(() => console.log('✅ Service Worker Kanari enregistré !'))
                 .catch(err => console.error('❌ Erreur Service Worker:', err));
         }
 
-        // 2. Écoute du déclencheur d'installation de Chrome/Safari
+        // 2. Écoute du déclencheur d'installation PWA mobile
         const handleBeforeInstallPrompt = (e) => {
             e.preventDefault();
-            setDeferredPrompt(e); // On garde l'événement de côté
-            setShowInstallBtn(true); // On active l'affichage du bouton
+            setDeferredPrompt(e);
+            setShowInstallBtn(true);
         };
 
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -49,7 +51,8 @@ export default function App() {
 
     const handleInstallApp = async () => {
         if (!deferredPrompt) return;
-        deferredPrompt.prompt(); // Affiche la demande d'installation officielle
+        deferredPrompt.prompt();
+        
         const { outcome } = await deferredPrompt.userChoice;
         if (outcome === 'accepted') {
             console.log('🎉 L\'utilisateur a installé Kanari !');
@@ -63,7 +66,7 @@ export default function App() {
             <NavigationProvider>
                 <div className="min-h-screen bg-slate-950 font-sans text-slate-100 relative">
                     
-                    {/* 📱 BANNIÈRE D'INSTALLATION PWA SUBTILE */}
+                    {/* 📱 BANNIÈRE D'INSTALLATION PWA */}
                     {showInstallBtn && (
                         <div className="fixed bottom-4 left-4 right-4 z-50 bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-2xl flex items-center justify-between max-w-md mx-auto animate-bounce">
                             <div>
@@ -86,33 +89,45 @@ export default function App() {
                         <Route path="/register" element={<Register />} />
                         <Route path="/register-utilisateur" element={<RegisterUtilisateur />} />
                         <Route path="/register-prestataire" element={<RegisterPrestataire />} />
+                        <Route path="/selection" element={<ServiceSelectionPage />} />
                         
                         {/* Pages dynamiques publiques */}
                         <Route path="/service/:id" element={<ServiceDetailPage />} />
                         <Route path="/produits/:fournisseurId" element={<ProduitsParFournisseur />} />
                         
-                        {/* Dashboards Sécurisés par Rôle */}
+                        {/* 🛡️ DASHBOARDS (Double sécurité Slash + Tiret pour casser la boucle infinie) */}
                         <Route path="/dashboard-client" element={
                             <ProtectedRoute role="client">
                                 <DashboardClient />
                             </ProtectedRoute>
                         } />
+                        <Route path="/dashboard/client" element={
+                            <ProtectedRoute role="client">
+                                <DashboardClient />
+                            </ProtectedRoute>
+                        } />
+
                         <Route path="/dashboard-fournisseur" element={
                             <ProtectedRoute role="fournisseur">
                                 <DashboardFournisseur />
                             </ProtectedRoute>
                         } />
+                        <Route path="/dashboard/fournisseur" element={
+                            <ProtectedRoute role="fournisseur">
+                                <DashboardFournisseur />
+                            </ProtectedRoute>
+                        } />
+
                         <Route path="/admin" element={
                             <ProtectedRoute role="admin">
                                 <DashboardAdmin />
                             </ProtectedRoute>
                         } />
                         
-                        {/* ✅ CORRIGÉ : Route sans ProtectedRoute pour préserver l'état de navigation (service/fournisseur) */}
                         <Route path="/reservation" element={<ReservationPage />} />
                         
                         {/* Redirection par défaut */}
-                        <Route path="*" element={<Navigate to="/" />} />
+                        <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                 </div>
             </NavigationProvider>

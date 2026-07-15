@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { getDashboardFournisseur, getProduitsFournisseur, deleteProduit } from '../util/api';
+import { getDashboardFournisseur, getProduitsFournisseur, deleteProduit, addProduit } from '../util/api';
 import SoldeRetrait from '../components/SoldeRetrait';
 
 const API = import.meta.env.VITE_API_URL;
@@ -154,6 +154,128 @@ function BonInterventionModal({ missionId, onClose, token, onSuccess }) {
     );
 }
 
+// MODAL : AJOUTER UN PRODUIT AU CATALOGUE
+function AjouterProduitModal({ onClose, onSuccess }) {
+    const [nom, setNom] = useState('');
+    const [prix, setPrix] = useState('');
+    const [description, setDescription] = useState('');
+    const [photo, setPhoto] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const soumettre = async (e) => {
+        e.preventDefault();
+        setError('');
+        if (!nom.trim() || !prix) {
+            setError('Le nom et le prix sont obligatoires.');
+            return;
+        }
+        setLoading(true);
+        try {
+            const fd = new FormData();
+            fd.append('nom', nom.trim());
+            fd.append('prix', prix);
+            fd.append('description', description.trim());
+            // ⚠️ À vérifier : la clé du champ image ('photo') doit correspondre à ce
+            // qu'attend votre route POST /api/produits (multer .single('photo') ou autre).
+            if (photo) fd.append('photo', photo);
+
+            const res = await addProduit(fd);
+            if (res?.success !== false) {
+                onSuccess(res?.data || { id: Date.now(), nom: nom.trim(), prix });
+                onClose();
+            } else {
+                setError(res?.message || "Échec de l'ajout du produit.");
+            }
+        } catch (err) {
+            setError(err?.message || 'Erreur réseau ou serveur.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+            <div className="w-full max-w-lg bg-[#0E1320] border border-purple-500/30 rounded-3xl shadow-2xl overflow-hidden flex flex-col p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-white/[0.07] pb-3">
+                    <h3 className="text-lg font-black text-white flex items-center gap-2">
+                        📦 Ajouter un produit
+                    </h3>
+                    <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors text-sm font-bold">✕</button>
+                </div>
+
+                {error && (
+                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-3 text-rose-300 text-xs font-semibold text-center">
+                        {error}
+                    </div>
+                )}
+
+                <form onSubmit={soumettre} className="space-y-4 text-left">
+                    <div>
+                        <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">Nom du produit *</label>
+                        <input
+                            type="text"
+                            value={nom}
+                            onChange={e => setNom(e.target.value)}
+                            placeholder="Ex: Robinet mitigeur inox"
+                            className="w-full bg-[#090D16] border border-white/[0.08] focus:border-purple-500 text-slate-200 placeholder-slate-600 rounded-xl px-4 py-3 text-sm outline-none transition-all shadow-inner"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">Prix (FCFA) *</label>
+                        <input
+                            type="number"
+                            value={prix}
+                            onChange={e => setPrix(e.target.value)}
+                            placeholder="Ex: 12000"
+                            className="w-full bg-[#090D16] border border-white/[0.08] focus:border-purple-500 text-slate-200 placeholder-slate-600 rounded-xl px-4 py-3 text-sm font-bold outline-none transition-all shadow-inner"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">Description (optionnel)</label>
+                        <textarea
+                            value={description}
+                            onChange={e => setDescription(e.target.value)}
+                            placeholder="Détails, état, garantie..."
+                            rows="3"
+                            className="w-full bg-[#090D16] border border-white/[0.08] focus:border-purple-500 text-slate-200 placeholder-slate-600 rounded-xl px-4 py-3 text-sm outline-none resize-none transition-all shadow-inner"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">Photo (optionnel)</label>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            onChange={e => setPhoto(e.target.files?.[0] || null)}
+                            className="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-purple-600 file:text-white file:text-xs file:font-bold"
+                        />
+                    </div>
+
+                    <div className="pt-2 flex gap-3">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="flex-1 py-3 bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 font-bold rounded-xl text-sm transition-all"
+                        >
+                            Annuler
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black rounded-xl text-sm shadow-lg shadow-purple-500/20 transition-all active:scale-[0.99] disabled:opacity-50"
+                        >
+                            {loading ? 'Ajout en cours...' : 'Ajouter au catalogue'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 function ChatModal({ mission, userId, onClose }) {
     const [messages, setMessages] = useState([]);
     const [texte, setTexte] = useState('');
@@ -229,15 +351,15 @@ function ChatModal({ mission, userId, onClose }) {
                 </div>
 
                 <div className="p-4 bg-white/[0.02] border-t border-white/[0.07] flex gap-2.5">
-                    <input 
-                        value={texte} 
+                    <input
+                        value={texte}
                         onChange={e => setTexte(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && envoyer()}
                         placeholder="Écrivez votre message ici..."
                         className="flex-1 bg-[#090D16] border border-white/[0.08] focus:border-purple-500 text-slate-200 placeholder-slate-500 rounded-2xl px-4 py-3 text-sm outline-none transition-all shadow-inner"
                     />
-                    <button 
-                        onClick={envoyer} 
+                    <button
+                        onClick={envoyer}
                         disabled={!texte.trim() || sending}
                         className={`px-5 rounded-2xl text-sm font-bold flex items-center justify-center transition-all ${texte.trim() ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white shadow-lg shadow-purple-500/25 active:scale-95' : 'bg-white/[0.04] text-slate-600 cursor-not-allowed'}`}>
                         {sending ? '...' : 'Envoyer'}
@@ -318,8 +440,8 @@ function OngletDevis({ token }) {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/[0.01] p-2 rounded-2xl border border-white/[0.05]">
                 <div className="flex gap-1 p-1 bg-[#070A12] rounded-xl border border-white/[0.05]">
                     {[['disponibles', ' Demandes disponibles'], ['mesdevis', ' Mes devis envoyés']].map(([id, label]) => (
-                        <button 
-                            key={id} 
+                        <button
+                            key={id}
                             onClick={() => setActiveSubTab(id)}
                             className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeSubTab === id ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-white/[0.02]'}`}>
                             {label}
@@ -492,8 +614,9 @@ export default function DashboardFournisseur({ setCurrentView }) {
     const [menuOuvert, setMenuOuvert] = useState(false);
     const [chatMission, setChatMission] = useState(null);
     const [bonInterventionId, setBonInterventionId] = useState(null);
+    const [ajoutProduitOuvert, setAjoutProduitOuvert] = useState(false);
     const token = localStorage.getItem('token');
-    
+
     let currentUser = {};
     try { currentUser = JSON.parse(localStorage.getItem('user')) || {}; } catch { }
 
@@ -701,7 +824,7 @@ export default function DashboardFournisseur({ setCurrentView }) {
                                 {missions.map(mission => (
                                     <div key={mission.id} className="bg-white/[0.02] border border-white/[0.07] hover:border-purple-500/20 rounded-3xl p-6 space-y-5 shadow-xl transition-all relative overflow-hidden group">
                                         <div className="absolute top-0 left-0 bottom-0 w-1 bg-purple-600 opacity-40 group-hover:opacity-100 transition-opacity" />
-                                        
+
                                         <div className="flex justify-between items-start flex-wrap gap-4 pl-2">
                                             <div>
                                                 <div className="flex items-center gap-2 flex-wrap">
@@ -710,14 +833,14 @@ export default function DashboardFournisseur({ setCurrentView }) {
                                                     <span className="text-xs font-medium text-slate-400">{mission.serviceNom || 'Prestation de service'}</span>
                                                 </div>
                                                 <h3 className="font-extrabold text-2xl text-white mt-1">{mission.client?.nom || mission.clientNom || 'Client'}</h3>
-                                                
+
                                                 {/* PROTECTION ET MASQUAGE DU NUMÉRO */}
                                                 <p className="text-xs text-slate-400 font-medium mt-1">
                                                     Téléphone : {' '}
-                                                    <span className={`font-bold ${['EN_COURS', 'TERMINEE', 'VALIDEE'].includes(mission.statut) ? 'text-amber-400' : 'text-slate-500'}`}>
-                                                        {['EN_COURS', 'TERMINEE', 'VALIDEE'].includes(mission.statut) 
-                                                            ? (mission.client?.telephone || mission.telephone || 'Non spécifié') 
-                                                            : '📞 Numéro masqué (Disponible au démarrage)'}
+                                                    <span className={`font-bold ${['ACCEPTEE', 'EN_PREPARATION', 'EN_COURS', 'TERMINEE', 'VALIDEE'].includes(mission.statut) ? 'text-amber-400' : 'text-slate-500'}`}>
+                                                        {['ACCEPTEE', 'EN_PREPARATION', 'EN_COURS', 'TERMINEE', 'VALIDEE'].includes(mission.statut)
+                                                            ? (mission.client?.telephone || mission.telephone || 'Non spécifié')
+                                                            : '📞 Numéro masqué (Disponible après validation par l\'Admin)'}
                                                     </span>
                                                 </p>
                                             </div>
@@ -752,20 +875,20 @@ export default function DashboardFournisseur({ setCurrentView }) {
 
                                         {/* BARRE D'ACTIONS ADAPTÉE AU NOUVEAU FLUX DE QUALITÉ */}
                                         <div className="flex flex-wrap items-center gap-3 pt-2">
-                                            
-                                            {/* ÉTAPE 1 : PRESTATAIRE REÇOIT LA DEMANDE ET DÉCIDE D'ACCEPTER OU NON */}
+
+                                            {/* ÉTAPE 1 : PRESTATAIRE REÇOIT LA DEMANDE ET DÉCIDE D'ACCEPTER OU NON (choix "je suis partant ou pas") */}
                                             {mission.statut === 'EN_ATTENTE' && (
                                                 <>
                                                     <button onClick={() => callAction(mission.id, 'accepter', 'EN_VALIDATION_ADMIN')} disabled={actionLoad === `${mission.id}_accepter`} className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black rounded-xl text-xs shadow-lg transition-all active:scale-95 disabled:opacity-50">
-                                                        {actionLoad === `${mission.id}_accepter` ? 'Traitement...' : '👍 Accepter & Envoyer à l\'Admin'}
+                                                        {actionLoad === `${mission.id}_accepter` ? 'Traitement...' : '👍 Je suis partant — Envoyer à l\'Admin'}
                                                     </button>
                                                     <button onClick={() => callAction(mission.id, 'refuser', 'ANNULEE')} disabled={actionLoad === `${mission.id}_refuser`} className="px-6 py-3 bg-white/[0.04] hover:bg-rose-500/20 text-rose-400 border border-transparent hover:border-rose-500/30 font-bold rounded-xl text-xs transition-all active:scale-95 disabled:opacity-50">
-                                                        {actionLoad === `${mission.id}_refuser` ? 'Refus...' : '👎 Refuser la mission'}
+                                                        {actionLoad === `${mission.id}_refuser` ? 'Refus...' : '👎 Je ne suis pas disponible'}
                                                     </button>
                                                 </>
                                             )}
 
-                                            {/* ÉTAPE 2 : ATTENTE DU FEU VERT DE L'ADMINISTRATION */}
+                                            {/* ÉTAPE 2 : ATTENTE DU FEU VERT DE L'ADMINISTRATION (numéro encore masqué tant que l'Admin n'a pas validé) */}
                                             {mission.statut === 'EN_VALIDATION_ADMIN' && (
                                                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex items-center gap-3 w-full">
                                                     <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
@@ -773,10 +896,10 @@ export default function DashboardFournisseur({ setCurrentView }) {
                                                 </div>
                                             )}
 
-                                            {/* ÉTAPE 3 : L'ADMIN A VALIDÉ, LE PRESTATAIRE PEUT LANCER LE DÉMARRAGE */}
+                                            {/* ÉTAPE 3 : L'ADMIN A VALIDÉ / ASSIGNÉ LA MISSION, LE PRESTATAIRE PEUT LANCER LE DÉMARRAGE */}
                                             {mission.statut === 'ACCEPTEE' && (
                                                 <button onClick={() => callAction(mission.id, 'demarrer', 'EN_COURS')} disabled={actionLoad === `${mission.id}_demarrer`} className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold rounded-xl text-xs shadow-lg transition-all active:scale-95 disabled:opacity-50">
-                                                    {actionLoad === `${mission.id}_demarrer` ? 'Démarrage...' : '🚀 Démarrer l\'intervention (Révèle le téléphone)'}
+                                                    {actionLoad === `${mission.id}_demarrer` ? 'Démarrage...' : '🚀 Démarrer l\'intervention'}
                                                 </button>
                                             )}
 
@@ -790,6 +913,14 @@ export default function DashboardFournisseur({ setCurrentView }) {
                                                         ⚠️ Signaler matériel manquant
                                                     </button>
                                                 </>
+                                            )}
+
+                                            {/* ÉTAPE 4bis : MATÉRIEL MANQUANT SIGNALÉ, MISSION REPASSÉE EN PRÉPARATION (numéro reste visible) */}
+                                            {mission.statut === 'EN_PREPARATION' && (
+                                                <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-4 flex items-center gap-3 w-full">
+                                                    <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+                                                    <p className="text-orange-300 font-bold text-xs tracking-wide uppercase">🧰 Matériel manquant signalé — Reprise dès réception</p>
+                                                </div>
                                             )}
                                         </div>
                                     </div>
@@ -840,6 +971,12 @@ export default function DashboardFournisseur({ setCurrentView }) {
                                 <h2 className="text-2xl font-black text-white"> Gestion du Catalogue</h2>
                                 <p className="text-slate-400 text-xs mt-1">Gérez vos produits en vente directe</p>
                             </div>
+                            <button
+                                onClick={() => setAjoutProduitOuvert(true)}
+                                className="px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-2xl text-xs font-black shadow-lg shadow-purple-500/20 transition-all active:scale-95"
+                            >
+                                + Ajouter un produit
+                            </button>
                         </div>
                         {produits.length === 0 ? (
                             <div className="text-center py-20 bg-white/[0.01] border border-white/[0.05] rounded-3xl text-slate-500">
@@ -854,7 +991,7 @@ export default function DashboardFournisseur({ setCurrentView }) {
                                             <p className="text-xs text-purple-400 font-black mt-1">{Number(p.prix).toLocaleString()} FCFA</p>
                                         </div>
                                         <div className="flex gap-2">
-                                            <button onClick={() => { if(window.confirm('Supprimer cet article ?')) deleteProduit(p.id).then(() => setProduits(prev => prev.filter(x => x.id !== p.id))); }} className="w-full py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-bold transition-all">Supprimer l'article</button>
+                                            <button onClick={() => { if (window.confirm('Supprimer cet article ?')) deleteProduit(p.id).then(() => setProduits(prev => prev.filter(x => x.id !== p.id))); }} className="w-full py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-bold transition-all">Supprimer l'article</button>
                                         </div>
                                     </div>
                                 ))}
@@ -901,14 +1038,22 @@ export default function DashboardFournisseur({ setCurrentView }) {
             </main>
 
             {chatMission && <ChatModal mission={chatMission} userId={currentUser.id} onClose={() => setChatMission(null)} />}
-            
+
             {/* INJECTION DE LA MODAL DU RAPPORT D'INTERVENTION */}
             {bonInterventionId && (
-                <BonInterventionModal 
-                    missionId={bonInterventionId} 
-                    token={token} 
-                    onClose={() => setBonInterventionId(null)} 
+                <BonInterventionModal
+                    missionId={bonInterventionId}
+                    token={token}
+                    onClose={() => setBonInterventionId(null)}
                     onSuccess={handlerActionSuccess}
+                />
+            )}
+
+            {/* INJECTION DE LA MODAL D'AJOUT DE PRODUIT */}
+            {ajoutProduitOuvert && (
+                <AjouterProduitModal
+                    onClose={() => setAjoutProduitOuvert(false)}
+                    onSuccess={(nouveauProduit) => setProduits(prev => [nouveauProduit, ...prev])}
                 />
             )}
         </div>

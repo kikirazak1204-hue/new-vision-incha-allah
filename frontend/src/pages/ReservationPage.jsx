@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CalendarClock, Zap, FileSignature } from 'lucide-react';
+import { ArrowLeft, CalendarClock, Zap, FileSignature, ShieldCheck } from 'lucide-react';
 
 const normalize = (s = '') => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
@@ -34,6 +34,11 @@ export default function ReservationPage({ setCurrentView }) {
 
     let user = {};
     try { user = JSON.parse(localStorage.getItem('user')) || {}; } catch { }
+
+    // ➕ AJOUT : détection du mode Admin (saisie manuelle suite à un appel téléphonique du client)
+    const isAdmin = String(user?.role || '').toLowerCase().trim() === 'admin';
+    // ➕ AJOUT : une assignation directe Admin = un admin connecté qui choisit lui-même un prestataire précis
+    const assignationDirecteAdmin = isAdmin && !!fournisseur;
 
     const typeDetecte = detecterType(service?.nom);
 
@@ -92,6 +97,14 @@ export default function ReservationPage({ setCurrentView }) {
             fournisseurId: fournisseur?.id || null,
             parcours: fournisseur ? 'direct' : 'assignation',
             clientId: user?.id || null,
+            // ➕ AJOUT : quand un Admin assigne lui-même un prestataire (client qui a appelé),
+            // la mission est créée déjà validée : le numéro apparaîtra immédiatement
+            // dans le Dashboard Prestataire (statut aligné sur celui utilisé côté Fournisseur).
+            ...(assignationDirecteAdmin ? {
+                statut: 'ACCEPTEE',
+                assignePar: 'admin',
+                validationAdmin: true,
+            } : {}),
         };
 
         try {
@@ -103,7 +116,9 @@ export default function ReservationPage({ setCurrentView }) {
             const data = await res.json();
 
             if (res.ok && data.success) {
-                setMessage('✅ Réservation transmise avec succès ! Redirection...');
+                setMessage(assignationDirecteAdmin
+                    ? '✅ Réservation créée et assignée avec succès ! Le prestataire voit déjà le numéro du client. Redirection...'
+                    : '✅ Réservation transmise avec succès ! Redirection...');
                 setTimeout(() => navigate('/'), 1500);
             } else {
                 setMessage('❌ ' + (data.message || "Échec de l'envoi de la réservation."));
@@ -152,6 +167,23 @@ export default function ReservationPage({ setCurrentView }) {
                     <p className="text-slate-400 mb-6 text-sm">
                         Prestataire choisi : <span className="text-white font-semibold">{fournisseur.nomEntreprise}</span>
                     </p>
+                )}
+
+                {/* ➕ AJOUT : bandeau visible uniquement en mode Admin avec prestataire déjà choisi */}
+                {assignationDirecteAdmin && (
+                    <div
+                        className="mb-6 rounded-2xl border border-emerald-500/30 p-4 flex items-center gap-3"
+                        style={{ background: 'rgba(16,185,129,0.08)', backdropFilter: 'blur(12px)' }}
+                    >
+                        <ShieldCheck className="text-emerald-400 shrink-0" size={26} />
+                        <div>
+                            <p className="font-black text-emerald-300 text-sm">Mode Admin — Assignation directe</p>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                                Cette réservation (client qui a appelé) sera créée déjà validée. Le prestataire verra
+                                immédiatement le numéro du client dans son Dashboard, sans étape de validation supplémentaire.
+                            </p>
+                        </div>
+                    </div>
                 )}
 
                 <div
@@ -240,7 +272,11 @@ export default function ReservationPage({ setCurrentView }) {
                     disabled={loading}
                     className="w-full mt-8 py-5 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl font-black text-xl active:scale-95 hover:shadow-lg hover:shadow-purple-500/20 transition-all disabled:opacity-50"
                 >
-                    {loading ? 'Envoi en cours...' : 'CONFIRMER LA DEMANDE'}
+                    {loading
+                        ? 'Envoi en cours...'
+                        : assignationDirecteAdmin
+                            ? 'VALIDER & ASSIGNER LA RÉSERVATION'
+                            : 'CONFIRMER LA DEMANDE'}
                 </button>
             </div>
         </div>
