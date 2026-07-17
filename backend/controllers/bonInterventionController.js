@@ -52,9 +52,9 @@ exports.creerBonIntervention = async (req, res) => {
             montantFinal,
         });
 
-        // Met à jour la réservation : statut terminé + date limite commission
+        // 🟢 CORRIGÉ : Statut passé en MAJUSCULE 'TERMINEE'
         await reservation.update({
-            statut: 'termine',
+            statut: 'TERMINEE',
             commissionDateLimite
         });
 
@@ -106,9 +106,9 @@ exports.validerBon = async (req, res) => {
             commentaire: commentaire || null,
         });
 
-        // Met à jour la réservation en 'valide'
+        // 🟢 CORRIGÉ : Statut passé en MAJUSCULE 'VALIDEE'
         await Reservation.update(
-            { statut: 'valide' },
+            { statut: 'VALIDEE' },
             { where: { id: bon.reservationId } }
         );
 

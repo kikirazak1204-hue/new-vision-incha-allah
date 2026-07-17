@@ -96,7 +96,7 @@ router.put('/fournisseurs/:id/statut', protect, adminOnly, async (req, res) => {
 // 📅 GESTION DES RÉSERVATIONS (MISSIONS KANARI)
 // ============================================================
 
-// 🟢 URL réelle : GET /api/admin/reservations
+// 🟢 GET /api/admin/reservations
 router.get('/reservations', protect, adminOnly, async (req, res) => {
     try {
         const reservations = await Reservation.findAll({
@@ -109,7 +109,7 @@ router.get('/reservations', protect, adminOnly, async (req, res) => {
     }
 });
 
-// 🟢 URL réelle : PATCH /api/admin/reservations/:id/statut
+// 🟢 PATCH /api/admin/reservations/:id/statut
 router.patch('/reservations/:id/statut', protect, adminOnly, async (req, res) => {
     try {
         const { statut } = req.body;
@@ -123,7 +123,7 @@ router.patch('/reservations/:id/statut', protect, adminOnly, async (req, res) =>
     }
 });
 
-// 🟢 URL réelle : PUT /api/admin/reservations/:id/assigner
+// 🟢 PUT /api/admin/reservations/:id/assigner (CORRIGÉ EN MAJUSCULE)
 router.put('/reservations/:id/assigner', protect, adminOnly, async (req, res) => {
     try {
         const { id } = req.params;
@@ -136,7 +136,7 @@ router.put('/reservations/:id/assigner', protect, adminOnly, async (req, res) =>
 
         await reservation.update({
             fournisseurId,
-            statut: 'assigne'
+            statut: 'EN_PREPARATION' // Alignée sur ta base MySQL
         });
 
         res.json({ success: true, message: 'Fournisseur assigné avec succès.', data: reservation });
@@ -146,7 +146,7 @@ router.put('/reservations/:id/assigner', protect, adminOnly, async (req, res) =>
     }
 });
 
-// 🟢 URL réelle : PUT /api/admin/reservations/:id/autoriser
+// 🟢 PUT /api/admin/reservations/:id/autoriser (CORRIGÉ EN MAJUSCULE)
 router.put('/reservations/:id/autoriser', protect, adminOnly, async (req, res) => {
     try {
         const { id } = req.params;
@@ -156,7 +156,7 @@ router.put('/reservations/:id/autoriser', protect, adminOnly, async (req, res) =
             return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
         }
 
-        await reservation.update({ statut: 'accepte' });
+        await reservation.update({ statut: 'ACCEPTEE' }); // Alignée sur ta base MySQL
 
         res.json({ success: true, message: 'Démarrage de la mission autorisé.', data: reservation });
     } catch (err) {
@@ -165,7 +165,41 @@ router.put('/reservations/:id/autoriser', protect, adminOnly, async (req, res) =
     }
 });
 
-// 🟢 URL réelle : POST /api/admin/reservations/admin-creer
+// 🟢 ✨ NOUVEAU : PUT /api/admin/reservations/:id/valider (BOUTON VALIDER LA MISSION)
+router.put('/reservations/:id/valider', protect, adminOnly, async (req, res) => {
+    try {
+        const reservation = await Reservation.findByPk(req.params.id);
+        if (!reservation) return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
+
+        await reservation.update({ statut: 'VALIDEE' });
+
+        res.json({ success: true, message: 'Mission validée avec succès !', data: reservation });
+    } catch (err) {
+        console.error("❌ Erreur PUT /valider :", err);
+        res.status(500).json({ success: false, message: 'Erreur serveur.', error: err.message });
+    }
+});
+
+// 🟢 ✨ NOUVEAU : PUT /api/admin/reservations/:id/refuser (BOUTON REFUSER LA MISSION)
+router.put('/reservations/:id/refuser', protect, adminOnly, async (req, res) => {
+    try {
+        const { motif } = req.body;
+        const reservation = await Reservation.findByPk(req.params.id);
+        if (!reservation) return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
+
+        await reservation.update({
+            statut: 'ANNULEE',
+            motifRefus: motif || 'Refusé par l\'administration'
+        });
+
+        res.json({ success: true, message: 'Mission refusée/annulée.', data: reservation });
+    } catch (err) {
+        console.error("❌ Erreur PUT /refuser :", err);
+        res.status(500).json({ success: false, message: 'Erreur serveur.', error: err.message });
+    }
+});
+
+// 🟢 POST /api/admin/reservations/admin-creer
 router.post('/reservations/admin-creer', protect, adminOnly, async (req, res) => {
     try {
         const newReservation = await Reservation.create(req.body);

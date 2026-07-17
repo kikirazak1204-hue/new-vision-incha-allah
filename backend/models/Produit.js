@@ -24,6 +24,19 @@ const Produit = sequelize.define('Produit', {
         allowNull: true
     },
 
+    // ➕ AJOUTÉ : catégorie du produit (texte libre, ex: "Plomberie", "Électricité")
+    categorie: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+
+    // ➕ AJOUTÉ : quantité en stock, 0 par défaut si non renseignée
+    quantite: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: 0
+    },
+
     // 🔗 Clé étrangère vers Fournisseur
     fournisseurId: {
         type: DataTypes.INTEGER,

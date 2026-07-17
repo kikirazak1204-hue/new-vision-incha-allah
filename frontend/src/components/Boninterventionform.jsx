@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Loader2 } from 'lucide-react'; // Ajout pour un meilleur feedback visuel
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -10,36 +11,56 @@ export default function BonInterventionForm({ mission, token, onSuccess, onClose
     const [sending, setSending] = useState(false);
     const [erreur, setErreur] = useState('');
 
-    const montantFinal = (parseFloat(montantMainOeuvre) || 0) + (parseFloat(montantPiecesOutils) || 0);
+    const mainOeuvreNum = parseFloat(montantMainOeuvre) || 0;
+    const piecesNum = parseFloat(montantPiecesOutils) || 0;
+    const montantFinal = mainOeuvreNum + piecesNum;
 
     const handleSubmit = async () => {
         setErreur('');
-        if (!descriptionTravail.trim() || !montantMainOeuvre) {
-            setErreur("La description du travail et le montant de la main-d'œuvre sont obligatoires.");
+
+        // 🟢 CORRECTION 1 : Validation stricte des nombres pour éviter l'envoi de NaN
+        if (!descriptionTravail.trim()) {
+            setErreur("La description du travail effectué est obligatoire.");
+            return;
+        }
+
+        if (isNaN(mainOeuvreNum) || mainOeuvreNum <= 0) {
+            setErreur("Veuillez entrer un montant de main-d'œuvre valide et supérieur à 0.");
+            return;
+        }
+
+        if (montantPiecesOutils && (isNaN(piecesNum) || piecesNum < 0)) {
+            setErreur("Le montant des pièces et outils doit être un nombre positif.");
             return;
         }
 
         setSending(true);
         try {
-            const r = await fetch(`${API}/api/bons-intervention`, {
+            // 🟢 CORRECTION 2 : Écriture asynchrone propre sans mixer await et .then()
+            const response = await fetch(`${API}/api/bons-intervention`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     reservationId: mission.id,
                     descriptionTravail,
-                    montantMainOeuvre: parseFloat(montantMainOeuvre),
+                    montantMainOeuvre: mainOeuvreNum,
                     piecesOutils: piecesOutils || null,
-                    montantPiecesOutils: parseFloat(montantPiecesOutils) || 0,
+                    montantPiecesOutils: piecesNum,
                 })
-            }).then(r => r.json());
+            });
 
-            if (r.success) {
+            const r = await response.json();
+
+            if (response.ok && r.success) {
                 onSuccess && onSuccess(r.data);
             } else {
                 setErreur(r.message || "Erreur lors de la création du bon d'intervention.");
             }
         } catch (err) {
-            setErreur('Erreur de connexion au serveur.');
+            setErreur('Erreur de connexion au serveur ou session expirée.');
         } finally {
             setSending(false);
         }
@@ -57,7 +78,7 @@ export default function BonInterventionForm({ mission, token, onSuccess, onClose
                     <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] flex items-center justify-center text-slate-400 hover:text-white transition-colors text-sm">✕</button>
                 </div>
 
-                <div className="p-6 space-y-5 max-h-[60vh] overflow-y-auto">
+                <div className="p-6 space-y-5 max-h-[60vh] overflow-y-auto animate-fadeIn">
 
                     {erreur && (
                         <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 text-rose-300 text-sm font-medium">
@@ -123,9 +144,14 @@ export default function BonInterventionForm({ mission, token, onSuccess, onClose
                     <button
                         onClick={handleSubmit}
                         disabled={sending}
-                        className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white font-black rounded-2xl text-sm shadow-lg shadow-purple-500/25 transition-all active:scale-[0.99] disabled:opacity-50"
+                        className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white font-black rounded-2xl text-sm shadow-lg shadow-purple-500/25 transition-all active:scale-[0.99] disabled:opacity-50 flex justify-center items-center gap-2"
                     >
-                        {sending ? 'Envoi en cours...' : '✅ Envoyer le bon au client'}
+                        {sending ? (
+                            <>
+                                <Loader2 className="animate-spin" size={16} />
+                                Envoi en cours...
+                            </>
+                        ) : '✅ Envoyer le bon au client'}
                     </button>
                 </div>
             </div>

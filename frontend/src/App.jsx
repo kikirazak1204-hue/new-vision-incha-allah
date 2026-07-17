@@ -1,3 +1,7 @@
+// ============================================================
+// Fichier : src/App.jsx
+// ============================================================
+
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
@@ -8,10 +12,9 @@ import { NavigationProvider } from './context/NavigationContext';
 // Composants de protection
 import ProtectedRoute from './components/ProtectedRoute';
 
-import ServiceSelectionPage from './pages/ServiceSelectionPage';
-
 // Importations des pages
 import Accueil from './pages/Accueil';
+import ServiceSelectionPage from './pages/ServiceSelectionPage';
 import ServiceDetailPage from './pages/ServiceDetailPage';
 import Register from './pages/Register';
 import RegisterPrestataire from './pages/RegisterPrestataire';
@@ -22,6 +25,9 @@ import DashboardFournisseur from './pages/DashboardFournisseur';
 import DashboardAdmin from './pages/AdminDashboard';
 import ReservationPage from './pages/ReservationPage';
 import ProduitsParFournisseur from './pages/Produitsparfournisseur';
+import PanierPage from './pages/PanierPage';
+import ProduitsParService from './pages/ProduitsParService';
+import VoirProduits from './pages/VoirProduitsPage'; // ⭐ NOUVEAU
 
 export default function App() {
     const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -52,7 +58,7 @@ export default function App() {
     const handleInstallApp = async () => {
         if (!deferredPrompt) return;
         deferredPrompt.prompt();
-        
+
         const { outcome } = await deferredPrompt.userChoice;
         if (outcome === 'accepted') {
             console.log('🎉 L\'utilisateur a installé Kanari !');
@@ -65,7 +71,7 @@ export default function App() {
         <PanierProvider>
             <NavigationProvider>
                 <div className="min-h-screen bg-slate-950 font-sans text-slate-100 relative">
-                    
+
                     {/* 📱 BANNIÈRE D'INSTALLATION PWA */}
                     {showInstallBtn && (
                         <div className="fixed bottom-4 left-4 right-4 z-50 bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-2xl flex items-center justify-between max-w-md mx-auto animate-bounce">
@@ -73,7 +79,7 @@ export default function App() {
                                 <p className="font-bold text-sm text-white">Installer l'application Kanari</p>
                                 <p className="text-xs text-slate-400">Pour recevoir vos notifications en temps réel.</p>
                             </div>
-                            <button 
+                            <button
                                 onClick={handleInstallApp}
                                 className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs px-4 py-2 rounded-lg transition-all"
                             >
@@ -85,17 +91,21 @@ export default function App() {
                     <Routes>
                         {/* Pages Publiques */}
                         <Route path="/" element={<Accueil />} />
+                        <Route path="/produits" element={<VoirProduits />} /> {/* ⭐ ROUTE AJOUTÉE */}
                         <Route path="/login" element={<Login />} />
                         <Route path="/register" element={<Register />} />
                         <Route path="/register-utilisateur" element={<RegisterUtilisateur />} />
                         <Route path="/register-prestataire" element={<RegisterPrestataire />} />
                         <Route path="/selection" element={<ServiceSelectionPage />} />
-                        
+
                         {/* Pages dynamiques publiques */}
                         <Route path="/service/:id" element={<ServiceDetailPage />} />
                         <Route path="/produits/:fournisseurId" element={<ProduitsParFournisseur />} />
-                        
-                        {/* 🛡️ DASHBOARDS (Double sécurité Slash + Tiret pour casser la boucle infinie) */}
+                        <Route path="/produits/service/:serviceId" element={<ProduitsParService />} />
+                        <Route path="/reservation" element={<ReservationPage />} />
+                        <Route path="/panier" element={<PanierPage />} />
+
+                        {/* 🛡️ DASHBOARDS */}
                         <Route path="/dashboard-client" element={
                             <ProtectedRoute role="client">
                                 <DashboardClient />
@@ -123,9 +133,7 @@ export default function App() {
                                 <DashboardAdmin />
                             </ProtectedRoute>
                         } />
-                        
-                        <Route path="/reservation" element={<ReservationPage />} />
-                        
+
                         {/* Redirection par défaut */}
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>

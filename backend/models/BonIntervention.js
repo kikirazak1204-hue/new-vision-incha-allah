@@ -31,12 +31,12 @@ const BonIntervention = sequelize.define('BonIntervention', {
     },
     montantPiecesOutils: {
         type: DataTypes.DECIMAL(10, 2),
-        allowNull: true,
-        defaultValue: 0
+        allowNull: false, // 🟢 CORRECTION : Fini les NULL, on force toujours à un nombre !
+        defaultValue: 0.00
     },
     montantFinal: {
         type: DataTypes.DECIMAL(10, 2),
-        allowNull: false // mainOeuvre + piecesOutils
+        allowNull: false // Sera calculé automatiquement par le Hook ci-dessous !
     },
 
     // ── Validation côté client ─────────────────────────
@@ -56,7 +56,11 @@ const BonIntervention = sequelize.define('BonIntervention', {
     // ── Note optionnelle du client ──────────────────────
     note: {
         type: DataTypes.INTEGER,
-        allowNull: true // 1 à 5
+        allowNull: true,
+        validate: {
+            min: 1, // 🟢 CORRECTION : Impossible de mettre moins de 1
+            max: 5  // 🟢 CORRECTION : Impossible de mettre plus de 5
+        }
     },
     commentaire: {
         type: DataTypes.TEXT,
@@ -65,7 +69,25 @@ const BonIntervention = sequelize.define('BonIntervention', {
 
 }, {
     tableName: 'bons_intervention',
-    timestamps: true
+    timestamps: true,
+
+    // 🔥 LA MAGIE EST ICI : LES HOOKS
+    hooks: {
+        // Avant de valider et d'enregistrer en base de données...
+        beforeValidate: (bon) => {
+            // 1. On s'assure que les montants sont bien des nombres (ou 0 par défaut)
+            const mainOeuvre = parseFloat(bon.montantMainOeuvre) || 0;
+            const pieces = parseFloat(bon.montantPiecesOutils) || 0;
+
+            // 2. On nettoie la valeur de pièces pour éviter un NULL en base
+            bon.montantMainOeuvre = mainOeuvre;
+            bon.montantPiecesOutils = pieces;
+
+            // 3. ON CALCULE LE MONTANT FINAL AUTOMATIQUEMENT !
+            // Plus de risque de bug si le frontend oublie de l'envoyer.
+            bon.montantFinal = mainOeuvre + pieces;
+        }
+    }
 });
 
 module.exports = BonIntervention;

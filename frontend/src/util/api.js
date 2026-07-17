@@ -453,3 +453,44 @@ export const adminCreerReservation = (payload) =>
     body: JSON.stringify(payload),
 
   });
+
+// 🟢 ✨ NOUVEAU : Valider définitivement une mission (Admin)
+export const validerReservation = (id) =>
+  request(`/api/admin/reservations/${id}/valider`, {
+    method: 'PUT',
+    headers: authHeaders(),
+  });
+
+// 🟢 ✨ NOUVEAU : Refuser / Annuler une mission avec motif optionnel (Admin)
+export const refuserReservation = (id, motif = '') =>
+  request(`/api/admin/reservations/${id}/refuser`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ motif }),
+  });
+
+// ============================================================
+// 📝 BONS D'INTERVENTION
+// ============================================================
+
+// 🟢 Créer un nouveau bon d'intervention (Prestataire)
+export const creerBonIntervention = (payload) =>
+  request('/api/bons-intervention', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+// 🟢 Récupérer le bon lié à une réservation (Admin / Client / Prestataire)
+export const getBonInterventionParReservation = (reservationId) =>
+  request(`/api/bons-intervention/reservation/${reservationId}`, {
+    headers: authHeaders(),
+  });
+
+// 🟢 Client valide le bon d'intervention avec note & avis
+export const validerBonIntervention = (bonId, { note, commentaire }) =>
+  request(`/api/bons-intervention/${bonId}/valider`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ note, commentaire }),
+  });

@@ -35,7 +35,6 @@ export default function FournisseursParService({ serviceId, setCurrentView }) {
         navigate('/fournisseur-profil', { state: { fournisseur, service } });
     };
 
-    // ✅ Vrai bouton Réserver — transmet service + fournisseur via React Router
     const handleReserver = (fournisseur) => {
         navigate('/reservation', { state: { service, fournisseur } });
     };
@@ -73,22 +72,29 @@ export default function FournisseursParService({ serviceId, setCurrentView }) {
                         </div>
                     ) : (
                         fournisseurs.map((f) => {
+                            // Normalisation des ID pour React
+                            const id = f._id || f.id;
                             const imageUrl = f.selfie ? (f.selfie.startsWith('http') ? f.selfie : `${API}/uploads/${f.selfie}`) : null;
 
                             return (
                                 <div
-                                    key={f.id}
+                                    key={id}
                                     className="group p-6 rounded-3xl border border-white/[0.06] hover:border-purple-500/30 transition-all flex flex-col md:flex-row gap-6 items-center shadow-xl"
                                     style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(16px)' }}
                                 >
                                     <div className="flex-shrink-0">
                                         {imageUrl ? (
-                                            <img src={imageUrl} alt={f.nomEntreprise} className="w-24 h-24 rounded-2xl object-cover border-2 border-white/10" />
-                                        ) : (
-                                            <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-purple-900 to-indigo-900 flex items-center justify-center text-3xl font-black">
-                                                {f.nomEntreprise?.charAt(0).toUpperCase()}
-                                            </div>
-                                        )}
+                                            <img
+                                                src={imageUrl}
+                                                alt={f.nomEntreprise}
+                                                className="w-24 h-24 rounded-2xl object-cover border-2 border-white/10"
+                                                onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                                            />
+                                        ) : null}
+                                        {/* Fallback si pas d'image ou image cassée */}
+                                        <div className={`${imageUrl ? 'hidden' : 'flex'} w-24 h-24 rounded-2xl bg-gradient-to-br from-purple-900 to-indigo-900 items-center justify-center text-3xl font-black`}>
+                                            {f.nomEntreprise?.charAt(0).toUpperCase()}
+                                        </div>
                                     </div>
 
                                     <div className="flex-grow text-center md:text-left">
@@ -112,12 +118,14 @@ export default function FournisseursParService({ serviceId, setCurrentView }) {
 
                                     <div className="flex flex-col gap-2 w-full md:w-auto">
                                         <button
+                                            aria-label={`Réserver ${f.nomEntreprise}`}
                                             onClick={() => handleReserver(f)}
                                             className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 active:scale-95 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2"
                                         >
                                             <CalendarCheck size={16} /> Réserver
                                         </button>
                                         <button
+                                            aria-label={`Voir le profil de ${f.nomEntreprise}`}
                                             onClick={() => handleVoirProfil(f)}
                                             className="px-6 py-3 bg-white/[0.05] hover:bg-white/[0.08] active:scale-95 border border-white/10 text-white font-medium rounded-xl transition-all"
                                         >

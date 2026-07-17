@@ -7,7 +7,7 @@ export default function Login() {
     const [message, setMessage] = useState("");
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-    
+
     const navigate = useNavigate(); // 2. Initialisation de la navigation
 
     const handleChange = (e) => {
@@ -22,12 +22,12 @@ export default function Login() {
 
         try {
             const result = await loginUser(form);
-            
+
             if (result.success && result.token) {
                 // Sauvegarde
                 localStorage.setItem("token", result.token);
                 localStorage.setItem("user", JSON.stringify(result.user));
-                
+
                 // Normalisation du rôle
                 const role = result.user?.role?.toLowerCase();
 
@@ -51,9 +51,19 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+        <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6 relative">
+
+            {/* ➕ AJOUTÉ : bouton retour */}
+            <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="absolute top-6 left-6 flex items-center gap-2 text-slate-400 hover:text-white text-sm font-medium transition"
+            >
+                ← Retour
+            </button>
+
             <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
-                
+
                 <div className="text-center mb-8">
                     <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl flex items-center justify-center text-2xl font-black mx-auto mb-4 shadow-lg shadow-purple-900/20">
                         K
@@ -63,14 +73,14 @@ export default function Login() {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <input 
+                    <input
                         type="email" name="email" placeholder="Email" value={form.email} onChange={handleChange}
                         required
                         className="w-full p-4 rounded-xl bg-slate-950 border border-slate-800 focus:border-purple-500 outline-none transition"
                     />
-                    
+
                     <div className="relative">
-                        <input 
+                        <input
                             type={showPassword ? "text" : "password"} name="password" placeholder="Mot de passe" value={form.password} onChange={handleChange}
                             required
                             className="w-full p-4 rounded-xl bg-slate-950 border border-slate-800 focus:border-purple-500 outline-none transition"
@@ -92,15 +102,15 @@ export default function Login() {
                 <div className="mt-8 pt-6 border-t border-slate-800 text-center space-y-4">
                     <p className="text-slate-500 text-sm">Pas encore de compte ?</p>
                     <div className="grid grid-cols-2 gap-3">
-                        <button 
+                        <button
                             type="button"
-                            onClick={() => navigate('/register-utilisateur')} 
+                            onClick={() => navigate('/register-utilisateur')}
                             className="py-3 rounded-xl border border-slate-800 hover:border-slate-700 text-sm font-semibold transition cursor-pointer block w-full">
                             Client
                         </button>
-                        <button 
+                        <button
                             type="button"
-                            onClick={() => navigate('/register-prestataire')} 
+                            onClick={() => navigate('/register-prestataire')}
                             className="py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-semibold transition cursor-pointer block w-full">
                             Prestataire
                         </button>

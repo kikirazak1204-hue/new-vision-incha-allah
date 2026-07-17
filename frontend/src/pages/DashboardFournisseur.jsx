@@ -45,40 +45,55 @@ function StatCard({ icon, label, value, gradient }) {
     );
 }
 
-// MODAL : BON D'INTERVENTION SIMPLIFIÉ
+
+
+// Assure-toi que la variable globale API est bien définie ou importe-la si nécessaire
+// const API = "https://newvision-backend.onrender.com"; // ou import { API } from '../../util/api';
+
 function BonInterventionModal({ missionId, onClose, token, onSuccess }) {
     const [description, setDescription] = useState('');
-    const [montant, setMontant] = useState('');
-    const [pieces, setPieces] = useState('');
+    const [montantMainOeuvre, setMontantMainOeuvre] = useState('');
+    const [piecesOutils, setPiecesOutils] = useState('');
+    const [montantPiecesOutils, setMontantPiecesOutils] = useState('');
     const [loading, setLoading] = useState(false);
+
+    // Calcul dynamique du total pour un affichage en temps réel dans la modale
+    const totalFinal = Number(montantMainOeuvre || 0) + Number(montantPiecesOutils || 0);
 
     const soumettreBon = async (e) => {
         e.preventDefault();
-        if (!description.trim() || !montant) {
-            alert('Veuillez remplir la description et le montant de la main-d\'œuvre.');
+
+        if (!description.trim() || !montantMainOeuvre) {
+            alert("Veuillez remplir la description et le montant de la main-d'œuvre.");
             return;
         }
+
         setLoading(true);
         try {
             const response = await fetch(`${API}/api/missions/${missionId}/terminer`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     descriptionTravail: description.trim(),
-                    montantMainOeuvre: Number(montant),
-                    piecesFournies: pieces.trim(),
+                    montantMainOeuvre: Number(montantMainOeuvre),
+                    piecesOutils: piecesOutils.trim() || null,
+                    montantPiecesOutils: Number(montantPiecesOutils || 0),
                     statut: 'TERMINEE'
                 })
             }).then(r => r.json());
 
             if (response.success) {
-                alert('Rapport et bon d\'intervention transmis avec succès !');
+                alert("Rapport et bon d'intervention transmis avec succès !");
                 onSuccess(missionId, 'TERMINEE');
                 onClose();
             } else {
                 alert(response.message || 'Erreur lors de la validation.');
             }
         } catch (err) {
+            console.error(err);
             alert('Erreur réseau ou serveur lors de la transmission.');
         } finally {
             setLoading(false);
@@ -87,17 +102,29 @@ function BonInterventionModal({ missionId, onClose, token, onSuccess }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-            <div className="w-full max-w-lg bg-[#0E1320] border border-purple-500/30 rounded-3xl shadow-2xl overflow-hidden flex flex-col p-6 space-y-4">
+            <div className="w-full max-w-lg bg-[#0E1320] border border-purple-500/30 rounded-3xl shadow-2xl overflow-hidden flex flex-col p-6 space-y-4 text-slate-100">
+
+                {/* ── EN-TÊTE ──────────────────────────────────────────────────────── */}
                 <div className="flex items-center justify-between border-b border-white/[0.07] pb-3">
                     <h3 className="text-lg font-black text-white flex items-center gap-2">
                         📝 Rapport & Bon d'Intervention
                     </h3>
-                    <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors text-sm font-bold">✕</button>
+                    <button
+                        onClick={onClose}
+                        className="text-slate-400 hover:text-white transition-colors text-lg font-bold"
+                    >
+                        ✕
+                    </button>
                 </div>
 
+                {/* ── FORMULAIRE ───────────────────────────────────────────────────── */}
                 <form onSubmit={soumettreBon} className="space-y-4 text-left">
+
+                    {/* Description */}
                     <div>
-                        <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">Description des travaux effectués *</label>
+                        <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">
+                            Description des travaux effectués *
+                        </label>
                         <textarea
                             value={description}
                             onChange={e => setDescription(e.target.value)}
@@ -108,30 +135,56 @@ function BonInterventionModal({ missionId, onClose, token, onSuccess }) {
                         />
                     </div>
 
+                    {/* Section Pièces & Outils textuelle */}
+                    <div>
+                        <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">
+                            Matériaux / Pièces utilisés (Optionnel)
+                        </label>
+                        <input
+                            type="text"
+                            value={piecesOutils}
+                            onChange={e => setPiecesOutils(e.target.value)}
+                            placeholder="Ex: Joint silicone, Câble 2m, Robinetterie"
+                            className="w-full bg-[#090D16] border border-white/[0.08] focus:border-purple-500 text-slate-200 placeholder-slate-600 rounded-xl px-4 py-3 text-sm outline-none transition-all shadow-inner"
+                        />
+                    </div>
+
+                    {/* Grille des montants */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">Coût Main d'œuvre (FCFA) *</label>
+                            <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">
+                                Coût Main d'œuvre (FCFA) *
+                            </label>
                             <input
                                 type="number"
-                                value={montant}
-                                onChange={e => setMontant(e.target.value)}
+                                value={montantMainOeuvre}
+                                onChange={e => setMontantMainOeuvre(e.target.value)}
                                 placeholder="Ex: 15000"
                                 className="w-full bg-[#090D16] border border-white/[0.08] focus:border-purple-500 text-slate-200 placeholder-slate-600 rounded-xl px-4 py-3 text-sm font-bold outline-none transition-all shadow-inner"
                                 required
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">Matériaux / Pièces (Optionnel)</label>
+                            <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">
+                                Coût des Pièces (FCFA)
+                            </label>
                             <input
-                                type="text"
-                                value={pieces}
-                                onChange={e => setPieces(e.target.value)}
-                                placeholder="Ex: Joint silicone, Câble 2m"
-                                className="w-full bg-[#090D16] border border-white/[0.08] focus:border-purple-500 text-slate-200 placeholder-slate-600 rounded-xl px-4 py-3 text-sm outline-none transition-all shadow-inner"
+                                type="number"
+                                value={montantPiecesOutils}
+                                onChange={e => setMontantPiecesOutils(e.target.value)}
+                                placeholder="Ex: 5000 (Laisser vide si 0)"
+                                className="w-full bg-[#090D16] border border-white/[0.08] focus:border-purple-500 text-slate-200 placeholder-slate-600 rounded-xl px-4 py-3 text-sm font-bold outline-none transition-all shadow-inner"
                             />
                         </div>
                     </div>
 
+                    {/* Total Indicateur Visuel */}
+                    <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex justify-between items-center text-sm">
+                        <span className="font-bold text-emerald-400">Total Facturé au Client :</span>
+                        <span className="font-black text-emerald-400 text-base">{totalFinal.toLocaleString('fr-FR')} FCFA</span>
+                    </div>
+
+                    {/* Boutons d'actions */}
                     <div className="pt-2 flex gap-3">
                         <button
                             type="button"
@@ -145,7 +198,7 @@ function BonInterventionModal({ missionId, onClose, token, onSuccess }) {
                             disabled={loading}
                             className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black rounded-xl text-sm shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.99] disabled:opacity-50"
                         >
-                            {loading ? 'Transmission...' : 'Envoyer le Bon au Client'}
+                            {loading ? 'Transmission...' : 'Envoyer le Bon'}
                         </button>
                     </div>
                 </form>
@@ -153,123 +206,124 @@ function BonInterventionModal({ missionId, onClose, token, onSuccess }) {
         </div>
     );
 }
+// AJOUTER PRODUIT 
 
-// MODAL : AJOUTER UN PRODUIT AU CATALOGUE
 function AjouterProduitModal({ onClose, onSuccess }) {
+    // États pour les champs du formulaire
     const [nom, setNom] = useState('');
     const [prix, setPrix] = useState('');
+    const [categorie, setCategorie] = useState('');
+    const [quantite, setQuantite] = useState('');
     const [description, setDescription] = useState('');
-    const [photo, setPhoto] = useState(null);
+    const [fichier, setFichier] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
     const soumettre = async (e) => {
         e.preventDefault();
         setError('');
+
+        // Validation basique
         if (!nom.trim() || !prix) {
             setError('Le nom et le prix sont obligatoires.');
             return;
         }
+
         setLoading(true);
         try {
             const fd = new FormData();
             fd.append('nom', nom.trim());
             fd.append('prix', prix);
+            fd.append('categorie', categorie.trim());
+            fd.append('quantite', quantite || 0);
             fd.append('description', description.trim());
-            // ⚠️ À vérifier : la clé du champ image ('photo') doit correspondre à ce
-            // qu'attend votre route POST /api/produits (multer .single('photo') ou autre).
-            if (photo) fd.append('photo', photo);
 
+            // On envoie le fichier sous la clé 'image' (correspond à upload.single('image') côté backend actuel)
+            if (fichier) {
+                fd.append('image', fichier);
+            }
+
+            // Appel à ta fonction API
             const res = await addProduit(fd);
-            if (res?.success !== false) {
-                onSuccess(res?.data || { id: Date.now(), nom: nom.trim(), prix });
+
+            if (res && res.success) {
+                onSuccess(res.data);
                 onClose();
             } else {
                 setError(res?.message || "Échec de l'ajout du produit.");
             }
         } catch (err) {
-            setError(err?.message || 'Erreur réseau ou serveur.');
+            console.error(err);
+            setError('Erreur réseau. Veuillez réessayer.');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-            <div className="w-full max-w-lg bg-[#0E1320] border border-purple-500/30 rounded-3xl shadow-2xl overflow-hidden flex flex-col p-6 space-y-4">
-                <div className="flex items-center justify-between border-b border-white/[0.07] pb-3">
-                    <h3 className="text-lg font-black text-white flex items-center gap-2">
-                        📦 Ajouter un produit
-                    </h3>
-                    <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors text-sm font-bold">✕</button>
-                </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+            <div className="w-full max-w-lg bg-[#0E1320] border border-purple-500/30 rounded-3xl p-6 shadow-2xl">
+                <h3 className="text-lg font-black text-white mb-4">📦 Ajouter un produit</h3>
 
-                {error && (
-                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-3 text-rose-300 text-xs font-semibold text-center">
-                        {error}
-                    </div>
-                )}
+                <form onSubmit={soumettre} className="space-y-4">
+                    {/* Nom */}
+                    <input
+                        type="text" placeholder="Nom du produit *"
+                        value={nom} onChange={(e) => setNom(e.target.value)}
+                        className="w-full bg-[#161c2e] text-white p-3 rounded-xl border border-white/10 outline-none focus:border-purple-500"
+                    />
 
-                <form onSubmit={soumettre} className="space-y-4 text-left">
-                    <div>
-                        <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">Nom du produit *</label>
+                    {/* Prix */}
+                    <input
+                        type="number" placeholder="Prix *"
+                        value={prix} onChange={(e) => setPrix(e.target.value)}
+                        className="w-full bg-[#161c2e] text-white p-3 rounded-xl border border-white/10 outline-none focus:border-purple-500"
+                    />
+
+                    {/* Catégorie & Quantité */}
+                    <div className="flex gap-2">
                         <input
-                            type="text"
-                            value={nom}
-                            onChange={e => setNom(e.target.value)}
-                            placeholder="Ex: Robinet mitigeur inox"
-                            className="w-full bg-[#090D16] border border-white/[0.08] focus:border-purple-500 text-slate-200 placeholder-slate-600 rounded-xl px-4 py-3 text-sm outline-none transition-all shadow-inner"
+                            type="text" placeholder="Catégorie"
+                            value={categorie} onChange={(e) => setCategorie(e.target.value)}
+                            className="flex-1 bg-[#161c2e] text-white p-3 rounded-xl border border-white/10 outline-none focus:border-purple-500"
                         />
-                    </div>
-
-                    <div>
-                        <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">Prix (FCFA) *</label>
                         <input
-                            type="number"
-                            value={prix}
-                            onChange={e => setPrix(e.target.value)}
-                            placeholder="Ex: 12000"
-                            className="w-full bg-[#090D16] border border-white/[0.08] focus:border-purple-500 text-slate-200 placeholder-slate-600 rounded-xl px-4 py-3 text-sm font-bold outline-none transition-all shadow-inner"
+                            type="number" placeholder="Qté"
+                            value={quantite} onChange={(e) => setQuantite(e.target.value)}
+                            className="w-24 bg-[#161c2e] text-white p-3 rounded-xl border border-white/10 outline-none focus:border-purple-500"
                         />
                     </div>
 
-                    <div>
-                        <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">Description (optionnel)</label>
-                        <textarea
-                            value={description}
-                            onChange={e => setDescription(e.target.value)}
-                            placeholder="Détails, état, garantie..."
-                            rows="3"
-                            className="w-full bg-[#090D16] border border-white/[0.08] focus:border-purple-500 text-slate-200 placeholder-slate-600 rounded-xl px-4 py-3 text-sm outline-none resize-none transition-all shadow-inner"
-                        />
-                    </div>
+                    {/* Description */}
+                    <textarea
+                        placeholder="Description..."
+                        rows="3"
+                        value={description} onChange={(e) => setDescription(e.target.value)}
+                        className="w-full bg-[#161c2e] text-white p-3 rounded-xl border border-white/10 outline-none focus:border-purple-500"
+                    />
 
+                    {/* Input Fichier Générique */}
                     <div>
-                        <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">Photo (optionnel)</label>
+                        <label className="block text-[10px] text-purple-400 font-bold uppercase mb-1">
+                            Fichier / Document / Support
+                        </label>
                         <input
                             type="file"
-                            accept="image/*"
-                            onChange={e => setPhoto(e.target.files?.[0] || null)}
-                            className="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-purple-600 file:text-white file:text-xs file:font-bold"
+                            onChange={(e) => setFichier(e.target.files?.[0] || null)}
+                            className="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:bg-purple-600 file:text-white file:rounded-xl file:border-0 cursor-pointer"
                         />
+                        <p className="text-[10px] text-slate-500 mt-1">Tous formats acceptés (PDF, JPG, PNG, DOCX, ZIP...)</p>
                     </div>
 
-                    <div className="pt-2 flex gap-3">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="flex-1 py-3 bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 font-bold rounded-xl text-sm transition-all"
-                        >
-                            Annuler
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black rounded-xl text-sm shadow-lg shadow-purple-500/20 transition-all active:scale-[0.99] disabled:opacity-50"
-                        >
-                            {loading ? 'Ajout en cours...' : 'Ajouter au catalogue'}
-                        </button>
-                    </div>
+                    {error && <p className="text-red-500 text-xs font-bold">{error}</p>}
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-all"
+                    >
+                        {loading ? 'Traitement...' : 'Ajouter au catalogue'}
+                    </button>
                 </form>
             </div>
         </div>
@@ -742,6 +796,7 @@ export default function DashboardFournisseur({ setCurrentView }) {
             {/* Mobile Nav Header */}
             <div className="md:hidden fixed top-0 inset-x-0 h-14 bg-[#0E1320]/90 backdrop-blur-lg border-b border-white/[0.05] z-30 px-4 flex justify-between items-center">
                 <div className="flex items-center gap-2">
+                    <button onClick={() => window.history.back()} className="text-slate-400 hover:text-white text-lg mr-1">←</button>
                     <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center font-black text-white text-xs">K</div>
                     <span className="font-extrabold text-sm tracking-tight text-white">Kanari Portal</span>
                 </div>
@@ -768,6 +823,12 @@ export default function DashboardFournisseur({ setCurrentView }) {
                         <span className="text-xs font-bold uppercase tracking-widest text-purple-400">Espace de gestion</span>
                         <h1 className="text-2xl font-black text-white mt-0.5">{tabs.find(t => t.id === activeTab)?.label}</h1>
                     </div>
+                    <button
+                        onClick={() => window.history.back()}
+                        className="px-4 py-2 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 font-bold text-xs flex items-center gap-2 transition-all"
+                    >
+                        ← Retour
+                    </button>
                 </header>
 
                 {activeTab === 'overview' && (

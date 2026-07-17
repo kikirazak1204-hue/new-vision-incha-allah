@@ -1,10 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const { Produit, Fournisseur, Service } = require('../models');
+const { Produit, Fournisseur, Service, User } = require('../models');
 const { protect, authorize } = require('../middleware/auth');
 const { Op } = require('sequelize');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+
+// 📁 SÉCURITÉ : Création automatique du dossier "uploads" s'il n'existe pas
+const uploadDir = path.resolve('uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+    console.log('📁 Dossier "uploads" créé automatiquement.');
+}
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'uploads/'),
@@ -14,6 +22,8 @@ const storage = multer.diskStorage({
         cb(null, `${name}-${Date.now()}${ext}`);
     }
 });
+
+// ✅ Pas de fileFilter : tous types de fichiers acceptés (images, PDF, vidéo, docs...)
 const upload = multer({ storage });
 
 // ── GET /api/produits — public avec filtres
@@ -33,7 +43,7 @@ router.get('/', async (req, res) => {
                 {
                     model: Fournisseur, as: 'fournisseur',
                     attributes: ['id', 'nomEntreprise', 'adresse'],
-                    include: [{ model: require('../models').User, as: 'userFournisseur', attributes: ['email', 'telephone'] }]
+                    include: [{ model: User, as: 'userFournisseur', attributes: ['email', 'telephone'] }]
                 },
                 { model: Service, as: 'produitService', attributes: ['id', 'nom', 'description'] }
             ],
@@ -46,7 +56,6 @@ router.get('/', async (req, res) => {
     }
 });
 
-// ✅ IMPORTANT — cette route DOIT être avant /:id sinon Express confond "fournisseur" avec un id
 // ── GET /api/produits/fournisseur — produits du fournisseur connecté
 router.get('/fournisseur', protect, authorize('fournisseur'), async (req, res) => {
     try {
@@ -65,7 +74,7 @@ router.get('/fournisseur', protect, authorize('fournisseur'), async (req, res) =
     }
 });
 
-// ── POST /api/produits — créer un produit
+// ── POST /api/produits — créer un produit (tous types de fichiers acceptés)
 router.post('/', protect, authorize('fournisseur', 'admin'), upload.single('image'), async (req, res) => {
     try {
         const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
@@ -74,14 +83,20 @@ router.post('/', protect, authorize('fournisseur', 'admin'), upload.single('imag
         const count = await Produit.count({ where: { fournisseurId: fournisseur.id } });
         if (count >= 25) return res.status(400).json({ success: false, message: 'Limite de 25 produits atteinte.' });
 
-        const { nom, description, prix, serviceId } = req.body;
+        // ➕ AJOUTÉ : categorie et quantite (colonnes désormais présentes sur le modèle Produit)
+        const { nom, description, prix, serviceId, categorie, quantite } = req.body;
         if (!nom || !prix) return res.status(400).json({ success: false, message: 'Nom et prix sont obligatoires.' });
 
         const produit = await Produit.create({
             fournisseurId: fournisseur.id,
             serviceId: serviceId || fournisseur.serviceId,
-            nom, description, prix,
-            image: req.file?.filename || null
+            nom,
+            description,
+            prix,
+            categorie: categorie || null,
+            quantite: quantite ? Number(quantite) : 0,
+            // Le champ stocke le nom de fichier peu importe son type réel (image, PDF, vidéo...)
+            image: req.file ? req.file.filename : null
         });
         res.status(201).json({ success: true, message: 'Produit créé ✅', data: produit });
     } catch (error) {
@@ -98,7 +113,7 @@ router.get('/:id', async (req, res) => {
                 {
                     model: Fournisseur, as: 'fournisseur',
                     attributes: ['id', 'nomEntreprise', 'adresse'],
-                    include: [{ model: require('../models').User, as: 'userFournisseur', attributes: ['email', 'telephone'] }]
+                    include: [{ model: User, as: 'userFournisseur', attributes: ['email', 'telephone'] }]
                 },
                 { model: Service, as: 'produitService', attributes: ['id', 'nom', 'description'] }
             ]
@@ -115,8 +130,11 @@ router.put('/:id', protect, async (req, res) => {
     try {
         const produit = await Produit.findByPk(req.params.id, { include: [{ model: Fournisseur, as: 'fournisseur' }] });
         if (!produit) return res.status(404).json({ success: false, message: 'Produit non trouvé' });
-        if (produit.fournisseur.userId !== req.user.id && req.user.role !== 'admin')
+
+        if (!produit.fournisseur || (produit.fournisseur.userId !== req.user.id && req.user.role !== 'admin')) {
             return res.status(403).json({ success: false, message: 'Non autorisé' });
+        }
+
         await produit.update(req.body);
         res.json({ success: true, message: 'Produit mis à jour ✅', data: produit });
     } catch (error) {
@@ -129,8 +147,11 @@ router.delete('/:id', protect, async (req, res) => {
     try {
         const produit = await Produit.findByPk(req.params.id, { include: [{ model: Fournisseur, as: 'fournisseur' }] });
         if (!produit) return res.status(404).json({ success: false, message: 'Produit non trouvé' });
-        if (produit.fournisseur.userId !== req.user.id && req.user.role !== 'admin')
+
+        if (!produit.fournisseur || (produit.fournisseur.userId !== req.user.id && req.user.role !== 'admin')) {
             return res.status(403).json({ success: false, message: 'Non autorisé' });
+        }
+
         await produit.destroy();
         res.json({ success: true, message: 'Produit supprimé ✅' });
     } catch (error) {
