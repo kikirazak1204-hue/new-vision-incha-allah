@@ -34,7 +34,7 @@ const corsOptions = {
         if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
             return callback(null, true);
         }
-        return callback(null, true); 
+        return callback(null, true);
     },
     // PATCH est inclus
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -60,11 +60,14 @@ const repairDatabase = async () => {
     const queries = [
         "ALTER TABLE reservations ADD COLUMN descriptionTravail TEXT;",
         "ALTER TABLE reservations ADD COLUMN montantMainOeuvre DECIMAL(10,2);",
-        "ALTER TABLE reservations ADD COLUMN piecesFournies VARCHAR(255);"
+        "ALTER TABLE reservations ADD COLUMN piecesFournies VARCHAR(255);",
+        // ➕ AJOUTÉ : colonnes manquantes sur produits (categorie, quantite)
+        "ALTER TABLE produits ADD COLUMN categorie VARCHAR(255);",
+        "ALTER TABLE produits ADD COLUMN quantite INT DEFAULT 0;"
     ];
 
     console.log("🛠️ Tentative d'ajout des colonnes manquantes...");
-    
+
     // On exécute chaque requête une par une avec un try/catch pour éviter le crash global
     for (let q of queries) {
         try {
@@ -86,9 +89,9 @@ sequelize.authenticate()
     .then(async () => {
         console.log('✅ Base de données connectée.');
         // 1. On force l'ajout des colonnes via MySQL pur
-        await repairDatabase(); 
+        await repairDatabase();
         // 2. On lance la synchro normale en désactivant alter pour éviter les bugs d'index
-        return sequelize.sync({ alter: false }); 
+        return sequelize.sync({ alter: false });
     })
     .then(() => {
         console.log('✅ Tables synchronisées.');

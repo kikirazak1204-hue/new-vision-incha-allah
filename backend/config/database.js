@@ -17,7 +17,11 @@ const sequelize = new Sequelize(
         dialect: 'mysql',
         logging: console.log, // Active le log pour voir les requêtes réelles dans ton terminal
         dialectOptions: {
-            connectTimeout: 10000
+            connectTimeout: 10000,
+            // ➕ AJOUTÉ : cohérent avec config/config.js — Aiven MySQL exige SSL
+            ssl: {
+                rejectUnauthorized: false
+            }
         }
     }
 );
