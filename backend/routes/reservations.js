@@ -6,7 +6,7 @@ const resController = require('../controllers/reservationController');
 // Public — créer une réservation client
 router.post('/', resController.createReservation);
 
-router.get('/mes-reservations/:userId', resController.getMesReservations);
+router.get('/mes-reservations/:userId', protect, resController.getMesReservations);
 router.put('/:id/statut', protect, resController.updateStatut);
 router.delete('/:id', protect, resController.deleteReservation);
 

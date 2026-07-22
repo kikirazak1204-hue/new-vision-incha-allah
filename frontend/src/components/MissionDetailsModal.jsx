@@ -1,304 +1,364 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    X,
-    CheckCircle,
-    XCircle,
-    Calendar,
-    MapPin,
-    Phone,
-    User,
-    Briefcase,
-    FileText,
-    Loader2,
-    AlertTriangle,
-    Star
+    autoriserDemarrage,
+    assignerFournisseur,
+    updateReservationStatut,
+    getFournisseurs,
+    getAdminFournisseurs
+} from '../util/api';
+import {
+    User, Phone, MapPin, Home, Loader2, PhoneCall, Briefcase,
+    AlertCircle, CheckCircle, Clock, ShieldAlert, Star, Check
 } from 'lucide-react';
-import StatusBadge from './StatusBadge';
-// 🟢 IMPORTATIONS DES VRAIES FONCTIONS API DEPUIS api.js (Ajout de validerBonIntervention)
-import { validerReservation, refuserReservation, validerBonIntervention } from '../util/api';
 
 export default function MissionDetailsModal({ reservation, onClose, onRefresh }) {
-    const [loadingAction, setLoadingAction] = useState(false);
-    const [error, setError] = useState(null);
+    // 1. ÉTATS DU COMPOSANT
+    const [processing, setProcessing] = useState(false);
+    const [fournisseurId, setFournisseurId] = useState(
+        reservation?.fournisseurId || reservation?.fournisseur_id || ''
+    );
+    const [accordTelephone, setAccordTelephone] = useState(false);
+    const [modeReassignation, setModeReassignation] = useState(false);
 
-    // Si aucune réservation n'est fournie, on ne rend rien
+    // États pour la liste des prestataires venue du backend
+    const [fournisseurs, setFournisseurs] = useState([]);
+    const [loadingFournisseurs, setLoadingFournisseurs] = useState(false);
+
+    // 2. CHARGEMENT ROBUSTE DES PRESTATAIRES
+    useEffect(() => {
+        const fetchListeFournisseurs = async () => {
+            setLoadingFournisseurs(true);
+            try {
+                let data = await getFournisseurs();
+
+                // Extraction intelligente du tableau peu importe la structure backend
+                let list = Array.isArray(data)
+                    ? data
+                    : (data?.fournisseurs || data?.data || data?.utilisateurs || []);
+
+                // Si la liste est vide, tentative de secours via l'API Admin
+                if (list.length === 0) {
+                    try {
+                        const adminData = await getAdminFournisseurs();
+                        list = Array.isArray(adminData)
+                            ? adminData
+                            : (adminData?.fournisseurs || adminData?.data || []);
+                    } catch (e) {
+                        console.warn("Fallback admin échoué :", e);
+                    }
+                }
+
+                setFournisseurs(list);
+            } catch (error) {
+                console.error("❌ Erreur lors du chargement des prestataires :", error);
+            } finally {
+                setLoadingFournisseurs(false);
+            }
+        };
+
+        if (reservation) {
+            fetchListeFournisseurs();
+        }
+    }, [reservation]);
+
     if (!reservation) return null;
 
-    // Récupération sécurisée du Bon d'Intervention s'il existe dans ta donnée
-    const bon = reservation.BonIntervention || reservation.bonIntervention;
+    // Helper pour générer le nom d'affichage d'un prestataire sans bug
+    const getFournisseurName = (f) => {
+        if (!f) return 'Prestataire inconnu';
+        const nomComplet = [
+            f.prenom || f.User?.prenom,
+            f.nom || f.User?.nom || f.name
+        ].filter(Boolean).join(' ');
 
-    // Normalisation du statut pour les vérifications d'activation de bouton
-    const statusUpper = reservation.statut?.toUpperCase() || '';
-    const isDejaRefuse = statusUpper === 'ANNULEE' || statusUpper === 'ANNULE' || statusUpper === 'REFUSEE' || statusUpper === 'REFUSE';
+        return f.nomEntreprise || f.nom_entreprise || nomComplet || f.email || `Prestataire #${f.id}`;
+    };
 
-    // 🟢 Un bon d'intervention validé ou une réservation validée bloque une nouvelle validation
-    const isDejaValide = statusUpper === 'VALIDEE' || statusUpper === 'VALIDE' || (bon && bon.valide);
+    // 3. NORMALISATION DES DONNÉES
+    const normalizeStatut = (raw) => {
+        return String(raw || 'INCONNU')
+            .trim()
+            .toUpperCase()
+            .normalize('NFD')
+            .replace(/\p{Diacritic}/gu, '')
+            .replace(/\s+/g, '_');
+    };
 
-    // ── GESTIONNAIRE : VALIDER LA MISSION OU LE BON ─────────────────────────
-    const handleValider = async () => {
-        setLoadingAction(true);
-        setError(null);
+    const statutBrut = reservation.statut || reservation.status || 'INCONNU';
+    const statut = normalizeStatut(statutBrut);
+    const currentFournisseurId = reservation.fournisseurId || reservation.fournisseur_id || null;
 
+    // Récupérer les infos du prestataire sélectionné en gérant correctement les IDs
+    const prestataireSelectionne = fournisseurs.find(f => {
+        const id = f.id ?? f.fournisseurId;
+        return id !== undefined && id !== null && id.toString() === fournisseurId.toString();
+    });
+
+    // 4. GESTION DES APPELS API
+    const handleAction = async (actionFn, ...args) => {
+        setProcessing(true);
         try {
-            if (bon) {
-                // 1. Si un bon existe, on demande la note et l'avis pour le prestataire
-                const noteSaisie = window.prompt("Attribuez une note au prestataire pour cette intervention (de 1 à 5) :", "5");
-                if (noteSaisie === null) {
-                    setLoadingAction(false);
-                    return; // Annulation par l'utilisateur
-                }
-
-                const noteInt = parseInt(noteSaisie, 10);
-                if (isNaN(noteInt) || noteInt < 1 || noteInt > 5) {
-                    alert("⚠️ La note doit être un nombre entier compris entre 1 et 5.");
-                    setLoadingAction(false);
-                    return;
-                }
-
-                const commentaire = window.prompt("Laissez un court commentaire sur l'intervention (optionnel) :", "Travail impeccable et rapide.");
-                if (commentaire === null) {
-                    setLoadingAction(false);
-                    return;
-                }
-
-                // 🟢 APPEL DE LA NOUVELLE API POUR LE BON D'INTERVENTION
-                await validerBonIntervention(bon.id, { note: noteInt, commentaire });
-                alert("✅ Bon d'intervention et prestation validés avec succès !");
-            } else {
-                // 2. Si aucun bon n'existe (simple réservation), validation classique
-                if (!window.confirm("Voulez-vous vraiment valider cette réservation ?")) {
-                    setLoadingAction(false);
-                    return;
-                }
-                await validerReservation(reservation.id);
-                alert("✅ Réservation validée avec succès !");
-            }
-
-            onRefresh(); // Recharge le tableau de bord
-            onClose();   // Ferme la modale
-        } catch (err) {
-            console.error(err);
-            setError("Erreur lors de la validation : " + (err.response?.data?.message || err.message));
+            await actionFn(...args);
+            await onRefresh();
+            onClose();
+        } catch (e) {
+            alert("Erreur lors de l'opération : " + (e.message || "Erreur réseau/serveur"));
         } finally {
-            setLoadingAction(false);
+            setProcessing(false);
         }
     };
 
-    // ── GESTIONNAIRE : REFUSER / ANNULER LA MISSION ─────────────────────────
-    const handleRefuser = async () => {
-        const motif = window.prompt("Veuillez indiquer le motif du refus / de l'annulation :");
-        if (motif === null) return; // Le client a cliqué sur "Annuler" dans le prompt
+    const handleAssignation = () => {
+        if (!fournisseurId) {
+            return alert("Veuillez sélectionner un prestataire dans la liste.");
+        }
+        handleAction(assignerFournisseur, reservation.id, parseInt(fournisseurId, 10), accordTelephone);
+    };
 
-        setLoadingAction(true);
-        setError(null);
-        try {
-            // 🟢 APPEL API RÉEL
-            await refuserReservation(reservation.id, motif);
-
-            alert("❌ Mission refusée.");
-            onRefresh(); // Recharge le tableau de bord
-            onClose();   // Ferme la modale
-        } catch (err) {
-            console.error(err);
-            setError("Erreur lors du refus : " + (err.response?.data?.message || err.message));
-        } finally {
-            setLoadingAction(false);
+    // Helper pour le badge de statut
+    const getStatusBadge = () => {
+        switch (statut) {
+            case 'EN_ATTENTE':
+            case 'PENDING':
+            case 'NOUVEAU':
+                return <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-3 py-1 rounded-full text-xs font-black flex items-center gap-1.5"><Clock size={14} /> EN ATTENTE D'ASSIGNATION</span>;
+            case 'EN_VALIDATION_ADMIN':
+            case 'ASSIGNEE':
+                return <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 px-3 py-1 rounded-full text-xs font-black flex items-center gap-1.5"><AlertCircle size={14} /> EN ATTENTE DE VALIDATION</span>;
+            case 'VALIDEE':
+            case 'ACCEPTEE':
+            case 'EN_COURS':
+                return <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full text-xs font-black flex items-center gap-1.5"><CheckCircle size={14} /> MISSION EN COURS</span>;
+            case 'ANNULEE':
+                return <span className="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-3 py-1 rounded-full text-xs font-black flex items-center gap-1.5"><ShieldAlert size={14} /> MISSION ANNULÉE</span>;
+            default:
+                return <span className="bg-slate-500/20 text-slate-300 border border-slate-500/30 px-3 py-1 rounded-full text-xs font-black">{statutBrut}</span>;
         }
     };
+
+    const afficherZoneAssignation = ['EN_ATTENTE', 'NOUVEAU', 'PENDING', 'INCONNU'].includes(statut) || !currentFournisseurId || modeReassignation;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-            {/* Boîte Modale */}
-            <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden text-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto animate-fadeIn">
+            <div className="bg-[#0A0E17] border border-white/10 p-6 sm:p-8 rounded-3xl max-w-lg w-full shadow-2xl relative my-8 text-slate-100 space-y-6">
 
-                {/* ── EN-TÊTE ──────────────────────────────────────────────────────── */}
-                <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 bg-slate-900/50">
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <h3 className="text-xl font-black text-white">
-                                Dossier #{reservation.id}
-                            </h3>
-                            <StatusBadge statut={reservation.statut} />
+                {/* BOUTON FERMER */}
+                <button
+                    onClick={onClose}
+                    className="absolute top-5 right-5 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 p-2 rounded-xl transition font-bold"
+                >
+                    ✕
+                </button>
+
+                {/* EN-TÊTE DU DOSSIER */}
+                <div>
+                    <div className="flex items-center justify-between flex-wrap gap-2 pr-8 mb-2">
+                        <span className="text-[11px] font-extrabold tracking-widest text-purple-400 uppercase">Administration Kanari</span>
+                        {getStatusBadge()}
+                    </div>
+                    <h3 className="text-xl font-black text-white flex items-center gap-2">
+                        <span>📂 Dossier #{reservation.id}</span>
+                        {/* ✅ CORRECTION : Boolean() évite l'affichage d'un 0 intempestif */}
+                        {Boolean(currentFournisseurId) && (
+                            <span className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2.5 py-0.5 rounded-lg font-bold">
+                                Prestataire ID: #{currentFournisseurId}
+                            </span>
+                        )}
+                    </h3>
+                </div>
+
+                {/* INFORMATIONS DU CLIENT & MISSION */}
+                <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="bg-white/[0.03] p-3.5 rounded-2xl border border-white/5">
+                            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1 flex items-center gap-1.5">
+                                <User size={13} className="text-purple-400" /> Client
+                            </span>
+                            <p className="text-white font-extrabold text-sm break-words">
+                                {reservation.clientNom || reservation.client_nom || '—'}
+                            </p>
                         </div>
-                        <p className="text-xs text-purple-300 font-medium mt-1">
-                            {reservation.serviceNom || 'Service de maintenance Kanari'}
+
+                        <div className="bg-white/[0.03] p-3.5 rounded-2xl border border-white/5">
+                            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1 flex items-center gap-1.5">
+                                <Phone size={13} className="text-emerald-400" /> Téléphone
+                            </span>
+                            <p className="text-white font-extrabold text-sm break-words">
+                                {reservation.telephone || '—'}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="bg-white/[0.03] p-3.5 rounded-2xl border border-white/5">
+                        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1 flex items-center gap-1.5">
+                            <MapPin size={13} className="text-rose-400" /> Lieu d'intervention
+                        </span>
+                        <p className="text-white font-medium text-xs sm:text-sm break-words">
+                            {reservation.adresse || '—'}
                         </p>
                     </div>
 
-                    <button
-                        onClick={onClose}
-                        className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition"
-                    >
-                        <X size={20} />
-                    </button>
+                    <div className="bg-white/[0.03] p-3.5 rounded-2xl border border-white/5">
+                        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1 flex items-center gap-1.5">
+                            <Home size={13} className="text-blue-400" /> Besoin client
+                        </span>
+                        <p className="text-slate-200 font-medium text-xs sm:text-sm break-words whitespace-pre-line mt-1 bg-black/30 p-3 rounded-xl border border-white/5">
+                            {reservation.besoin || reservation.description || '—'}
+                        </p>
+                    </div>
                 </div>
 
-                {/* ── CORPS SCROLLABLE ─────────────────────────────────────────────── */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {/* ZONE D'ACTIONS ADMINISTRATIVES */}
+                <div className="pt-4 border-t border-white/10 space-y-4">
+                    <div className="flex justify-between items-center">
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-300 block">
+                            🛠️ Actions Administratives :
+                        </span>
 
-                    {/* Alerte Erreur */}
-                    {error && (
-                        <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-400 flex items-center gap-3 text-sm">
-                            <AlertTriangle size={18} className="shrink-0" />
-                            <span>{error}</span>
-                        </div>
-                    )}
-
-                    {/* Bloc 1 : Client & Lieu */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl space-y-2">
-                            <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 flex items-center gap-1.5">
-                                <User size={12} className="text-purple-400" /> Client
-                            </span>
-                            <p className="font-bold text-sm text-white">
-                                {reservation.clientNom || 'Client Anonyme'}
-                            </p>
-                            <p className="text-xs text-slate-400 flex items-center gap-1.5">
-                                <Phone size={12} /> {reservation.telephone || 'Non renseigné'}
-                            </p>
-                        </div>
-
-                        <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl space-y-2">
-                            <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 flex items-center gap-1.5">
-                                <MapPin size={12} className="text-purple-400" /> Lieu & Date
-                            </span>
-                            <p className="font-semibold text-xs text-slate-200 line-clamp-2">
-                                {reservation.adresse || 'Adresse non spécifiée'}
-                            </p>
-                            <p className="text-xs text-purple-300 flex items-center gap-1.5 font-medium">
-                                <Calendar size={12} />
-                                {reservation.dateIntervention
-                                    ? new Date(reservation.dateIntervention).toLocaleString('fr-FR')
-                                    : 'Date à définir'}
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Bloc 2 : Prestataire Assigné */}
-                    <div className="p-4 bg-purple-950/20 border border-purple-500/20 rounded-2xl flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-3 bg-purple-500/10 rounded-xl text-purple-400">
-                                <Briefcase size={20} />
-                            </div>
-                            <div>
-                                <span className="text-[10px] uppercase font-bold tracking-widest text-purple-400">
-                                    Prestataire Assigné
-                                </span>
-                                <h4 className="font-bold text-sm text-white">
-                                    {reservation.prestataire?.nomEntreprise || `Fournisseur ID #${reservation.fournisseurId || 'Non assigné'}`}
-                                </h4>
-                            </div>
-                        </div>
-                        {reservation.fournisseurId && (
-                            <span className="text-xs bg-purple-500/20 text-purple-300 px-3 py-1 rounded-lg font-semibold">
-                                Actif
-                            </span>
+                        {/* ✅ CORRECTION : Boolean(currentFournisseurId) */}
+                        {Boolean(currentFournisseurId) && !modeReassignation && !['ANNULEE', 'TERMINÉE', 'TERMINEE'].includes(statut) && (
+                            <button
+                                type="button"
+                                onClick={() => setModeReassignation(true)}
+                                className="text-[11px] text-amber-400 hover:text-amber-300 underline font-bold"
+                            >
+                                Modifier le prestataire
+                            </button>
                         )}
                     </div>
 
-                    {/* Bloc 3 : Bon d'intervention (S'il existe) */}
-                    {bon ? (
-                        <div className="p-5 bg-slate-950 border border-emerald-500/30 rounded-2xl space-y-4">
-                            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                                <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
-                                    <FileText size={16} /> Bon d'Intervention Rempli
-                                </span>
-                                <span className="text-xs text-slate-400">
-                                    Soumis le {new Date(bon.createdAt || Date.now()).toLocaleDateString('fr-FR')}
-                                </span>
+                    {/* 1. BLOC ASSIGNATION & SÉLECTION DU PRESTATAIRE */}
+                    {afficherZoneAssignation && !['ANNULEE', 'TERMINÉE', 'TERMINEE'].includes(statut) && (
+                        <div className="p-4 sm:p-5 bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-2xl space-y-4 shadow-inner">
+                            <div className="flex justify-between items-center">
+                                <label className="text-xs text-amber-300 font-extrabold flex items-center gap-1.5">
+                                    <Briefcase size={14} />
+                                    {currentFournisseurId ? 'Réassigner à un autre prestataire :' : 'Choisir un prestataire dans la liste :'}
+                                </label>
+                                {modeReassignation && (
+                                    <button onClick={() => setModeReassignation(false)} className="text-[10px] text-slate-400 hover:text-white">Annuler</button>
+                                )}
                             </div>
 
-                            <div className="space-y-1">
-                                <span className="text-[11px] text-slate-400 uppercase font-semibold">Description des travaux :</span>
-                                <p className="text-xs text-slate-200 bg-white/[0.02] p-3 rounded-xl border border-white/5">
-                                    {bon.descriptionTravail || 'Aucune description fournie.'}
-                                </p>
+                            {/* LISTE DÉROULANTE CONNECTÉE ET SÉCURISÉE */}
+                            <div className="flex flex-col sm:flex-row gap-2.5">
+                                <select
+                                    value={fournisseurId}
+                                    onChange={(e) => setFournisseurId(e.target.value)}
+                                    disabled={loadingFournisseurs || processing}
+                                    className="flex-1 bg-black/80 border border-amber-500/30 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-400 text-white font-bold cursor-pointer"
+                                >
+                                    <option value="">
+                                        {loadingFournisseurs
+                                            ? "⏳ Chargement des prestataires..."
+                                            : fournisseurs.length === 0
+                                                ? "⚠️ Aucun prestataire trouvé"
+                                                : "-- Sélectionner un prestataire --"
+                                        }
+                                    </option>
+                                    {fournisseurs.map((f) => {
+                                        // Extraction robuste de l'ID
+                                        const id = f.id ?? f.fournisseurId;
+                                        if (!id) return null;
+
+                                        const name = getFournisseurName(f);
+                                        const spec = f.specialite || f.Service?.nom || 'Général';
+
+                                        return (
+                                            <option key={id} value={id} className="bg-slate-900 text-white py-1">
+                                                #{id} - {name} ({spec})
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+
+                                <button
+                                    onClick={handleAssignation}
+                                    disabled={processing || !fournisseurId || loadingFournisseurs}
+                                    className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-slate-950 font-black rounded-xl text-xs transition-all shadow-lg shadow-amber-500/10 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                                >
+                                    {processing ? <Loader2 className="animate-spin" size={16} /> : 'Assigner 🚀'}
+                                </button>
                             </div>
 
-                            {bon.piecesOutils && (
-                                <div className="space-y-1">
-                                    <span className="text-[11px] text-slate-400 uppercase font-semibold">Pièces / Outils utilisés :</span>
-                                    <p className="text-xs text-slate-300 bg-white/[0.02] p-3 rounded-xl border border-white/5">
-                                        {bon.piecesOutils}
-                                    </p>
-                                </div>
-                            )}
-
-                            <div className="pt-2 border-t border-white/10 grid grid-cols-3 gap-2 text-center">
-                                <div className="p-2 bg-slate-900 rounded-lg">
-                                    <span className="text-[10px] text-slate-400 block">Main d'œuvre</span>
-                                    <span className="text-xs font-bold text-slate-200">{bon.montantMainOeuvre} FCFA</span>
-                                </div>
-                                <div className="p-2 bg-slate-900 rounded-lg">
-                                    <span className="text-[10px] text-slate-400 block">Pièces & Outils</span>
-                                    <span className="text-xs font-bold text-slate-200">{bon.montantPiecesOutils || 0} FCFA</span>
-                                </div>
-                                <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                                    <span className="text-[10px] text-emerald-400 font-bold block">Total Final</span>
-                                    <span className="text-sm font-black text-emerald-400">{bon.montantFinal} FCFA</span>
-                                </div>
-                            </div>
-
-                            {/* Affichage de la note et du commentaire si déjà validé */}
-                            {bon.valide && bon.note && (
-                                <div className="pt-3 border-t border-white/5 space-y-2">
-                                    <span className="text-[11px] text-amber-400 uppercase font-bold flex items-center gap-1.5">
-                                        <Star size={12} className="fill-amber-400" /> Évaluation enregistrée
-                                    </span>
-                                    <div className="p-3 bg-white/[0.02] rounded-xl border border-white/5 text-xs text-slate-300">
-                                        <div className="flex gap-1 mb-1.5">
-                                            {[...Array(5)].map((_, i) => (
-                                                <Star key={i} size={12} className={i < bon.note ? "fill-amber-400 text-amber-400" : "text-slate-600"} />
-                                            ))}
-                                        </div>
-                                        {bon.commentaire && <p className="italic text-slate-400">"{bon.commentaire}"</p>}
+                            {/* APERÇU / INFOS DU PRESTATAIRE SÉLECTIONNÉ */}
+                            {prestataireSelectionne && (
+                                <div className="bg-black/50 border border-amber-500/30 p-3 rounded-xl text-xs space-y-1 animate-fadeIn">
+                                    <div className="flex justify-between items-center text-amber-300 font-bold">
+                                        <span>👤 {getFournisseurName(prestataireSelectionne)}</span>
+                                        {/* ✅ CORRECTION MAJEURE DU BUG DU "0" : On vérifie que la note est strictement supérieure à 0 */}
+                                        {Number(prestataireSelectionne.note) > 0 && (
+                                            <span className="flex items-center gap-1 bg-amber-500/20 px-2 py-0.5 rounded text-[10px]">
+                                                <Star size={10} className="fill-amber-400 text-amber-400" /> {prestataireSelectionne.note}/5
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-slate-300 flex flex-wrap gap-x-4 gap-y-1 text-[11px] pt-1">
+                                        <span>📞 {prestataireSelectionne.telephone || prestataireSelectionne.User?.telephone || 'Non renseigné'}</span>
+                                        <span>🛠️ {prestataireSelectionne.specialite || 'Spécialité polyvalente'}</span>
                                     </div>
                                 </div>
                             )}
-                        </div>
-                    ) : (
-                        <div className="p-6 bg-white/[0.01] border border-dashed border-white/10 rounded-2xl text-center text-slate-500">
-                            <FileText size={24} className="mx-auto mb-2 opacity-40" />
-                            <p className="text-xs font-medium">Aucun bon d'intervention n'a encore été soumis par le prestataire pour cette mission.</p>
+
+                            {/* CASE À COCHER ACCORD TÉLÉPHONIQUE */}
+                            <div className="pt-2 border-t border-amber-500/10">
+                                <label className="flex items-start gap-3 text-xs text-slate-300 cursor-pointer select-none bg-black/40 p-3 rounded-xl border border-amber-500/20 hover:border-amber-500/40 transition">
+                                    <input
+                                        type="checkbox"
+                                        checked={accordTelephone}
+                                        onChange={(e) => setAccordTelephone(e.target.checked)}
+                                        className="mt-0.5 w-4 h-4 rounded border-amber-500/40 bg-black text-amber-500 focus:ring-0 focus:ring-offset-0 cursor-pointer accent-amber-500"
+                                    />
+                                    <div className="space-y-0.5">
+                                        <span className="flex items-center gap-1.5 text-amber-400 font-extrabold text-xs">
+                                            <PhoneCall size={13} /> Accord téléphonique direct obtenu !
+                                        </span>
+                                        <p className="text-[11px] text-slate-400 leading-tight">
+                                            En cochant ceci, la mission sera <strong className="text-slate-200">validée instantanément</strong> sans attendre la confirmation du prestataire sur son application.
+                                        </p>
+                                    </div>
+                                </label>
+                            </div>
                         </div>
                     )}
-                </div>
 
-                {/* ── PIED DE PAGE : LES BOUTONS DE VALIDATION / REFUS ──────────── */}
-                <div className="p-5 border-t border-white/10 bg-slate-900/80 flex flex-col sm:flex-row justify-between items-center gap-3">
+                    {/* 2. BLOC FEU VERT (Si en validation) */}
+                    {['EN_VALIDATION_ADMIN', 'EN_ATTENTE_VALIDATION', 'ASSIGNEE'].includes(statut) && (
+                        <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl space-y-3">
+                            <p className="text-xs text-purple-200 font-medium flex items-center gap-2">
+                                <Check size={16} className="text-purple-400 shrink-0" />
+                                <span>Le prestataire est assigné. Vous pouvez donner l'autorisation officielle de démarrer.</span>
+                            </p>
+                            <button
+                                onClick={() => handleAction(autoriserDemarrage, reservation.id)}
+                                disabled={processing}
+                                className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs sm:text-sm font-black transition flex items-center justify-center gap-2 shadow-lg shadow-purple-600/25 cursor-pointer"
+                            >
+                                {processing ? <Loader2 className="animate-spin" size={16} /> : '🟢 ACCORDER LE FEU VERT D\'INTERVENTION'}
+                            </button>
+                        </div>
+                    )}
 
-                    <button
-                        onClick={onClose}
-                        className="w-full sm:w-auto px-5 py-2.5 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl text-xs font-bold transition order-2 sm:order-1"
-                    >
-                        Fermer
-                    </button>
-
-                    {/* ZONES DES BOUTONS D'ACTION */}
-                    <div className="flex items-center gap-3 w-full sm:w-auto order-1 sm:order-2">
-
-                        {/* BOUTON REFUSER */}
+                    {/* 3. BOUTONS ANNULER & FERMER */}
+                    <div className="flex gap-3 pt-2">
+                        {!['ANNULEE', 'TERMINÉE', 'TERMINEE', 'VALIDEE'].includes(statut) && (
+                            <button
+                                type="button"
+                                onClick={() => window.confirm("⚠️ Voulez-vous vraiment annuler définitivement cette mission ?") && handleAction(updateReservationStatut, reservation.id, 'ANNULEE')}
+                                disabled={processing}
+                                className="flex-1 py-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 rounded-xl text-xs font-extrabold transition border border-rose-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                                <ShieldAlert size={15} /> Annuler
+                            </button>
+                        )}
                         <button
-                            onClick={handleRefuser}
-                            disabled={loadingAction || isDejaRefuse}
-                            className="flex-1 sm:flex-none px-4 py-2.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                            type="button"
+                            onClick={onClose}
+                            className="px-6 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-bold transition text-slate-300 border border-white/5 cursor-pointer"
                         >
-                            {loadingAction ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={15} />}
-                            Refuser / Annuler
+                            Fermer
                         </button>
-
-                        {/* BOUTON VALIDER */}
-                        <button
-                            onClick={handleValider}
-                            disabled={loadingAction || isDejaValide}
-                            className="flex-1 sm:flex-none px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
-                        >
-                            {loadingAction ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={15} />}
-                            {bon ? "Valider la prestation" : "Valider la mission"}
-                        </button>
-
                     </div>
-
                 </div>
 
             </div>

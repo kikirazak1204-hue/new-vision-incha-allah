@@ -13,6 +13,33 @@ const adminOnly = (req, res, next) => {
     next();
 };
 
+const RESERVATION_STATUS_MAP = {
+    EN_ATTENTE: 'EN_ATTENTE',
+    ASSIGNEE: 'ASSIGNEE',
+    EN_VALIDATION_ADMIN: 'EN_VALIDATION_ADMIN',
+    EN_ATTENTE_VALIDATION: 'EN_VALIDATION_ADMIN',
+    ACCEPTEE: 'ACCEPTEE',
+    EN_PREPARATION: 'EN_PREPARATION',
+    EN_COURS: 'EN_COURS',
+    VALIDEE: 'VALIDEE',
+    TERMINEE: 'TERMINEE',
+    TERMINE: 'TERMINEE',
+    ANNULEE: 'ANNULEE',
+    ANNULE: 'ANNULEE'
+};
+
+const normalizeReservationStatut = (statut) => {
+    if (typeof statut !== 'string') return null;
+    const normalized = statut
+        .trim()
+        .toUpperCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '_');
+
+    return RESERVATION_STATUS_MAP[normalized] || null;
+};
+
 // ============================================================
 // 📊 STATISTIQUES & UTILISATEURS
 // ============================================================
@@ -112,9 +139,15 @@ router.get('/reservations', protect, adminOnly, async (req, res) => {
 // 🟢 PATCH /api/admin/reservations/:id/statut
 router.patch('/reservations/:id/statut', protect, adminOnly, async (req, res) => {
     try {
-        const { statut } = req.body;
+        const { statut: rawStatut } = req.body;
+        const statut = normalizeReservationStatut(rawStatut);
+        if (!statut) {
+            return res.status(400).json({ success: false, message: 'Statut de réservation invalide.' });
+        }
+
         const reservation = await Reservation.findByPk(req.params.id);
-        if (!reservation) return res.status(404).json({ success: false, message: 'Introuvable.' });
+        if (!reservation) return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
+
         await reservation.update({ statut });
         res.json({ success: true, data: reservation });
     } catch (err) {

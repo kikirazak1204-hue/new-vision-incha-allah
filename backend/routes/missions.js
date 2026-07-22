@@ -1,10 +1,28 @@
-// routes/missions.js
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
-const { Reservation, Fournisseur, User } = require('../models');
+const { Reservation, Fournisseur } = require('../models');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
-// ── Middleware — vérifie que le fournisseur est propriétaire de la mission
+const uploadDir = path.resolve('uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, 'uploads/'),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        const base = file.originalname.replace(ext, '').replace(/\s+/g, '-').toLowerCase();
+        cb(null, `${base}-${Date.now()}${ext}`);
+    }
+});
+
+const upload = multer({ storage });
+
+// Middleware — vérifie que le fournisseur est propriétaire de la mission
 const checkFournisseur = async (req, res, next) => {
     try {
         const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
@@ -12,11 +30,26 @@ const checkFournisseur = async (req, res, next) => {
         req.fournisseur = fournisseur;
         next();
     } catch (err) {
+        console.error(err);
         res.status(500).json({ success: false, message: 'Erreur serveur.' });
     }
 };
 
-// ── PUT /api/missions/:id/accepter — Fournisseur accepte la mission
+// GET /api/missions — Récupérer toutes les missions du fournisseur connecté
+router.get('/', protect, checkFournisseur, async (req, res) => {
+    try {
+        const missions = await Reservation.findAll({
+            where: { fournisseurId: req.fournisseur.id },
+            order: [['createdAt', 'DESC']]
+        });
+        res.json({ success: true, data: missions });
+    } catch (err) {
+        console.error("Erreur récupération missions:", err);
+        res.status(500).json({ success: false, message: 'Erreur serveur.' });
+    }
+});
+
+// PUT /api/missions/:id/accepter — Fournisseur accepte la mission
 router.put('/:id/accepter', protect, checkFournisseur, async (req, res) => {
     try {
         const mission = await Reservation.findOne({
@@ -25,15 +58,36 @@ router.put('/:id/accepter', protect, checkFournisseur, async (req, res) => {
         if (!mission) return res.status(404).json({ success: false, message: 'Mission introuvable.' });
         if (mission.statut !== 'EN_ATTENTE') return res.status(400).json({ success: false, message: 'Mission non modifiable.' });
 
-        await mission.update({ statut: 'ACCEPTEE' });
-        res.json({ success: true, message: 'Mission acceptée.', data: mission });
+        await mission.update({ statut: 'EN_VALIDATION_ADMIN' });
+        res.json({ success: true, message: 'Mission acceptée. En attente de validation admin.', data: mission });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Erreur serveur.' });
     }
 });
 
-// ── PUT /api/missions/:id/demarrer — Fournisseur démarre la mission
+// PUT /api/missions/:id/refuser — Fournisseur refuse la mission
+router.put('/:id/refuser', protect, checkFournisseur, async (req, res) => {
+    try {
+        const mission = await Reservation.findOne({
+            where: { id: req.params.id, fournisseurId: req.fournisseur.id }
+        });
+        if (!mission) return res.status(404).json({ success: false, message: 'Mission introuvable.' });
+        if (mission.statut !== 'EN_ATTENTE') return res.status(400).json({ success: false, message: 'Mission non modifiable.' });
+
+        await mission.update({
+            statut: 'ANNULEE',
+            refusePar: req.fournisseur.id,
+            motifRefus: req.body.motifRefus || 'Refusé par le prestataire'
+        });
+        res.json({ success: true, message: 'Mission refusée.', data: mission });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Erreur serveur.' });
+    }
+});
+
+// PUT /api/missions/:id/demarrer — Fournisseur démarre la mission
 router.put('/:id/demarrer', protect, checkFournisseur, async (req, res) => {
     try {
         const mission = await Reservation.findOne({
@@ -49,7 +103,7 @@ router.put('/:id/demarrer', protect, checkFournisseur, async (req, res) => {
     }
 });
 
-// ── PUT /api/missions/:id/terminer — Fournisseur marque la mission terminée
+// PUT /api/missions/:id/terminer — Fournisseur marque la mission terminée
 router.put('/:id/terminer', protect, checkFournisseur, async (req, res) => {
     try {
         const mission = await Reservation.findOne({
@@ -66,7 +120,7 @@ router.put('/:id/terminer', protect, checkFournisseur, async (req, res) => {
     }
 });
 
-// ── PUT /api/missions/:id/valider — CLIENT valide la prestation → libère Escrow
+// PUT /api/missions/:id/valider — CLIENT valide la prestation
 router.put('/:id/valider', protect, async (req, res) => {
     try {
         const mission = await Reservation.findOne({
@@ -76,12 +130,8 @@ router.put('/:id/valider', protect, async (req, res) => {
         if (mission.statut !== 'TERMINEE') return res.status(400).json({ success: false, message: 'La mission n\'est pas encore terminée.' });
 
         await mission.update({
-            statut: 'VALIDEE',
-            paiementLibere: true
+            statut: 'VALIDEE'
         });
-
-        // ✅ Ici on pourrait déclencher le virement au fournisseur
-        // via Mobile Money API (Orange Money, Wave, etc.)
 
         res.json({ success: true, message: 'Prestation validée. Paiement libéré au prestataire.', data: mission });
     } catch (err) {
@@ -90,7 +140,7 @@ router.put('/:id/valider', protect, async (req, res) => {
     }
 });
 
-// ── PUT /api/missions/:id/materiel — Fournisseur signale manque matériel
+// PUT /api/missions/:id/materiel — Fournisseur signale manque matériel
 router.put('/:id/materiel', protect, checkFournisseur, async (req, res) => {
     try {
         const { descriptionMateriel } = req.body;
@@ -103,14 +153,36 @@ router.put('/:id/materiel', protect, checkFournisseur, async (req, res) => {
 
         await mission.update({
             statut: 'EN_PREPARATION',
-            manqueMateriel: true,
-            descriptionMateriel
+            descriptionTravail: descriptionMateriel
         });
 
-        // ✅ Ici on notifie l'admin New Vision pour contacter fournisseur matériel
-        console.log(`🔧 Manque matériel signalé — Mission #${mission.id}: ${descriptionMateriel}`);
-
         res.json({ success: true, message: 'Signalement envoyé. New Vision va contacter un partenaire.', data: mission });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Erreur serveur.' });
+    }
+});
+
+// POST /api/missions/:id/photos — Upload de justificatifs photo pour la mission
+router.post('/:id/photos', protect, checkFournisseur, upload.fields([
+    { name: 'photoAvant', maxCount: 1 },
+    { name: 'photoApres', maxCount: 1 }
+]), async (req, res) => {
+    try {
+        const mission = await Reservation.findOne({
+            where: { id: req.params.id, fournisseurId: req.fournisseur.id }
+        });
+        if (!mission) return res.status(404).json({ success: false, message: 'Mission introuvable.' });
+
+        const fichiers = {};
+        if (req.files?.photoAvant?.[0]) fichiers.photoAvant = req.files.photoAvant[0].filename;
+        if (req.files?.photoApres?.[0]) fichiers.photoApres = req.files.photoApres[0].filename;
+
+        if (Object.keys(fichiers).length === 0) {
+            return res.status(400).json({ success: false, message: 'Aucune photo fournie.' });
+        }
+
+        res.json({ success: true, message: 'Photos envoyées avec succès.', data: { missionId: mission.id, fichiers } });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Erreur serveur.' });

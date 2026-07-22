@@ -8,22 +8,22 @@ const STATUT = {
     EN_ATTENTE: { label: 'Nouvelle demande', bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', dot: 'bg-amber-400 shadow-[0_0_8px_#fbbf24]' },
     EN_VALIDATION_ADMIN: { label: 'En attente de validation Admin', bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20', dot: 'bg-blue-400 shadow-[0_0_8px_#60a5fa] animate-pulse' },
     ACCEPTEE: { label: 'Validée par Admin (Prête)', bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/20', dot: 'bg-indigo-400 shadow-[0_0_8px_#6366f1]' },
-    EN_PREPARATION: { label: 'Préparation', bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20', dot: 'bg-orange-400 shadow-[0_0_8px_#fb923c]' },
+    EN_PREPARATION: { label: 'Préparation / Matériel', bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20', dot: 'bg-orange-400 shadow-[0_0_8px_#fb923c]' },
     EN_COURS: { label: 'Intervention en cours', bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/20', dot: 'bg-purple-400 shadow-[0_0_8px_#c084fc]' },
     TERMINEE: { label: 'Travaux terminés', bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', dot: 'bg-emerald-400 shadow-[0_0_8px_#34d399]' },
     VALIDEE: { label: 'Clôturée & Validée', bg: 'bg-emerald-500/20', text: 'text-emerald-300', border: 'border-emerald-500/30', dot: 'bg-emerald-400' },
-    ANNULEE: { label: 'Annulée', bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20', dot: 'bg-rose-400 shadow-[0_0_8px_#fb7185]' },
+    ANNULEE: { label: 'Annulée / Refusée', bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20', dot: 'bg-rose-400 shadow-[0_0_8px_#fb7185]' },
 };
 
 const BADGE_PROFIL = {
-    EN_ATTENTE: { label: ' En attente de validation', bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20' },
-    EN_EVALUATION: { label: " En cours d'évaluation", bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20' },
-    CONFORME: { label: ' Garanti Kanari Service', bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
-    SUSPENDU: { label: ' Compte suspendu', bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20' },
+    EN_ATTENTE: { label: 'En attente de validation', bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20' },
+    EN_EVALUATION: { label: "En cours d'évaluation", bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20' },
+    CONFORME: { label: 'Garanti Kanari Service', bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
+    SUSPENDU: { label: 'Compte suspendu', bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20' },
 };
 
 function StatutBadge({ statut }) {
-    const s = STATUT[statut] || STATUT.EN_ATTENTE;
+    const s = STATUT[statut] || { label: statut || 'Inconnu', bg: 'bg-slate-500/10', text: 'text-slate-300', border: 'border-slate-500/20', dot: 'bg-slate-400' };
     return (
         <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold tracking-wide border ${s.bg} ${s.text} ${s.border} backdrop-blur-md shadow-sm transition-all`}>
             <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
@@ -45,56 +45,61 @@ function StatCard({ icon, label, value, gradient }) {
     );
 }
 
-
-
-// Assure-toi que la variable globale API est bien définie ou importe-la si nécessaire
-// const API = "https://newvision-backend.onrender.com"; // ou import { API } from '../../util/api';
-
+// ════════════════════════════════════════════════════════════════
+// MODAL : BON D'INTERVENTION — branché sur la VRAIE route backend
+// POST /api/bons-intervention (crée le bon ET passe la réservation en TERMINEE)
+// ════════════════════════════════════════════════════════════════
 function BonInterventionModal({ missionId, onClose, token, onSuccess }) {
     const [description, setDescription] = useState('');
     const [montantMainOeuvre, setMontantMainOeuvre] = useState('');
     const [piecesOutils, setPiecesOutils] = useState('');
     const [montantPiecesOutils, setMontantPiecesOutils] = useState('');
     const [loading, setLoading] = useState(false);
+    const [erreur, setErreur] = useState('');
 
-    // Calcul dynamique du total pour un affichage en temps réel dans la modale
     const totalFinal = Number(montantMainOeuvre || 0) + Number(montantPiecesOutils || 0);
 
     const soumettreBon = async (e) => {
         e.preventDefault();
+        setErreur('');
 
         if (!description.trim() || !montantMainOeuvre) {
-            alert("Veuillez remplir la description et le montant de la main-d'œuvre.");
+            setErreur("Veuillez remplir la description et le montant de la main-d'œuvre.");
+            return;
+        }
+        if (isNaN(Number(montantMainOeuvre)) || Number(montantMainOeuvre) <= 0) {
+            setErreur("Le montant de main-d'œuvre doit être un nombre supérieur à 0.");
             return;
         }
 
         setLoading(true);
         try {
-            const response = await fetch(`${API}/api/missions/${missionId}/terminer`, {
-                method: 'PUT',
+            // ✅ CORRIGÉ : on parle bien à la vraie route du contrôleur bonInterventionController.js
+            const response = await fetch(`${API}/api/bons-intervention`, {
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`
                 },
                 body: JSON.stringify({
+                    reservationId: missionId,
                     descriptionTravail: description.trim(),
                     montantMainOeuvre: Number(montantMainOeuvre),
                     piecesOutils: piecesOutils.trim() || null,
                     montantPiecesOutils: Number(montantPiecesOutils || 0),
-                    statut: 'TERMINEE'
                 })
             }).then(r => r.json());
 
             if (response.success) {
-                alert("Rapport et bon d'intervention transmis avec succès !");
+                alert("Rapport et bon d'intervention transmis avec succès ! Le client va recevoir une notification pour valider.");
                 onSuccess(missionId, 'TERMINEE');
                 onClose();
             } else {
-                alert(response.message || 'Erreur lors de la validation.');
+                setErreur(response.message || 'Erreur lors de la validation.');
             }
         } catch (err) {
             console.error(err);
-            alert('Erreur réseau ou serveur lors de la transmission.');
+            setErreur('Erreur réseau ou serveur lors de la transmission.');
         } finally {
             setLoading(false);
         }
@@ -103,24 +108,20 @@ function BonInterventionModal({ missionId, onClose, token, onSuccess }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
             <div className="w-full max-w-lg bg-[#0E1320] border border-purple-500/30 rounded-3xl shadow-2xl overflow-hidden flex flex-col p-6 space-y-4 text-slate-100">
-
-                {/* ── EN-TÊTE ──────────────────────────────────────────────────────── */}
                 <div className="flex items-center justify-between border-b border-white/[0.07] pb-3">
                     <h3 className="text-lg font-black text-white flex items-center gap-2">
                         📝 Rapport & Bon d'Intervention
                     </h3>
-                    <button
-                        onClick={onClose}
-                        className="text-slate-400 hover:text-white transition-colors text-lg font-bold"
-                    >
-                        ✕
-                    </button>
+                    <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors text-lg font-bold">✕</button>
                 </div>
 
-                {/* ── FORMULAIRE ───────────────────────────────────────────────────── */}
-                <form onSubmit={soumettreBon} className="space-y-4 text-left">
+                {erreur && (
+                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-3 text-rose-300 text-xs font-semibold text-center">
+                        {erreur}
+                    </div>
+                )}
 
-                    {/* Description */}
+                <form onSubmit={soumettreBon} className="space-y-4 text-left">
                     <div>
                         <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">
                             Description des travaux effectués *
@@ -135,7 +136,6 @@ function BonInterventionModal({ missionId, onClose, token, onSuccess }) {
                         />
                     </div>
 
-                    {/* Section Pièces & Outils textuelle */}
                     <div>
                         <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">
                             Matériaux / Pièces utilisés (Optionnel)
@@ -149,7 +149,6 @@ function BonInterventionModal({ missionId, onClose, token, onSuccess }) {
                         />
                     </div>
 
-                    {/* Grille des montants */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">
@@ -178,26 +177,20 @@ function BonInterventionModal({ missionId, onClose, token, onSuccess }) {
                         </div>
                     </div>
 
-                    {/* Total Indicateur Visuel */}
                     <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex justify-between items-center text-sm">
                         <span className="font-bold text-emerald-400">Total Facturé au Client :</span>
                         <span className="font-black text-emerald-400 text-base">{totalFinal.toLocaleString('fr-FR')} FCFA</span>
                     </div>
 
-                    {/* Boutons d'actions */}
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                        ⚠️ Ce bon sera envoyé au client pour validation. Une fois validé, le compte à rebours de 48h pour le dépôt de votre commission démarre automatiquement.
+                    </p>
+
                     <div className="pt-2 flex gap-3">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="flex-1 py-3 bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 font-bold rounded-xl text-sm transition-all"
-                        >
+                        <button type="button" onClick={onClose} className="flex-1 py-3 bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 font-bold rounded-xl text-sm transition-all">
                             Annuler
                         </button>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black rounded-xl text-sm shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.99] disabled:opacity-50"
-                        >
+                        <button type="submit" disabled={loading} className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black rounded-xl text-sm shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.99] disabled:opacity-50">
                             {loading ? 'Transmission...' : 'Envoyer le Bon'}
                         </button>
                     </div>
@@ -206,10 +199,11 @@ function BonInterventionModal({ missionId, onClose, token, onSuccess }) {
         </div>
     );
 }
-// AJOUTER PRODUIT 
 
+// ════════════════════════════════════════════════════════════════
+// MODAL : AJOUTER UN PRODUIT (catégorie, quantité, tous types de fichiers)
+// ════════════════════════════════════════════════════════════════
 function AjouterProduitModal({ onClose, onSuccess }) {
-    // États pour les champs du formulaire
     const [nom, setNom] = useState('');
     const [prix, setPrix] = useState('');
     const [categorie, setCategorie] = useState('');
@@ -222,13 +216,10 @@ function AjouterProduitModal({ onClose, onSuccess }) {
     const soumettre = async (e) => {
         e.preventDefault();
         setError('');
-
-        // Validation basique
         if (!nom.trim() || !prix) {
             setError('Le nom et le prix sont obligatoires.');
             return;
         }
-
         setLoading(true);
         try {
             const fd = new FormData();
@@ -237,24 +228,19 @@ function AjouterProduitModal({ onClose, onSuccess }) {
             fd.append('categorie', categorie.trim());
             fd.append('quantite', quantite || 0);
             fd.append('description', description.trim());
+            // ✅ Clé 'image' : cohérente avec upload.single('image') côté backend
+            if (fichier) fd.append('image', fichier);
 
-            // On envoie le fichier sous la clé 'image' (correspond à upload.single('image') côté backend actuel)
-            if (fichier) {
-                fd.append('image', fichier);
-            }
-
-            // Appel à ta fonction API
             const res = await addProduit(fd);
-
-            if (res && res.success) {
-                onSuccess(res.data);
+            if (res && res.success !== false) {
+                onSuccess(res.data || { id: Date.now(), nom: nom.trim(), prix, categorie: categorie.trim(), quantite });
                 onClose();
             } else {
                 setError(res?.message || "Échec de l'ajout du produit.");
             }
         } catch (err) {
             console.error(err);
-            setError('Erreur réseau. Veuillez réessayer.');
+            setError(err?.message || 'Erreur réseau. Veuillez réessayer.');
         } finally {
             setLoading(false);
         }
@@ -263,24 +249,28 @@ function AjouterProduitModal({ onClose, onSuccess }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
             <div className="w-full max-w-lg bg-[#0E1320] border border-purple-500/30 rounded-3xl p-6 shadow-2xl">
-                <h3 className="text-lg font-black text-white mb-4">📦 Ajouter un produit</h3>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-black text-white">📦 Ajouter un produit</h3>
+                    <button onClick={onClose} className="text-slate-400 hover:text-white text-sm font-bold">✕</button>
+                </div>
+
+                {error && (
+                    <div className="mb-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl p-3 text-rose-300 text-xs font-semibold text-center">
+                        {error}
+                    </div>
+                )}
 
                 <form onSubmit={soumettre} className="space-y-4">
-                    {/* Nom */}
                     <input
                         type="text" placeholder="Nom du produit *"
                         value={nom} onChange={(e) => setNom(e.target.value)}
                         className="w-full bg-[#161c2e] text-white p-3 rounded-xl border border-white/10 outline-none focus:border-purple-500"
                     />
-
-                    {/* Prix */}
                     <input
-                        type="number" placeholder="Prix *"
+                        type="number" placeholder="Prix (FCFA) *"
                         value={prix} onChange={(e) => setPrix(e.target.value)}
                         className="w-full bg-[#161c2e] text-white p-3 rounded-xl border border-white/10 outline-none focus:border-purple-500"
                     />
-
-                    {/* Catégorie & Quantité */}
                     <div className="flex gap-2">
                         <input
                             type="text" placeholder="Catégorie"
@@ -288,39 +278,32 @@ function AjouterProduitModal({ onClose, onSuccess }) {
                             className="flex-1 bg-[#161c2e] text-white p-3 rounded-xl border border-white/10 outline-none focus:border-purple-500"
                         />
                         <input
-                            type="number" placeholder="Qté"
+                            type="number" placeholder="Qté" min="0"
                             value={quantite} onChange={(e) => setQuantite(e.target.value)}
                             className="w-24 bg-[#161c2e] text-white p-3 rounded-xl border border-white/10 outline-none focus:border-purple-500"
                         />
                     </div>
-
-                    {/* Description */}
                     <textarea
                         placeholder="Description..."
                         rows="3"
                         value={description} onChange={(e) => setDescription(e.target.value)}
                         className="w-full bg-[#161c2e] text-white p-3 rounded-xl border border-white/10 outline-none focus:border-purple-500"
                     />
-
-                    {/* Input Fichier Générique */}
                     <div>
                         <label className="block text-[10px] text-purple-400 font-bold uppercase mb-1">
-                            Fichier / Document / Support
+                            Photo / fichier (optionnel)
                         </label>
                         <input
                             type="file"
                             onChange={(e) => setFichier(e.target.files?.[0] || null)}
                             className="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:bg-purple-600 file:text-white file:rounded-xl file:border-0 cursor-pointer"
                         />
-                        <p className="text-[10px] text-slate-500 mt-1">Tous formats acceptés (PDF, JPG, PNG, DOCX, ZIP...)</p>
                     </div>
-
-                    {error && <p className="text-red-500 text-xs font-bold">{error}</p>}
 
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-all"
+                        className="w-full py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-all disabled:opacity-50"
                     >
                         {loading ? 'Traitement...' : 'Ajouter au catalogue'}
                     </button>
@@ -330,6 +313,9 @@ function AjouterProduitModal({ onClose, onSuccess }) {
     );
 }
 
+// ════════════════════════════════════════════════════════════════
+// MODAL : MESSAGERIE CLIENT (vraie API /api/messages, pas un mock)
+// ════════════════════════════════════════════════════════════════
 function ChatModal({ mission, userId, onClose }) {
     const [messages, setMessages] = useState([]);
     const [texte, setTexte] = useState('');
@@ -424,6 +410,9 @@ function ChatModal({ mission, userId, onClose }) {
     );
 }
 
+// ════════════════════════════════════════════════════════════════
+// ONGLET : AO & DEVIS (vraies API /api/reservations/disponibles, /api/devis)
+// ════════════════════════════════════════════════════════════════
 function OngletDevis({ token }) {
     const [reservations, setReservations] = useState([]);
     const [mesDevis, setMesDevis] = useState([]);
@@ -458,9 +447,9 @@ function OngletDevis({ token }) {
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ reservationId, montant: montant[reservationId], description: description[reservationId] || '' })
             }).then(r => r.json());
-            if (r.success) { alert(' Devis envoyé !'); charger(); }
-            else alert(' ' + r.message);
-        } catch { alert(' Erreur serveur'); }
+            if (r.success) { alert('Devis envoyé !'); charger(); }
+            else alert(r.message || 'Erreur');
+        } catch { alert('Erreur serveur'); }
         finally { setSending(null); }
     };
 
@@ -476,9 +465,9 @@ function OngletDevis({ token }) {
                 headers: { Authorization: `Bearer ${token}` },
                 body: fd
             }).then(r => r.json());
-            if (r.success) alert(' Photo envoyée !');
-            else alert(' ' + r.message);
-        } catch { alert(' Erreur'); }
+            if (r.success) alert('Photo envoyée !');
+            else alert(r.message || 'Erreur');
+        } catch { alert('Erreur'); }
         finally { setUploadLoading(null); }
     };
 
@@ -493,7 +482,7 @@ function OngletDevis({ token }) {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/[0.01] p-2 rounded-2xl border border-white/[0.05]">
                 <div className="flex gap-1 p-1 bg-[#070A12] rounded-xl border border-white/[0.05]">
-                    {[['disponibles', ' Demandes disponibles'], ['mesdevis', ' Mes devis envoyés']].map(([id, label]) => (
+                    {[['disponibles', 'Demandes disponibles'], ['mesdevis', 'Mes devis envoyés']].map(([id, label]) => (
                         <button
                             key={id}
                             onClick={() => setActiveSubTab(id)}
@@ -529,9 +518,9 @@ function OngletDevis({ token }) {
 
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                     {[
-                                        [' Lieu', res.adresseIntervention || res.adresse],
-                                        [' Date ciblée', res.dateSouhaitee ? new Date(res.dateSouhaitee).toLocaleDateString('fr-FR') : 'Dès que possible'],
-                                        [' Contact', '📞 Numéro masqué'],
+                                        ['Lieu', res.adresseIntervention || res.adresse],
+                                        ['Date ciblée', res.dateSouhaitee ? new Date(res.dateSouhaitee).toLocaleDateString('fr-FR') : 'Dès que possible'],
+                                        ['Contact', '📞 Numéro masqué'],
                                     ].map(([label, val]) => val ? (
                                         <div key={label} className="bg-[#070A12]/60 rounded-2xl p-3.5 border border-white/[0.04]">
                                             <p className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">{label}</p>
@@ -574,7 +563,7 @@ function OngletDevis({ token }) {
                                             onClick={() => envoyerDevis(res.id)}
                                             disabled={sending === res.id}
                                             className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-purple-500/20 transition-all active:scale-[0.99] disabled:opacity-50">
-                                            {sending === res.id ? 'Transmission en cours...' : ' Envoyer ma proposition commerciale'}
+                                            {sending === res.id ? 'Transmission en cours...' : 'Envoyer ma proposition commerciale'}
                                         </button>
                                     </div>
                                 )}
@@ -593,9 +582,9 @@ function OngletDevis({ token }) {
                     ) : mesDevis.map(devis => {
                         const res = devis.reservationDevis;
                         const statutDevis = {
-                            EN_ATTENTE: { label: ' En attente de réponse', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
-                            ACCEPTE: { label: ' Devis Accepté !', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20 shadow-[0_0_15px_rgba(52,211,153,0.1)]' },
-                            REFUSE: { label: ' Décliné', color: 'text-rose-400 bg-rose-500/10 border-rose-500/20' },
+                            EN_ATTENTE: { label: 'En attente de réponse', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
+                            ACCEPTE: { label: 'Devis Accepté !', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20 shadow-[0_0_15px_rgba(52,211,153,0.1)]' },
+                            REFUSE: { label: 'Décliné', color: 'text-rose-400 bg-rose-500/10 border-rose-500/20' },
                         }[devis.statut] || { label: devis.statut, color: 'text-slate-400 bg-white/[0.05] border-white/[0.1]' };
 
                         return (
@@ -657,6 +646,9 @@ function OngletDevis({ token }) {
     );
 }
 
+// ════════════════════════════════════════════════════════════════
+// COMPOSANT PRINCIPAL
+// ════════════════════════════════════════════════════════════════
 export default function DashboardFournisseur({ setCurrentView }) {
     const [activeTab, setActiveTab] = useState('overview');
     const [data, setData] = useState(null);
@@ -674,26 +666,26 @@ export default function DashboardFournisseur({ setCurrentView }) {
     let currentUser = {};
     try { currentUser = JSON.parse(localStorage.getItem('user')) || {}; } catch { }
 
-    useEffect(() => {
+    const chargerDonnees = async () => {
         if (!token) return;
-        (async () => {
-            try {
-                const [dash, prods] = await Promise.all([
-                    getDashboardFournisseur(),
-                    getProduitsFournisseur()
-                ]);
-                if (!dash.success) throw new Error(dash.message);
-                setData(dash.data);
-                setMissions(dash.data.missions || []);
-                setProduits(prods.data || []);
-            } catch (e) {
-                console.error(e);
-                setError('Impossible de charger le dashboard.');
-            } finally {
-                setLoading(false);
-            }
-        })();
-    }, [token]);
+        try {
+            const [dash, prods] = await Promise.all([
+                getDashboardFournisseur(),
+                getProduitsFournisseur()
+            ]);
+            if (!dash.success) throw new Error(dash.message);
+            setData(dash.data);
+            setMissions(dash.data.missions || []);
+            setProduits(prods.data || []);
+        } catch (e) {
+            console.error(e);
+            setError('Impossible de charger le dashboard.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { chargerDonnees(); }, [token]);
 
     const callAction = async (id, endpoint, nextStatut, body = {}) => {
         setActionLoad(`${id}_${endpoint}`);
@@ -702,11 +694,18 @@ export default function DashboardFournisseur({ setCurrentView }) {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify(body)
-            }).then(r => r.json());
-            if (r.success) setMissions(p => p.map(m => m.id === id ? { ...m, statut: nextStatut, ...body } : m));
-            else alert(' ' + (r.message || 'Erreur'));
-        } catch { alert(' Erreur serveur'); }
-        finally { setActionLoad(null); }
+            });
+            const data = await r.json().catch(() => ({}));
+            if (r.ok && data.success !== false) {
+                setMissions(p => p.map(m => m.id === id ? { ...m, statut: nextStatut, ...body } : m));
+            } else {
+                alert(data.message || `Erreur (${r.status})`);
+            }
+        } catch {
+            alert('Erreur serveur');
+        } finally {
+            setActionLoad(null);
+        }
     };
 
     const handlerActionSuccess = (id, nextStatut) => {
@@ -717,7 +716,7 @@ export default function DashboardFournisseur({ setCurrentView }) {
         const desc = window.prompt('Décrivez le matériel manquant :');
         if (!desc) return;
         await callAction(id, 'materiel', 'EN_PREPARATION', { descriptionMateriel: desc, manqueMateriel: true });
-        alert(' Kanari Service a été notifié.');
+        alert('Kanari Service a été notifié.');
     };
 
     if (!token) {
@@ -747,7 +746,7 @@ export default function DashboardFournisseur({ setCurrentView }) {
     );
 
     const { profil, stats, commandesRecentes = [] } = data || {};
-    const missionsActives = missions.filter(m => ['EN_ATTENTE', 'EN_VALIDATION_ADMIN', 'ACCEPTEE', 'EN_PREPARATION', 'EN_COURS'].includes(m.statut));
+    const missionsActives = missions.filter(m => !['TERMINEE', 'VALIDEE', 'ANNULEE'].includes(m.statut));
     const badgeProfil = BADGE_PROFIL[profil?.statutKanari] || BADGE_PROFIL.EN_ATTENTE;
 
     const tabs = [
@@ -800,7 +799,7 @@ export default function DashboardFournisseur({ setCurrentView }) {
                     <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center font-black text-white text-xs">K</div>
                     <span className="font-extrabold text-sm tracking-tight text-white">Kanari Portal</span>
                 </div>
-                <button onClick={() => setMenuOuvert(!menuOuvert)} className="px-3 py-1.5 rounded-xl bg-white/[0.05] text-slate-300 font-bold text-xs">{menuOuvert ? 'Fermer ' : 'Menu '}</button>
+                <button onClick={() => setMenuOuvert(!menuOuvert)} className="px-3 py-1.5 rounded-xl bg-white/[0.05] text-slate-300 font-bold text-xs">{menuOuvert ? 'Fermer ✕' : 'Menu ☰'}</button>
             </div>
 
             {/* Mobile Menu Overlay */}
@@ -823,10 +822,7 @@ export default function DashboardFournisseur({ setCurrentView }) {
                         <span className="text-xs font-bold uppercase tracking-widest text-purple-400">Espace de gestion</span>
                         <h1 className="text-2xl font-black text-white mt-0.5">{tabs.find(t => t.id === activeTab)?.label}</h1>
                     </div>
-                    <button
-                        onClick={() => window.history.back()}
-                        className="px-4 py-2 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 font-bold text-xs flex items-center gap-2 transition-all"
-                    >
+                    <button onClick={() => window.history.back()} className="px-4 py-2 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 font-bold text-xs flex items-center gap-2 transition-all">
                         ← Retour
                     </button>
                 </header>
@@ -874,11 +870,15 @@ export default function DashboardFournisseur({ setCurrentView }) {
                     <section className="space-y-6 animate-fadeIn text-left">
                         <div className="flex items-center justify-between pb-2 border-b border-white/[0.05]">
                             <h2 className="text-xl font-black text-white">Suivi de vos Interventions</h2>
+                            <span className="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold">
+                                {missions.length} mission{missions.length > 1 ? 's' : ''} au total
+                            </span>
                         </div>
 
                         {missions.length === 0 ? (
                             <div className="text-center py-20 bg-white/[0.01] border border-white/[0.05] rounded-3xl text-slate-500">
                                 <p className="text-sm font-medium">Aucune mission ne vous est affectée pour le moment.</p>
+                                <p className="text-xs text-slate-600 mt-2">Vos missions apparaîtront ici dès qu'un Admin vous assignera une réservation.</p>
                             </div>
                         ) : (
                             <div className="space-y-5">
@@ -891,11 +891,10 @@ export default function DashboardFournisseur({ setCurrentView }) {
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Mission ID #{mission.id}</span>
                                                     <span className="text-slate-600">•</span>
-                                                    <span className="text-xs font-medium text-slate-400">{mission.serviceNom || 'Prestation de service'}</span>
+                                                    <span className="text-xs font-medium text-slate-400">{mission.serviceNom || mission.service?.nom || 'Prestation de service'}</span>
                                                 </div>
                                                 <h3 className="font-extrabold text-2xl text-white mt-1">{mission.client?.nom || mission.clientNom || 'Client'}</h3>
 
-                                                {/* PROTECTION ET MASQUAGE DU NUMÉRO */}
                                                 <p className="text-xs text-slate-400 font-medium mt-1">
                                                     Téléphone : {' '}
                                                     <span className={`font-bold ${['ACCEPTEE', 'EN_PREPARATION', 'EN_COURS', 'TERMINEE', 'VALIDEE'].includes(mission.statut) ? 'text-amber-400' : 'text-slate-500'}`}>
@@ -934,10 +933,7 @@ export default function DashboardFournisseur({ setCurrentView }) {
                                             </div>
                                         )}
 
-                                        {/* BARRE D'ACTIONS ADAPTÉE AU NOUVEAU FLUX DE QUALITÉ */}
                                         <div className="flex flex-wrap items-center gap-3 pt-2">
-
-                                            {/* ÉTAPE 1 : PRESTATAIRE REÇOIT LA DEMANDE ET DÉCIDE D'ACCEPTER OU NON (choix "je suis partant ou pas") */}
                                             {mission.statut === 'EN_ATTENTE' && (
                                                 <>
                                                     <button onClick={() => callAction(mission.id, 'accepter', 'EN_VALIDATION_ADMIN')} disabled={actionLoad === `${mission.id}_accepter`} className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black rounded-xl text-xs shadow-lg transition-all active:scale-95 disabled:opacity-50">
@@ -949,7 +945,6 @@ export default function DashboardFournisseur({ setCurrentView }) {
                                                 </>
                                             )}
 
-                                            {/* ÉTAPE 2 : ATTENTE DU FEU VERT DE L'ADMINISTRATION (numéro encore masqué tant que l'Admin n'a pas validé) */}
                                             {mission.statut === 'EN_VALIDATION_ADMIN' && (
                                                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex items-center gap-3 w-full">
                                                     <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
@@ -957,14 +952,12 @@ export default function DashboardFournisseur({ setCurrentView }) {
                                                 </div>
                                             )}
 
-                                            {/* ÉTAPE 3 : L'ADMIN A VALIDÉ / ASSIGNÉ LA MISSION, LE PRESTATAIRE PEUT LANCER LE DÉMARRAGE */}
                                             {mission.statut === 'ACCEPTEE' && (
                                                 <button onClick={() => callAction(mission.id, 'demarrer', 'EN_COURS')} disabled={actionLoad === `${mission.id}_demarrer`} className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold rounded-xl text-xs shadow-lg transition-all active:scale-95 disabled:opacity-50">
                                                     {actionLoad === `${mission.id}_demarrer` ? 'Démarrage...' : '🚀 Démarrer l\'intervention'}
                                                 </button>
                                             )}
 
-                                            {/* ÉTAPE 4 : MISSION EN COURS -> FORMULAIRE DU BON D'INTERVENTION POUR COMPLÉTION */}
                                             {mission.statut === 'EN_COURS' && (
                                                 <>
                                                     <button onClick={() => setBonInterventionId(mission.id)} className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black rounded-xl text-xs shadow-lg transition-all active:scale-95">
@@ -976,11 +969,17 @@ export default function DashboardFournisseur({ setCurrentView }) {
                                                 </>
                                             )}
 
-                                            {/* ÉTAPE 4bis : MATÉRIEL MANQUANT SIGNALÉ, MISSION REPASSÉE EN PRÉPARATION (numéro reste visible) */}
                                             {mission.statut === 'EN_PREPARATION' && (
                                                 <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-4 flex items-center gap-3 w-full">
                                                     <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
                                                     <p className="text-orange-300 font-bold text-xs tracking-wide uppercase">🧰 Matériel manquant signalé — Reprise dès réception</p>
+                                                </div>
+                                            )}
+
+                                            {mission.statut === 'TERMINEE' && (
+                                                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex items-center gap-3 w-full">
+                                                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                                    <p className="text-emerald-300 font-bold text-xs tracking-wide uppercase">✅ Bon envoyé — En attente de validation du client</p>
                                                 </div>
                                             )}
                                         </div>
@@ -994,7 +993,7 @@ export default function DashboardFournisseur({ setCurrentView }) {
                 {activeTab === 'commandes' && (
                     <section className="space-y-6 animate-fadeIn text-left">
                         <div className="bg-white/[0.01] p-6 rounded-3xl border border-white/[0.05]">
-                            <h2 className="text-2xl font-black text-white"> Commandes de la Boutique</h2>
+                            <h2 className="text-2xl font-black text-white">Commandes de la Boutique</h2>
                             <p className="text-slate-400 text-xs mt-1">Achats directs passés sur votre vitrine Kanari</p>
                         </div>
                         {commandesRecentes.length === 0 ? (
@@ -1029,7 +1028,7 @@ export default function DashboardFournisseur({ setCurrentView }) {
                     <section className="space-y-6 animate-fadeIn text-left">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/[0.01] p-6 rounded-3xl border border-white/[0.05]">
                             <div>
-                                <h2 className="text-2xl font-black text-white"> Gestion du Catalogue</h2>
+                                <h2 className="text-2xl font-black text-white">Gestion du Catalogue</h2>
                                 <p className="text-slate-400 text-xs mt-1">Gérez vos produits en vente directe</p>
                             </div>
                             <button
@@ -1046,13 +1045,28 @@ export default function DashboardFournisseur({ setCurrentView }) {
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 text-left">
                                 {produits.map(p => (
-                                    <div key={p.id} className="bg-white/[0.02] border border-white/[0.07] rounded-3xl p-5 flex flex-col justify-between space-y-4 shadow-xl">
-                                        <div>
-                                            <h4 className="font-extrabold text-base text-white">{p.nom}</h4>
-                                            <p className="text-xs text-purple-400 font-black mt-1">{Number(p.prix).toLocaleString()} FCFA</p>
+                                    <div key={p.id} className="bg-white/[0.02] border border-white/[0.07] rounded-3xl overflow-hidden flex flex-col justify-between shadow-xl">
+                                        <div className="w-full h-36 bg-[#070A12] flex items-center justify-center overflow-hidden">
+                                            {p.image ? (
+                                                <img
+                                                    src={`${API}/uploads/${p.image}`}
+                                                    alt={p.nom}
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.style.display = 'none'; e.currentTarget.parentElement.innerHTML = '<span class="text-3xl">📦</span>'; }}
+                                                />
+                                            ) : (
+                                                <span className="text-3xl">📦</span>
+                                            )}
                                         </div>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => { if (window.confirm('Supprimer cet article ?')) deleteProduit(p.id).then(() => setProduits(prev => prev.filter(x => x.id !== p.id))); }} className="w-full py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-bold transition-all">Supprimer l'article</button>
+                                        <div className="p-5 flex flex-col justify-between space-y-4 flex-1">
+                                            <div>
+                                                <h4 className="font-extrabold text-base text-white">{p.nom}</h4>
+                                                <p className="text-xs text-purple-400 font-black mt-1">{Number(p.prix).toLocaleString()} FCFA</p>
+                                                {p.categorie && <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mt-1">{p.categorie}</p>}
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => { if (window.confirm('Supprimer cet article ?')) deleteProduit(p.id).then(() => setProduits(prev => prev.filter(x => x.id !== p.id))); }} className="w-full py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-bold transition-all">Supprimer l'article</button>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -1064,7 +1078,7 @@ export default function DashboardFournisseur({ setCurrentView }) {
                 {activeTab === 'solde' && (
                     <section className="space-y-6 animate-fadeIn text-left">
                         <div className="bg-white/[0.01] p-6 rounded-3xl border border-white/[0.05]">
-                            <h2 className="text-2xl font-black text-white"> Flux Financiers</h2>
+                            <h2 className="text-2xl font-black text-white">Flux Financiers</h2>
                             <p className="text-slate-400 text-xs mt-1">Gérez vos encaissements et demandez vos virements</p>
                         </div>
                         <div className="bg-white/[0.02] border border-white/[0.07] rounded-3xl p-6 md:p-8 shadow-2xl">
@@ -1079,13 +1093,14 @@ export default function DashboardFournisseur({ setCurrentView }) {
                             <h2 className="text-xl font-black text-white border-b border-white/[0.05] pb-3">Informations de l'Établissement</h2>
                             <div className="divide-y divide-white/[0.05] pt-2">
                                 {[
-                                    ['Responsable légal', profil?.nom || '—'],
-                                    ['Téléphone Pro.', profil?.telephone || profil?.userFournisseur?.telephone || '—'],
+                                    ['Responsable légal', profil?.nom || currentUser.nom || '—'],
+                                    ['Téléphone Pro.', profil?.telephone || profil?.userFournisseur?.telephone || currentUser.telephone || '—'],
+                                    ['Email professionnel', profil?.email || currentUser.email || '—'],
                                     ['Siège / Adresse', profil?.adresse || '—'],
                                     ['Secteur / Quartier', profil?.quartier || '—'],
-                                    ['Capacité de Transport', profil?.hasTransport ? ' Véhiculé' : ' Non véhiculé'],
-                                    ['Outillage Pro.', profil?.hasMateriel ? ' Équipement complet' : ' À vérifier'],
-                                    ['Indice de satisfaction', profil?.note > 0 ? ` ${profil.note.toFixed(1)} / 5` : 'Nouveau partenaire (Non noté)'],
+                                    ['Capacité de Transport', profil?.hasTransport ? 'Véhiculé' : 'Non véhiculé'],
+                                    ['Outillage Pro.', profil?.hasMateriel ? 'Équipement complet' : 'À vérifier'],
+                                    ['Indice de satisfaction', profil?.note > 0 ? `${profil.note.toFixed(1)} / 5` : 'Nouveau partenaire (Non noté)'],
                                 ].map(([label, val]) => (
                                     <div key={label} className="flex justify-between items-center py-3.5">
                                         <span className="text-slate-400 text-sm">{label}</span>
@@ -1100,7 +1115,6 @@ export default function DashboardFournisseur({ setCurrentView }) {
 
             {chatMission && <ChatModal mission={chatMission} userId={currentUser.id} onClose={() => setChatMission(null)} />}
 
-            {/* INJECTION DE LA MODAL DU RAPPORT D'INTERVENTION */}
             {bonInterventionId && (
                 <BonInterventionModal
                     missionId={bonInterventionId}
@@ -1110,7 +1124,6 @@ export default function DashboardFournisseur({ setCurrentView }) {
                 />
             )}
 
-            {/* INJECTION DE LA MODAL D'AJOUT DE PRODUIT */}
             {ajoutProduitOuvert && (
                 <AjouterProduitModal
                     onClose={() => setAjoutProduitOuvert(false)}

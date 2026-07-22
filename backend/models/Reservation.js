@@ -8,13 +8,29 @@ const Reservation = sequelize.define('Reservation', {
         primaryKey: true,
         autoIncrement: true
     },
+
     // Champs de base
-    besoin: { type: DataTypes.TEXT, allowNull: false },
-    adresse: { type: DataTypes.STRING, allowNull: false },
-    telephone: { type: DataTypes.STRING, allowNull: false },
-    clientNom: { type: DataTypes.STRING, allowNull: true },
-    dateIntervention: { type: DataTypes.DATE, allowNull: true },
-    
+    besoin: {
+        type: DataTypes.TEXT,
+        allowNull: false
+    },
+    adresse: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    telephone: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    clientNom: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    dateIntervention: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
+
     type: {
         type: DataTypes.ENUM('classique', 'planifie', 'contrat'),
         defaultValue: 'classique'
@@ -24,57 +40,112 @@ const Reservation = sequelize.define('Reservation', {
         defaultValue: 'assignation'
     },
 
-    // Statut : Alignés sur ta base de données (Majuscules)
+    // Statut sans doublons d'accents et aligné avec MySQL
     statut: {
         type: DataTypes.ENUM(
             'EN_ATTENTE',
+            'ASSIGNEE',
+            'EN_VALIDATION_ADMIN',
             'ACCEPTEE',
             'EN_PREPARATION',
             'EN_COURS',
-            'TERMINEE',
             'VALIDEE',
+            'TERMINEE',
             'ANNULEE'
         ),
         defaultValue: 'EN_ATTENTE'
     },
 
-    modePaiement: { 
-        type: DataTypes.ENUM('direct_prestataire', 'depot_kanari'), 
-        allowNull: true 
+    modePaiement: {
+        type: DataTypes.ENUM('direct_prestataire', 'depot_kanari'),
+        allowNull: true
     },
-    codePrestataireUtilise: { type: DataTypes.STRING, allowNull: true },
-    
-    commissionStatut: { 
-        type: DataTypes.ENUM('en_attente', 'recue', 'en_retard'), 
-        defaultValue: 'en_attente' 
+    codePrestataireUtilise: {
+        type: DataTypes.STRING,
+        allowNull: true
     },
-    commissionDateLimite: { type: DataTypes.DATE, allowNull: true },
 
-    // Clés étrangères
-    clientId: { type: DataTypes.INTEGER, allowNull: true },
-    fournisseurId: { type: DataTypes.INTEGER, allowNull: true },
-    serviceId: { type: DataTypes.INTEGER, allowNull: false },
-    serviceNom: { type: DataTypes.STRING, allowNull: true },
+    commissionStatut: {
+        type: DataTypes.ENUM('en_attente', 'recue', 'en_retard'),
+        defaultValue: 'en_attente'
+    },
+    commissionDateLimite: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
+
+    // Clés étrangères déclarées explicitement
+    clientId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'users',
+            key: 'id'
+        },
+        onDelete: 'SET NULL'
+    },
+    fournisseurId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'fournisseurs',
+            key: 'id'
+        },
+        onDelete: 'SET NULL'
+    },
+    serviceId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        references: {
+            model: 'services',
+            key: 'id'
+        },
+        onDelete: 'CASCADE'
+    },
+    serviceNom: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
 
     // Refus
-    refusePar: { type: DataTypes.INTEGER, allowNull: true },
-    motifRefus: { type: DataTypes.TEXT, allowNull: true },
-
-    valideAutomatiquement: { 
-        type: DataTypes.BOOLEAN, 
-        defaultValue: false 
+    refusePar: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'users',
+            key: 'id'
+        },
+        onDelete: 'SET NULL'
+    },
+    motifRefus: {
+        type: DataTypes.TEXT,
+        allowNull: true
     },
 
-    // Nouveaux champs (Bon d'intervention)
-    descriptionTravail: { type: DataTypes.TEXT, allowNull: true },
-    montantMainOeuvre: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
-    piecesFournies: { type: DataTypes.STRING, allowNull: true }
+    valideAutomatiquement: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+
+    // Champs Bon d'intervention (TEXT pour éviter la troncature)
+    descriptionTravail: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    montantMainOeuvre: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true
+    },
+    piecesFournies: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    }
 }, {
-    sequelize, // L'instance Sequelize
+    sequelize,
     modelName: 'Reservation',
-    tableName: 'reservations', // Important : nom exact de la table en BDD
-    freezeTableName: true,     // Empêche Sequelize de modifier le nom
-    timestamps: true           // Gère createdAt et updatedAt
+    tableName: 'reservations',
+    freezeTableName: true,
+    timestamps: true
 });
 
 module.exports = Reservation;

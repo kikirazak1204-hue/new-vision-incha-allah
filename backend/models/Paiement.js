@@ -17,6 +17,10 @@ const Paiement = sequelize.define('Paiement', {
         },
         onDelete: 'CASCADE'
     },
+    clientId: { // 👈 AJOUTÉ pour correspondre à ton controller
+        type: DataTypes.INTEGER,
+        allowNull: true // ou false selon ta base de données
+    },
     transactionId: {
         type: DataTypes.STRING,
         allowNull: false,

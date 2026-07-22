@@ -42,6 +42,31 @@ router.post('/', protect, authorize('fournisseur'), async (req, res) => {
     }
 });
 
+// ── GET /api/devis/mes-devis — Fournisseur voit ses devis ──
+router.get('/mes-devis', protect, authorize('fournisseur'), async (req, res) => {
+    try {
+        const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
+        if (!fournisseur) return res.status(404).json({ success: false, message: 'Profil fournisseur introuvable.' });
+
+        const devis = await Devis.findAll({
+            where: { fournisseurId: fournisseur.id },
+            include: [
+                {
+                    model: Reservation,
+                    as: 'reservationDevis',
+                    include: [{ model: User, as: 'client', attributes: ['id', 'nom', 'telephone'] }]
+                }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+
+        res.json({ success: true, data: devis });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Erreur serveur.' });
+    }
+});
+
 // ── GET /api/devis/reservation/:id — Client voit les devis ─
 router.get('/reservation/:id', protect, async (req, res) => {
     try {

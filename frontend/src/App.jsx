@@ -24,24 +24,32 @@ import DashboardClient from './pages/DashboardClient';
 import DashboardFournisseur from './pages/DashboardFournisseur';
 import DashboardAdmin from './pages/AdminDashboard';
 import ReservationPage from './pages/ReservationPage';
+import PaiementPage from './pages/PaiementPage';
+import HistoriquePaiements from './pages/HistoriquePaiements'; // ⭐ ROUTE HISTORIQUE AJOUTÉE
 import ProduitsParFournisseur from './pages/Produitsparfournisseur';
 import PanierPage from './pages/PanierPage';
 import ProduitsParService from './pages/ProduitsParService';
-import VoirProduits from './pages/VoirProduitsPage'; // ⭐ NOUVEAU
+import VoirProduits from './pages/VoirProduitsPage';
 
 export default function App() {
     const [deferredPrompt, setDeferredPrompt] = useState(null);
     const [showInstallBtn, setShowInstallBtn] = useState(false);
 
     useEffect(() => {
-        // 1. Enregistrement du Service Worker
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js')
-                .then(() => console.log('✅ Service Worker Kanari enregistré !'))
-                .catch(err => console.error('❌ Erreur Service Worker:', err));
+        const registerSW = () => {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(() => console.log('✅ Service Worker Kanari enregistré avec succès !'))
+                    .catch(err => console.error('❌ Erreur Service Worker:', err));
+            }
+        };
+
+        if (document.readyState === 'complete') {
+            registerSW();
+        } else {
+            window.addEventListener('load', registerSW);
         }
 
-        // 2. Écoute du déclencheur d'installation PWA mobile
         const handleBeforeInstallPrompt = (e) => {
             e.preventDefault();
             setDeferredPrompt(e);
@@ -51,6 +59,7 @@ export default function App() {
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
         return () => {
+            window.removeEventListener('load', registerSW);
             window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
         };
     }, []);
@@ -72,7 +81,6 @@ export default function App() {
             <NavigationProvider>
                 <div className="min-h-screen bg-slate-950 font-sans text-slate-100 relative">
 
-                    {/* 📱 BANNIÈRE D'INSTALLATION PWA */}
                     {showInstallBtn && (
                         <div className="fixed bottom-4 left-4 right-4 z-50 bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-2xl flex items-center justify-between max-w-md mx-auto animate-bounce">
                             <div>
@@ -91,7 +99,7 @@ export default function App() {
                     <Routes>
                         {/* Pages Publiques */}
                         <Route path="/" element={<Accueil />} />
-                        <Route path="/produits" element={<VoirProduits />} /> {/* ⭐ ROUTE AJOUTÉE */}
+                        <Route path="/produits" element={<VoirProduits />} />
                         <Route path="/login" element={<Login />} />
                         <Route path="/register" element={<Register />} />
                         <Route path="/register-utilisateur" element={<RegisterUtilisateur />} />
@@ -103,6 +111,8 @@ export default function App() {
                         <Route path="/produits/:fournisseurId" element={<ProduitsParFournisseur />} />
                         <Route path="/produits/service/:serviceId" element={<ProduitsParService />} />
                         <Route path="/reservation" element={<ReservationPage />} />
+                        <Route path="/paiement" element={<PaiementPage />} />
+                        <Route path="/historique-paiements" element={<HistoriquePaiements />} /> {/* ⭐ ROUTE HISTORIQUE PAIEMENTS ACTIVE */}
                         <Route path="/panier" element={<PanierPage />} />
 
                         {/* 🛡️ DASHBOARDS */}

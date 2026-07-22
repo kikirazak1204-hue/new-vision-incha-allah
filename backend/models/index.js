@@ -14,7 +14,7 @@ const Message = require('./Message');
 const Solde = require('./Solde');
 const Retrait = require('./Retrait');
 const Devis = require('./Devis');
-const BonIntervention = require('./BonIntervention'); // ✅ NOUVEAU
+const BonIntervention = require('./BonIntervention');
 
 // 2. Définition des associations
 
@@ -83,7 +83,7 @@ Solde.belongsTo(Fournisseur, { foreignKey: 'fournisseurId', as: 'fournisseurSold
 Fournisseur.hasMany(Retrait, { foreignKey: 'fournisseurId', as: 'retraits' });
 Retrait.belongsTo(Fournisseur, { foreignKey: 'fournisseurId', as: 'fournisseurRetrait' });
 
-// ✅ BonIntervention ↔ Reservation / Fournisseur
+// BonIntervention ↔ Reservation / Fournisseur
 Reservation.hasOne(BonIntervention, { foreignKey: 'reservationId', as: 'bonIntervention' });
 BonIntervention.belongsTo(Reservation, { foreignKey: 'reservationId', as: 'reservation' });
 
@@ -93,7 +93,18 @@ BonIntervention.belongsTo(Fournisseur, { foreignKey: 'fournisseurId', as: 'fourn
 // 3. Export global
 module.exports = {
   sequelize,
-  User, Service, Fournisseur, Produit, Commande,
-  CommandeProduit, Facture, Paiement, Reservation,
-  Message, Solde, Retrait, Devis, BonIntervention,
+  User,
+  Service,
+  Fournisseur,
+  Produit,
+  Commande,
+  CommandeProduit,
+  Facture,
+  Paiement,
+  Reservation,
+  Message,
+  Solde,
+  Retrait,
+  Devis,
+  BonIntervention
 };
