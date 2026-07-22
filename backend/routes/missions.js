@@ -56,7 +56,9 @@ router.put('/:id/accepter', protect, checkFournisseur, async (req, res) => {
             where: { id: req.params.id, fournisseurId: req.fournisseur.id }
         });
         if (!mission) return res.status(404).json({ success: false, message: 'Mission introuvable.' });
-        if (mission.statut !== 'EN_ATTENTE') return res.status(400).json({ success: false, message: 'Mission non modifiable.' });
+        if (!['EN_ATTENTE', 'ASSIGNEE'].includes(mission.statut)) {
+            return res.status(400).json({ success: false, message: 'Mission non modifiable.' });
+        }
 
         await mission.update({ statut: 'EN_VALIDATION_ADMIN' });
         res.json({ success: true, message: 'Mission acceptée. En attente de validation admin.', data: mission });
@@ -73,7 +75,9 @@ router.put('/:id/refuser', protect, checkFournisseur, async (req, res) => {
             where: { id: req.params.id, fournisseurId: req.fournisseur.id }
         });
         if (!mission) return res.status(404).json({ success: false, message: 'Mission introuvable.' });
-        if (mission.statut !== 'EN_ATTENTE') return res.status(400).json({ success: false, message: 'Mission non modifiable.' });
+        if (!['EN_ATTENTE', 'ASSIGNEE'].includes(mission.statut)) {
+            return res.status(400).json({ success: false, message: 'Mission non modifiable.' });
+        }
 
         await mission.update({
             statut: 'ANNULEE',

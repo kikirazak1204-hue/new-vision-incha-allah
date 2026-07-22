@@ -934,7 +934,7 @@ export default function DashboardFournisseur({ setCurrentView }) {
                                         )}
 
                                         <div className="flex flex-wrap items-center gap-3 pt-2">
-                                            {mission.statut === 'EN_ATTENTE' && (
+                                            {['EN_ATTENTE', 'ASSIGNEE'].includes(mission.statut) && (
                                                 <>
                                                     <button onClick={() => callAction(mission.id, 'accepter', 'EN_VALIDATION_ADMIN')} disabled={actionLoad === `${mission.id}_accepter`} className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black rounded-xl text-xs shadow-lg transition-all active:scale-95 disabled:opacity-50">
                                                         {actionLoad === `${mission.id}_accepter` ? 'Traitement...' : '👍 Je suis partant — Envoyer à l\'Admin'}

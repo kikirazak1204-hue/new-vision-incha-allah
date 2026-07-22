@@ -5,6 +5,7 @@ const Paiement = require('../models/Paiement');
 const Commande = require('../models/Commande');
 const CommandeProduit = require('../models/CommandeProduit');
 const Produit = require('../models/Produit');
+const Fournisseur = require('../models/Fournisseur');
 
 const buildCommandeFromPayload = async (commandeId, articles, userId) => {
     let commande = null;
@@ -140,8 +141,13 @@ router.get('/historique', protect, async (req, res) => {
             whereCondition = { clientId: userId };
         }
         else if (userRole === 'prestataire' || userRole === 'fournisseur') {
+            const fournisseur = await Fournisseur.findOne({ where: { userId } });
+            if (!fournisseur) {
+                return res.status(200).json({ success: true, data: [] });
+            }
+
             const commandesPrestataire = await Commande.findAll({
-                where: { fournisseurId: userId },
+                where: { fournisseurId: fournisseur.id },
                 attributes: ['id']
             });
             const commandeIds = commandesPrestataire.map(c => c.id);

@@ -196,16 +196,16 @@ export const updateStatutFournisseur = (id, statut) =>
   });
 
 export const getAdminPaiements = () =>
-  request('/api/paiements/admin/liste', { headers: authHeaders() });
+  request('/api/admin/paiements', { headers: authHeaders() });
 
 export const validerPaiement = (id) =>
-  request(`/api/paiements/admin/${id}/valider`, {
+  request(`/api/admin/paiements/${id}`, {
     method: 'PUT',
     headers: authHeaders(),
   });
 
 export const rejeterPaiement = (id) =>
-  request(`/api/paiements/admin/${id}/rejeter`, {
+  request(`/api/admin/paiements/${id}`, {
     method: 'PUT',
     headers: authHeaders(),
   });

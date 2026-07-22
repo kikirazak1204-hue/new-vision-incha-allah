@@ -50,4 +50,7 @@ const authorize = (...roles) => {
     };
 };
 
-module.exports = { protect, authorize };
+// Alias pratique pour les routes admin-only
+const adminOnly = authorize('admin');
+
+module.exports = { protect, authorize, adminOnly };
