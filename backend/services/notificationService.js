@@ -54,7 +54,7 @@ async function sendAdminNotificationEmail(adminEmail, reservation) {
 
     try {
         await transporter.sendMail({
-            from: process.env.EMAIL_USER || 'noreply@incha-allah.com',
+            from: process.env.ADMIN_EMAIL_USER || process.env.EMAIL_USER || 'noreply@incha-allah.com',
             to: adminEmail,
             subject: `🔔 NOUVELLE RÉSERVATION #${reservation.id}`,
             html: emailContent

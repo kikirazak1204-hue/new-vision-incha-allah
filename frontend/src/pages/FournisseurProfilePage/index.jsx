@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, MapPin, Star, ShieldCheck, CalendarCheck, Phone, Mail, Loader2, Info } from 'lucide-react';
-import { getFournisseurById } from '../util/api'; // Au cas où on recharge la page directement
+import { getFournisseurById } from '../../util/api'; // Au cas où on recharge la page directement
 
 export default function FournisseurProfilePage() {
     const { state } = useLocation();
     const { id: paramId } = useParams();
     const navigate = useNavigate();
-    const API = import.meta.env.VITE_API_URL;
+    const API = import.meta.env.VITE_API_URL || '';
 
     // On tente d'abord de récupérer le fournisseur depuis le state (envoyé par la page précédente)
     const [fournisseur, setFournisseur] = useState(state?.fournisseur || null);

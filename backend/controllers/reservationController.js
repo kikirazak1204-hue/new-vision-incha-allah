@@ -1,5 +1,7 @@
 const { Reservation, Fournisseur, Service, User } = require('../models');
 const admin = require('../config/firebase-admin');
+const { sendAdminNotificationEmail } = require('../services/notificationService');
+const { ADMIN_EMAIL } = require('../config/admin');
 
 // ── Helper Firebase Notification ────────────────────────────
 const sendNotification = async ({ token, topic, title, body, data }) => {
@@ -52,6 +54,11 @@ exports.createReservation = async (req, res) => {
                     serviceNom: String(serviceNom || 'votre service')
                 }
             });
+        }
+
+        if (ADMIN_EMAIL) {
+            sendAdminNotificationEmail(ADMIN_EMAIL, reservation)
+                .catch(() => null);
         }
 
         res.status(201).json({ success: true, data: reservation });
@@ -226,7 +233,7 @@ exports.adminCreerReservation = async (req, res) => {
             type: type || 'classique',
             dateIntervention: dateIntervention || null,
             parcours: fournisseurId ? 'direct' : 'assignation',
-            statut: fournisseurId ? 'assigne' : 'en_attente',
+            statut: fournisseurId ? 'ASSIGNEE' : 'EN_ATTENTE',
         });
 
         if (fournisseurId) {
@@ -243,6 +250,11 @@ exports.adminCreerReservation = async (req, res) => {
                     }
                 });
             }
+        }
+
+        if (ADMIN_EMAIL) {
+            sendAdminNotificationEmail(ADMIN_EMAIL, reservation)
+                .catch(() => null);
         }
 
         res.status(201).json({ success: true, data: reservation });

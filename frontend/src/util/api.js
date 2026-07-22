@@ -136,6 +136,11 @@ export const getFournisseursParService = (id) => {
   return request(`/api/services/${id}/fournisseurs`);
 };
 
+export const getFournisseurById = (id) => {
+  if (!id) throw new Error('ID de fournisseur manquant');
+  return request(`/api/fournisseurs/${id}`);
+};
+
 // ============================================================
 // 📦 PRODUITS
 // ============================================================

@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
+import { NotificationProvider } from './context/NotificationContext.jsx';
 import './index.css';
 
 const rootElement = document.getElementById('root');
@@ -24,8 +25,10 @@ if ('serviceWorker' in navigator) {
 
 ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>
-        <BrowserRouter>
-            <App />
-        </BrowserRouter>
+        <NotificationProvider>
+            <BrowserRouter>
+                <App />
+            </BrowserRouter>
+        </NotificationProvider>
     </React.StrictMode>
 );

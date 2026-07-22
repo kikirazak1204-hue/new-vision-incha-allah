@@ -6,6 +6,8 @@ const Commande = require('../models/Commande');
 const CommandeProduit = require('../models/CommandeProduit');
 const Produit = require('../models/Produit');
 const Fournisseur = require('../models/Fournisseur');
+const { sendAdminNotificationEmail } = require('../services/notificationService');
+const { ADMIN_EMAIL } = require('../config/admin');
 
 const buildCommandeFromPayload = async (commandeId, articles, userId) => {
     let commande = null;
@@ -101,6 +103,19 @@ const handleMobileMoneyPaiement = async (req, res) => {
             { statutPaiement: 'en_attente_verification' },
             { where: { id: commande.id } }
         );
+
+        if (ADMIN_EMAIL) {
+            sendAdminNotificationEmail(ADMIN_EMAIL, {
+                id: nouveauPaiement.id,
+                telephone: nouveauPaiement.telephone,
+                montant: nouveauPaiement.montant,
+                referenceTransaction: nouveauPaiement.referenceClient,
+                modePaiement: nouveauPaiement.modePaiement,
+                nom: nouveauPaiement.nom,
+                message: nouveauPaiement.messageClient,
+                createdAt: nouveauPaiement.createdAt
+            }).catch(() => null);
+        }
 
         return res.status(201).json({
             success: true,

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CalendarClock, Zap, FileSignature, ShieldCheck } from 'lucide-react';
-
+import { useNotification } from '../context/NotificationContext.jsx';
+const API = import.meta.env.VITE_API_URL || '';
 const normalize = (s = '') => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 const SERVICES_CLASSIQUE = [
@@ -56,6 +57,7 @@ export default function ReservationPage({ setCurrentView }) {
 
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
+    const { showNotification } = useNotification();
 
     useEffect(() => {
         if (!service) return;
@@ -108,7 +110,7 @@ export default function ReservationPage({ setCurrentView }) {
         };
 
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/reservations`, {
+            const res = await fetch(`${API}/api/reservations`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
@@ -119,6 +121,13 @@ export default function ReservationPage({ setCurrentView }) {
                 setMessage(assignationDirecteAdmin
                     ? '✅ Réservation créée et assignée avec succès ! Le prestataire voit déjà le numéro du client. Redirection...'
                     : '✅ Réservation transmise avec succès ! Redirection...');
+                showNotification({
+                    title: assignationDirecteAdmin ? 'Mission assignée' : 'Réservation transmise',
+                    body: assignationDirecteAdmin
+                        ? 'Le prestataire a reçu votre demande et peut démarrer l’intervention.'
+                        : 'Votre demande est bien enregistrée. Nous vous recontactons bientôt.',
+                    categorie: 'Réservation'
+                });
                 setTimeout(() => navigate('/'), 1500);
             } else {
                 setMessage('❌ ' + (data.message || "Échec de l'envoi de la réservation."));

@@ -26,6 +26,7 @@ import DashboardAdmin from './pages/AdminDashboard';
 import ReservationPage from './pages/ReservationPage';
 import PaiementPage from './pages/PaiementPage';
 import HistoriquePaiements from './pages/HistoriquePaiements'; // ⭐ ROUTE HISTORIQUE AJOUTÉE
+import FournisseurProfilePage from './pages/FournisseurProfilePage';
 import ProduitsParFournisseur from './pages/Produitsparfournisseur';
 import PanierPage from './pages/PanierPage';
 import ProduitsParService from './pages/ProduitsParService';
@@ -111,6 +112,7 @@ export default function App() {
                         <Route path="/produits/:fournisseurId" element={<ProduitsParFournisseur />} />
                         <Route path="/produits/service/:serviceId" element={<ProduitsParService />} />
                         <Route path="/reservation" element={<ReservationPage />} />
+                        <Route path="/fournisseur-profil/:id?" element={<FournisseurProfilePage />} />
                         <Route path="/paiement" element={<PaiementPage />} />
                         <Route path="/historique-paiements" element={<HistoriquePaiements />} /> {/* ⭐ ROUTE HISTORIQUE PAIEMENTS ACTIVE */}
                         <Route path="/panier" element={<PanierPage />} />

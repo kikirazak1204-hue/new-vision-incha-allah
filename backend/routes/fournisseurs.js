@@ -6,6 +6,7 @@ const { protect } = require('../middleware/auth');
 const {
     createFournisseur,
     getAllFournisseurs,
+    getFournisseurById,
     getProduitsByFournisseurId // Import ajouté ici
 } = require('../controllers/fournisseurController');
 
@@ -43,6 +44,11 @@ router.post(
 // 📦 GET PRODUITS FOURNISSEUR (La route corrigée)
 // =======================
 router.get('/:id/produits', getProduitsByFournisseurId);
+
+// =======================
+// 📦 GET UN FOURNISSEUR PAR ID
+// =======================
+router.get('/:id', getFournisseurById);
 
 // =======================
 // 📦 GET ALL FOURNISSEURS (SAFE)

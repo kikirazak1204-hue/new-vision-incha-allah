@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getDashboardFournisseur, addProduit } from '../util/api';
+import { useNotification } from '../context/NotificationContext.jsx';
 
 export default function AjouterProduit() {
     const [form, setForm] = useState({ nom: '', description: '', prix: '', serviceId: '' });
@@ -8,6 +9,7 @@ export default function AjouterProduit() {
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const { showNotification } = useNotification();
 
     useEffect(() => {
         const fetchServiceId = async () => {
@@ -52,6 +54,11 @@ export default function AjouterProduit() {
             const res = await addProduit(data);
             if (res.success) {
                 setMessage('✅ Produit ajouté avec succès !');
+                showNotification({
+                    title: 'Produit ajouté',
+                    body: `Le produit "${form.nom.trim()}" a bien été ajouté au catalogue.`,
+                    categorie: 'Boutique'
+                });
                 setForm((prev) => ({ nom: '', description: '', prix: '', serviceId: prev.serviceId }));
                 setImage(null);
                 setTimeout(() => navigate('/dashboard-fournisseur'), 1500);

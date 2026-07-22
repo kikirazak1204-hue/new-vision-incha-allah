@@ -32,7 +32,12 @@ export default function FournisseursParService({ serviceId, setCurrentView }) {
     }, [serviceId]);
 
     const handleVoirProfil = (fournisseur) => {
-        navigate('/fournisseur-profil', { state: { fournisseur, service } });
+        const id = fournisseur?.id || fournisseur?._id;
+        if (id) {
+            navigate(`/fournisseur-profil/${id}`, { state: { fournisseur, service } });
+        } else {
+            navigate('/fournisseur-profil', { state: { fournisseur, service } });
+        }
     };
 
     const handleReserver = (fournisseur) => {
