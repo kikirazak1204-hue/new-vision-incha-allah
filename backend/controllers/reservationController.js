@@ -23,10 +23,13 @@ exports.createReservation = async (req, res) => {
         const { fournisseurId, serviceId, serviceNom } = req.body;
         const parcours = fournisseurId ? 'direct' : 'assignation';
 
+        // ✅ CORRIGÉ : 'ASSIGNEE' n'existe pas dans l'ENUM Reservation.statut.
+        // Qu'il s'agisse d'un parcours direct ou d'une assignation classique,
+        // la réservation démarre en EN_ATTENTE (en attente d'acceptation du prestataire).
         const reservation = await Reservation.create({
             ...req.body,
             parcours,
-            statut: parcours === 'direct' ? 'ASSIGNEE' : 'EN_ATTENTE',
+            statut: 'EN_ATTENTE',
         });
 
         if (parcours === 'direct') {
@@ -63,7 +66,7 @@ exports.createReservation = async (req, res) => {
 
         res.status(201).json({ success: true, data: reservation });
     } catch (error) {
-        console.error('Erreur création réservation:', error.message);
+        console.error('Erreur création réservation:', error.stack);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -71,7 +74,6 @@ exports.createReservation = async (req, res) => {
 // ── GET /api/reservations/mes-reservations ─────────────────
 exports.getMesReservations = async (req, res) => {
     try {
-        // Utilisation de req.user.id sécurisé
         const clientId = req.user?.id || req.params.userId;
 
         const reservations = await Reservation.findAll({
@@ -105,7 +107,8 @@ exports.assignerFournisseur = async (req, res) => {
         const reservation = await Reservation.findByPk(req.params.id);
         if (!reservation) return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
 
-        await reservation.update({ fournisseurId, statut: 'ASSIGNEE', refusePar: null, motifRefus: null });
+        // ✅ CORRIGÉ : 'ASSIGNEE' → 'EN_ATTENTE' (mission assignée, en attente de réponse du prestataire)
+        await reservation.update({ fournisseurId, statut: 'EN_ATTENTE', refusePar: null, motifRefus: null });
 
         const fournisseur = await Fournisseur.findByPk(fournisseurId);
         if (fournisseur?.fcmToken) {
@@ -123,6 +126,7 @@ exports.assignerFournisseur = async (req, res) => {
 
         res.json({ success: true, data: reservation });
     } catch (error) {
+        console.error('Erreur assignerFournisseur:', error.stack);
         res.status(500).json({ success: false, message: 'Erreur serveur' });
     }
 };
@@ -226,6 +230,8 @@ exports.adminCreerReservation = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Besoin, adresse, téléphone et service sont obligatoires.' });
         }
 
+        // ✅ CORRIGÉ : 'ASSIGNEE' → 'EN_ATTENTE' (même avec un fournisseurId déjà précisé,
+        // il doit encore accepter la mission — cohérent avec le reste du flux)
         const reservation = await Reservation.create({
             besoin, adresse, telephone, clientNom,
             serviceId, serviceNom,
@@ -233,7 +239,7 @@ exports.adminCreerReservation = async (req, res) => {
             type: type || 'classique',
             dateIntervention: dateIntervention || null,
             parcours: fournisseurId ? 'direct' : 'assignation',
-            statut: fournisseurId ? 'ASSIGNEE' : 'EN_ATTENTE',
+            statut: 'EN_ATTENTE',
         });
 
         if (fournisseurId) {
