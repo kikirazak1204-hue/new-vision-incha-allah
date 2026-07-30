@@ -31,43 +31,72 @@ const Reservation = sequelize.define('Reservation', {
         allowNull: true
     },
 
+    // 🛠️ CORRECTION PRODUCTION : STRING au lieu de ENUM
     type: {
-        type: DataTypes.ENUM('classique', 'planifie', 'contrat'),
-        defaultValue: 'classique'
+        type: DataTypes.STRING(30),
+        defaultValue: 'classique',
+        validate: {
+            isIn: {
+                args: [['classique', 'planifie', 'contrat']],
+                msg: "Le type de réservation est invalide."
+            }
+        }
     },
+
+    // 🛠️ CORRECTION PRODUCTION : STRING au lieu de ENUM
     parcours: {
-        type: DataTypes.ENUM('assignation', 'direct'),
-        defaultValue: 'assignation'
+        type: DataTypes.STRING(30),
+        defaultValue: 'assignation',
+        validate: {
+            isIn: {
+                args: [['assignation', 'direct']],
+                msg: "Le parcours est invalide."
+            }
+        }
     },
 
-    // Statut sans doublons d'accents et aligné avec MySQL
+    // 🛠️ CORRECTION PRODUCTION : STRING au lieu de ENUM (Plus de crash MySQL !)
     statut: {
-        type: DataTypes.ENUM(
-            'EN_ATTENTE',
-            'ASSIGNEE',
-            'EN_VALIDATION_ADMIN',
-            'ACCEPTEE',
-            'EN_PREPARATION',
-            'EN_COURS',
-            'VALIDEE',
-            'TERMINEE',
-            'ANNULEE'
-        ),
-        defaultValue: 'EN_ATTENTE'
+        type: DataTypes.STRING(50),
+        defaultValue: 'EN_ATTENTE',
+        validate: {
+            isIn: {
+                args: [[
+                    'EN_ATTENTE', 'ASSIGNEE', 'EN_VALIDATION_ADMIN',
+                    'ACCEPTEE', 'EN_PREPARATION', 'EN_COURS',
+                    'VALIDEE', 'TERMINEE', 'ANNULEE'
+                ]],
+                msg: "Le statut envoyé par le frontend n'est pas reconnu."
+            }
+        }
     },
 
+    // 🛠️ CORRECTION PRODUCTION : STRING au lieu de ENUM
     modePaiement: {
-        type: DataTypes.ENUM('direct_prestataire', 'depot_kanari'),
-        allowNull: true
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        validate: {
+            isIn: {
+                args: [['direct_prestataire', 'depot_kanari']],
+                msg: "Mode de paiement invalide."
+            }
+        }
     },
     codePrestataireUtilise: {
         type: DataTypes.STRING,
         allowNull: true
     },
 
+    // 🛠️ CORRECTION PRODUCTION : STRING au lieu de ENUM
     commissionStatut: {
-        type: DataTypes.ENUM('en_attente', 'recue', 'en_retard'),
-        defaultValue: 'en_attente'
+        type: DataTypes.STRING(30),
+        defaultValue: 'en_attente',
+        validate: {
+            isIn: {
+                args: [['en_attente', 'recue', 'en_retard']],
+                msg: "Statut de commission invalide."
+            }
+        }
     },
     commissionDateLimite: {
         type: DataTypes.DATE,
@@ -127,7 +156,7 @@ const Reservation = sequelize.define('Reservation', {
         defaultValue: false
     },
 
-    // Champs Bon d'intervention (TEXT pour éviter la troncature)
+    // Champs Bon d'intervention 
     descriptionTravail: {
         type: DataTypes.TEXT,
         allowNull: true
