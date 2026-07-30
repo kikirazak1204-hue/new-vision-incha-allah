@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
-// Importation de la connexion Sequelize (adapte le chemin selon ton projet)
+// Importation de la connexion Sequelize
 const { sequelize } = require('./models');
 
 const app = express();
@@ -111,6 +111,25 @@ const startServer = async () => {
         // Vérification de la connexion à MySQL
         await sequelize.authenticate();
         console.log('✅ Connexion réussie à la base de données MySQL.');
+
+        // ==============================================================
+        // 🚀 SCRIPT TEMPORAIRE POUR AIVEN (Contournement Proxy Bureau)
+        // ==============================================================
+        try {
+            console.log("⏳ Exécution de la mise à jour de la table reservations sur Aiven...");
+            await sequelize.query(`
+                ALTER TABLE reservations 
+                MODIFY statut VARCHAR(50) DEFAULT 'EN_ATTENTE',
+                MODIFY type VARCHAR(30) DEFAULT 'classique',
+                MODIFY parcours VARCHAR(30) DEFAULT 'assignation',
+                MODIFY modePaiement VARCHAR(50) NULL,
+                MODIFY commissionStatut VARCHAR(30) DEFAULT 'en_attente';
+            `);
+            console.log("✅ SUCCÈS : BASE AIVEN MISE À JOUR DEPUIS RENDER !");
+        } catch (e) {
+            console.log("⚠️ Info SQL (la table est peut-être déjà à jour) :", e.message);
+        }
+        // ==============================================================
 
         // Note : Évite { alter: true } en production pour ne pas altérer la structure par accident
         // await sequelize.sync(); 
