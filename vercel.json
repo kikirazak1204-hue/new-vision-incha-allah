@@ -7,10 +7,10 @@
       "config": { "distDir": "frontend/dist" }
     }
   ],
-  "installCommand": "npm --prefix frontend install",
-  "buildCommand": "npm --prefix frontend run build",
-    "env": {
-        "VITE_APP_NAME": "Kanari Service",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "env": {
+    "VITE_APP_NAME": "Kanari Service",
         "VITE_APP_VERSION": "1.0.0",
         "VITE_API_URL": "https://newvision-backend.onrender.com"
     },
