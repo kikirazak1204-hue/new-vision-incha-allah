@@ -235,7 +235,45 @@ router.put('/reservations/:id/refuser', protect, adminOnly, async (req, res) => 
 // 🟢 POST /api/admin/reservations/admin-creer
 router.post('/reservations/admin-creer', protect, adminOnly, async (req, res) => {
     try {
-        const newReservation = await Reservation.create(req.body);
+        const {
+            besoin,
+            adresse,
+            telephone,
+            clientNom,
+            serviceId,
+            serviceNom,
+            fournisseurId,
+            type,
+            dateIntervention,
+            modePaiement,
+            accordTelephone
+        } = req.body;
+
+        if (!besoin || !adresse || !telephone || !serviceId) {
+            return res.status(400).json({ success: false, message: 'Besoin, adresse, téléphone et service sont obligatoires.' });
+        }
+
+        const parsedFournisseurId = fournisseurId ? parseInt(fournisseurId, 10) : null;
+        const parcours = parsedFournisseurId ? 'direct' : 'assignation';
+        const statut = parsedFournisseurId
+            ? (accordTelephone ? 'ACCEPTEE' : 'ASSIGNEE')
+            : 'EN_ATTENTE';
+
+        const newReservation = await Reservation.create({
+            besoin,
+            adresse,
+            telephone,
+            clientNom: clientNom || null,
+            serviceId,
+            serviceNom,
+            fournisseurId: parsedFournisseurId,
+            type: type || 'classique',
+            dateIntervention: dateIntervention || null,
+            parcours,
+            statut,
+            modePaiement: modePaiement || 'depot_kanari'
+        });
+
         res.status(201).json({ success: true, message: 'Réservation créée par l’admin.', data: newReservation });
     } catch (err) {
         console.error("❌ Erreur POST /admin-creer :", err);

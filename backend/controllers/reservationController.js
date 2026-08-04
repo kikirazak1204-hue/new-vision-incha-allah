@@ -3,6 +3,34 @@ const admin = require('../config/firebase-admin');
 const { sendAdminNotificationEmail } = require('../services/notificationService');
 const { ADMIN_EMAIL } = require('../config/admin');
 
+const normalizeReservationStatut = (statut) => {
+    if (typeof statut !== 'string') return null;
+    const cleaned = statut
+        .trim()
+        .toUpperCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '_')
+        .replace(/[^A-Z_]/g, '');
+
+    const map = {
+        EN_ATTENTE: 'EN_ATTENTE',
+        ASSIGNEE: 'ASSIGNEE',
+        EN_VALIDATION_ADMIN: 'EN_VALIDATION_ADMIN',
+        EN_ATTENTE_VALIDATION: 'EN_VALIDATION_ADMIN',
+        ACCEPTEE: 'ACCEPTEE',
+        EN_PREPARATION: 'EN_PREPARATION',
+        EN_COURS: 'EN_COURS',
+        VALIDEE: 'VALIDEE',
+        TERMINEE: 'TERMINEE',
+        TERMINE: 'TERMINEE',
+        ANNULEE: 'ANNULEE',
+        ANNULE: 'ANNULEE'
+    };
+
+    return map[cleaned] || null;
+};
+
 // ── Helper Firebase Notification ────────────────────────────
 const sendNotification = async ({ token, topic, title, body, data }) => {
     try {
@@ -23,13 +51,10 @@ exports.createReservation = async (req, res) => {
         const { fournisseurId, serviceId, serviceNom } = req.body;
         const parcours = fournisseurId ? 'direct' : 'assignation';
 
-        // ✅ CORRIGÉ : 'ASSIGNEE' n'existe pas dans l'ENUM Reservation.statut.
-        // Qu'il s'agisse d'un parcours direct ou d'une assignation classique,
-        // la réservation démarre en EN_ATTENTE (en attente d'acceptation du prestataire).
         const reservation = await Reservation.create({
             ...req.body,
             parcours,
-            statut: 'EN_ATTENTE',
+            statut: fournisseurId ? 'ASSIGNEE' : 'EN_ATTENTE',
         });
 
         if (parcours === 'direct') {
@@ -92,7 +117,10 @@ exports.updateStatut = async (req, res) => {
         const reservation = await Reservation.findByPk(req.params.id);
         if (!reservation) return res.status(404).json({ success: false, message: 'Réservation non trouvée' });
 
-        reservation.statut = req.body.statut;
+        const statut = normalizeReservationStatut(req.body.statut);
+        if (!statut) return res.status(400).json({ success: false, message: 'Statut invalide.' });
+
+        reservation.statut = statut;
         await reservation.save();
         res.status(200).json({ success: true, data: reservation });
     } catch (error) {
@@ -107,8 +135,8 @@ exports.assignerFournisseur = async (req, res) => {
         const reservation = await Reservation.findByPk(req.params.id);
         if (!reservation) return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
 
-        // ✅ CORRIGÉ : 'ASSIGNEE' → 'EN_ATTENTE' (mission assignée, en attente de réponse du prestataire)
-        await reservation.update({ fournisseurId, statut: 'EN_ATTENTE', refusePar: null, motifRefus: null });
+        // ✅ Standardisation : la mission est désormais clairement assignée
+        await reservation.update({ fournisseurId, statut: 'ASSIGNEE', refusePar: null, motifRefus: null });
 
         const fournisseur = await Fournisseur.findByPk(fournisseurId);
         if (fournisseur?.fcmToken) {
@@ -239,7 +267,7 @@ exports.adminCreerReservation = async (req, res) => {
             type: type || 'classique',
             dateIntervention: dateIntervention || null,
             parcours: fournisseurId ? 'direct' : 'assignation',
-            statut: 'EN_ATTENTE',
+            statut: fournisseurId ? 'ASSIGNEE' : 'EN_ATTENTE',
         });
 
         if (fournisseurId) {

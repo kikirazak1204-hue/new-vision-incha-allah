@@ -26,6 +26,35 @@ const LABEL_TYPE = {
     contrat: { label: 'Devis & Contrat', icon: FileSignature, desc: 'Détails complets requis, acompte possible.' },
 };
 
+const SERVICE_BACKGROUND_IMAGES = {
+    electricite: '/backgrounds/electricite.png',
+    plomberie: '/backgrounds/plomberie.png',
+    transports: '/backgrounds/transport.png',
+    mecanique: '/backgrounds/mecanique.jpg',
+    coiffure: '/backgrounds/coiffure.jpg',
+    couture: '/backgrounds/couture.jpg',
+    sante: '/backgrounds/sante.png',
+    restauration: '/backgrounds/restauration.png',
+    peinture: '/backgrounds/peinture.jpg',
+    maconnerie: '/backgrounds/maconnerie.jpg',
+    agriculture: '/backgrounds/agriculture.png',
+};
+
+const normalizeKey = (value = '') =>
+    String(value || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '_')
+        .replace(/[^a-z0-9_]/g, '');
+
+const getServiceImage = (service) => {
+    if (!service) return '/backgrounds/transport.png';
+    if (service.image) return service.image;
+    const key = normalizeKey(service.code || service.nom || 'transport');
+    return SERVICE_BACKGROUND_IMAGES[key] || '/backgrounds/transport.png';
+};
+
 export default function ReservationPage({ setCurrentView }) {
     const location = useLocation();
     const navigate = useNavigate();
@@ -142,6 +171,7 @@ export default function ReservationPage({ setCurrentView }) {
 
     const typeInfo = LABEL_TYPE[formData.type];
     const TypeIcon = typeInfo.icon;
+    const serviceImage = getServiceImage(service);
 
     // ✅ Garde-fou : si on arrive ici sans service (accès direct à l'URL), on guide l'utilisateur
     if (!service) {
@@ -170,7 +200,7 @@ export default function ReservationPage({ setCurrentView }) {
                     Finaliser la demande
                 </h1>
                 <p className="text-slate-400 mb-1">
-                    Service : <span className="text-purple-400 font-semibold">{service?.emoji} {service?.nom}</span>
+                    Service : <span className="text-purple-400 font-semibold"><img src={serviceImage} alt={service?.nom} className="inline-block w-5 h-5 rounded-full object-cover mr-2" /> {service?.nom}</span>
                 </p>
                 {fournisseur && (
                     <p className="text-slate-400 mb-6 text-sm">
