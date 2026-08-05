@@ -1,6 +1,52 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+const SERVICE_BACKGROUND_IMAGES = {
+    electricite: '/backgrounds/electricite.png',
+    plomberie: '/backgrounds/plomberie.png',
+    transports: '/backgrounds/transport.png',
+    transport: '/backgrounds/transport.png',
+    mecanique: '/backgrounds/mecanique.jpg',
+    coiffure: '/backgrounds/coiffure.jpg',
+    couture: '/backgrounds/couture.jpg',
+    sante: '/backgrounds/sante.png',
+    restauration: '/backgrounds/restauration.png',
+    peinture: '/backgrounds/peinture.jpg',
+    maconnerie: '/backgrounds/maconnerie.jpg',
+    jardinage: '/backgrounds/agriculture.png',
+    livraison: '/backgrounds/transport.png',
+    location: '/backgrounds/transport.png',
+    hotellerie: '/backgrounds/transport.png',
+    assurance: '/backgrounds/transport.png',
+    avocat: '/backgrounds/transport.png',
+    sport: '/backgrounds/transport.png',
+    entretien: '/backgrounds/transport.png',
+    menage: '/backgrounds/transport.png',
+    securite: '/backgrounds/transport.png',
+    menuiserie: '/backgrounds/maconnerie.jpg',
+    climatisation: '/backgrounds/sante.png',
+    reparation: '/backgrounds/mecanique.jpg',
+    beaute: '/backgrounds/coiffure.jpg',
+    alimentation: '/backgrounds/restauration.png',
+    artisanat: '/backgrounds/couture.jpg',
+    fleuriste: '/backgrounds/peinture.jpg',
+};
+
+const normalizeKey = (value = '') =>
+    String(value || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_|_$/g, '');
+
+const getServiceImage = (service) => {
+    if (!service) return '/backgrounds/transport.png';
+    if (service.image) return service.image;
+    const key = normalizeKey(service.code || service.nom || 'transport');
+    return SERVICE_BACKGROUND_IMAGES[key] || '/backgrounds/transport.png';
+};
+
 export default function ListeServices() {
     const [services, setServices] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -75,37 +121,23 @@ export default function ListeServices() {
                             className="group cursor-pointer"
                         >
                             <div className="relative h-64 rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 bg-white/5">
-                                {/* Image ou Placeholder */}
-                                <div
-                                    className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-110"
-                                    style={{
-                                        backgroundImage: service.image
-                                            ? `url('${service.image}')`
-                                            : `linear-gradient(135deg, #667eea 0%, #764ba2 100%)`
-                                    }}
-                                >
-                                    {/* Overlay */}
-                                    <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-all duration-300" />
-                                </div>
+                                <img
+                                    src={getServiceImage(service)}
+                                    alt={service.nom}
+                                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                                    onError={(e) => { e.target.onerror = null; e.target.src = '/backgrounds/transport.png'; }}
+                                />
+                                <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition-all duration-300" />
 
-                                {/* Content */}
                                 <div className="relative h-full flex flex-col justify-end p-6 text-white">
-                                    {/* Emoji Icon */}
-                                    <div className="text-5xl mb-3 transform group-hover:scale-110 transition-transform duration-300">
-                                        {service.emoji || '🛠️'}
-                                    </div>
-
-                                    {/* Title */}
                                     <h3 className="text-2xl font-bold mb-2 group-hover:translate-y-0 transition-transform">
                                         {service.nom}
                                     </h3>
 
-                                    {/* Description - visible on hover on mobile, always visible on larger screens */}
-                                    <p className="text-white/80 text-sm line-clamp-2 opacity-0 group-hover:opacity-100 lg:opacity-100 transition-opacity duration-300">
+                                    <p className="text-white/80 text-sm line-clamp-2 opacity-100 transition-opacity duration-300">
                                         {service.description || 'Service professionnel de qualité'}
                                     </p>
 
-                                    {/* Arrow - visible on hover */}
                                     <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                         <svg className="w-6 h-6 text-white transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />

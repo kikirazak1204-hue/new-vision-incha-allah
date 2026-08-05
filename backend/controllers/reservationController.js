@@ -51,10 +51,17 @@ exports.createReservation = async (req, res) => {
         const { fournisseurId, serviceId, serviceNom } = req.body;
         const parcours = fournisseurId ? 'direct' : 'assignation';
 
+        const statutFromBody = normalizeReservationStatut(req.body.statut);
+        if (req.body.statut && !statutFromBody) {
+            return res.status(400).json({ success: false, message: 'Statut de réservation invalide.' });
+        }
+
+        const statut = statutFromBody || (fournisseurId ? 'ASSIGNEE' : 'EN_ATTENTE');
+
         const reservation = await Reservation.create({
             ...req.body,
             parcours,
-            statut: fournisseurId ? 'ASSIGNEE' : 'EN_ATTENTE',
+            statut,
         });
 
         if (parcours === 'direct') {
@@ -135,11 +142,29 @@ exports.assignerFournisseur = async (req, res) => {
         const reservation = await Reservation.findByPk(req.params.id);
         if (!reservation) return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
 
-        // ✅ Standardisation : la mission est désormais clairement assignée
-        await reservation.update({ fournisseurId, statut: 'ASSIGNEE', refusePar: null, motifRefus: null });
+        if (fournisseurId === undefined || fournisseurId === null || fournisseurId === '') {
+            return res.status(400).json({ success: false, message: 'Identifiant du prestataire requis.' });
+        }
 
-        const fournisseur = await Fournisseur.findByPk(fournisseurId);
-        if (fournisseur?.fcmToken) {
+        const parsedFournisseurId = parseInt(fournisseurId, 10);
+        if (Number.isNaN(parsedFournisseurId) || parsedFournisseurId <= 0) {
+            return res.status(400).json({ success: false, message: 'Identifiant de prestataire invalide.' });
+        }
+
+        const fournisseur = await Fournisseur.findByPk(parsedFournisseurId);
+        if (!fournisseur) {
+            return res.status(404).json({ success: false, message: 'Prestataire introuvable.' });
+        }
+
+        // ✅ Standardisation : la mission est désormais clairement assignée
+        await reservation.update({
+            fournisseurId: parsedFournisseurId,
+            statut: 'ASSIGNEE',
+            refusePar: null,
+            motifRefus: null
+        });
+
+        if (fournisseur.fcmToken) {
             sendNotification({
                 token: fournisseur.fcmToken,
                 title: '🔔 Mission assignée par Kanari',

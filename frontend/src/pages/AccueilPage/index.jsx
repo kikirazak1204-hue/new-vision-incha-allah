@@ -12,6 +12,47 @@ const AccueilPage = ({ services, loading, setSelectedService }) => {
     const [deferredPrompt, setDeferredPrompt] = useState(null);
     const [isInstallable, setIsInstallable] = useState(false);
 
+    const SERVICE_BACKGROUND_IMAGES = {
+        electricite: '/backgrounds/electricite.png',
+        plomberie: '/backgrounds/plomberie.png',
+        transports: '/backgrounds/transport.png',
+        transport: '/backgrounds/transport.png',
+        mecanique: '/backgrounds/mecanique.jpg',
+        coiffure: '/backgrounds/coiffure.jpg',
+        couture: '/backgrounds/couture.jpg',
+        sante: '/backgrounds/sante.png',
+        restauration: '/backgrounds/restauration.png',
+        peinture: '/backgrounds/peinture.jpg',
+        maconnerie: '/backgrounds/maconnerie.jpg',
+        jardinage: '/backgrounds/agriculture.png',
+        livraison: '/backgrounds/transport.png',
+        location: '/backgrounds/transport.png',
+        hotellerie: '/backgrounds/transport.png',
+        assurance: '/backgrounds/transport.png',
+        avocat: '/backgrounds/transport.png',
+        sport: '/backgrounds/transport.png',
+        entretien: '/backgrounds/transport.png',
+        menage: '/backgrounds/transport.png',
+        securite: '/backgrounds/transport.png',
+        menuiserie: '/backgrounds/maconnerie.jpg',
+        climatisation: '/backgrounds/sante.png',
+        reparation: '/backgrounds/mecanique.jpg',
+        beaute: '/backgrounds/coiffure.jpg',
+        alimentation: '/backgrounds/restauration.png',
+        artisanat: '/backgrounds/couture.jpg',
+        fleuriste: '/backgrounds/peinture.jpg',
+    };
+
+    const normalizeKey = (value = '') =>
+        String(value || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_|_$/g, '');
+
+
     // Récupération sécurisée des données du panier
     const { nombreArticles = 0, totalPanier = 0 } = usePanier() || {};
 
@@ -39,15 +80,11 @@ const AccueilPage = ({ services, loading, setSelectedService }) => {
         setDeferredPrompt(null);
     };
 
-    const serviceIcons = {
-        'Accessoires': '💍', 'Alimentation': '🍎', 'Artisanat': '🎨', 'Assurance': '🛡️',
-        'Avocat et Juridique': '⚖️', 'Benevolat': '🤝', 'Climatisation': '❄️', 'Coiffure et Beaute': '💇',
-        'Couture': '🧵', 'Divertissement': '🎬', 'Education': '📚', 'Electricite': '⚡',
-        'Fleuriste': '💐', 'Fournisseur de produits': '📦', 'Hotellerie': '🏨', 'Jardinage': '🌱',
-        'Livraison': '🚚', 'Location': '🔑', 'Maconnerie': '🧱', 'Mecanique': '🔧',
-        'Medecine': '🩺', 'Menage': '🧹', 'Menuiserie': '🪑', 'Mission et Freelance': '💼',
-        'Plomberie': '🚰', 'Prise de rendez-vous': '📅', 'Reparation': '🛠️', 'Securite': '🔒',
-        'Sport et Fitness': '🏋️', 'Transport': '🚗'
+    const getServiceImage = (service) => {
+        if (!service) return '/backgrounds/transport.png';
+        if (service.image) return service.image;
+        const key = normalizeKey(service.code || service.nom || 'transport');
+        return SERVICE_BACKGROUND_IMAGES[key] || '/backgrounds/transport.png';
     };
 
     return (
@@ -153,17 +190,29 @@ const AccueilPage = ({ services, loading, setSelectedService }) => {
                     </div>
                 ) : (
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                        {services.map((service) => (
-                            <button
-                                key={service.id}
-                                onClick={() => setSelectedService(service)}
-                                className="bg-[#131921] border border-slate-800 hover:border-purple-500/50 hover:bg-[#1b232e] p-6 rounded-2xl transition-all duration-300 group flex flex-col items-center text-center gap-3"
-                            >
-                                <span className="text-4xl">{serviceIcons[service.nom] || '✨'}</span>
-                                <span className="font-semibold text-sm group-hover:text-purple-400">{service.nom}</span>
-                                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold italic">Expertise certifiée</span>
-                            </button>
-                        ))}
+                        {services.map((service) => {
+                            const imageUrl = getServiceImage(service);
+                            return (
+                                <button
+                                    key={service.id}
+                                    onClick={() => setSelectedService(service)}
+                                    className="bg-[#131921] border border-slate-800 hover:border-purple-500/50 hover:bg-[#1b232e] p-0 rounded-2xl transition-all duration-300 group overflow-hidden text-left"
+                                >
+                                    <div className="h-40 w-full overflow-hidden bg-slate-950">
+                                        <img
+                                            src={imageUrl}
+                                            alt={service.nom}
+                                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                            onError={(e) => { e.target.onerror = null; e.target.src = '/backgrounds/transport.png'; }}
+                                        />
+                                    </div>
+                                    <div className="p-5 space-y-2 text-left">
+                                        <h3 className="text-sm font-semibold text-white line-clamp-1">{service.nom}</h3>
+                                        <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold italic">Expertise certifiée</p>
+                                    </div>
+                                </button>
+                            );
+                        })}
                     </div>
                 )}
             </main>

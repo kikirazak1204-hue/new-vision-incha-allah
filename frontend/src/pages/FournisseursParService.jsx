@@ -41,6 +41,13 @@ export default function FournisseursParService({ serviceId, setCurrentView }) {
     };
 
     const handleReserver = (fournisseur) => {
+        if (service) {
+            localStorage.setItem('selectedService', JSON.stringify(service));
+            localStorage.setItem('selectedServiceId', service.id || service._id);
+        }
+        if (fournisseur) {
+            localStorage.setItem('selectedFournisseur', JSON.stringify(fournisseur));
+        }
         navigate('/reservation', { state: { service, fournisseur } });
     };
 

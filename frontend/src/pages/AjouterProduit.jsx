@@ -6,6 +6,7 @@ import { useNotification } from '../context/NotificationContext.jsx';
 export default function AjouterProduit() {
     const [form, setForm] = useState({ nom: '', description: '', prix: '', serviceId: '' });
     const [image, setImage] = useState(null);
+    const [previewImageUrl, setPreviewImageUrl] = useState(null);
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -55,12 +56,14 @@ export default function AjouterProduit() {
             if (res.success) {
                 setMessage('✅ Produit ajouté avec succès !');
                 showNotification({
-                    title: 'Produit ajouté',
-                    body: `Le produit "${form.nom.trim()}" a bien été ajouté au catalogue.`,
-                    categorie: 'Boutique'
+                    title: 'Produit ajouté avec succès',
+                    body: `Le produit "${form.nom.trim()}" est désormais disponible dans votre catalogue.`,
+                    categorie: 'Boutique',
+                    image: previewImageUrl,
                 });
                 setForm((prev) => ({ nom: '', description: '', prix: '', serviceId: prev.serviceId }));
                 setImage(null);
+                setPreviewImageUrl(null);
                 setTimeout(() => navigate('/dashboard-fournisseur'), 1500);
             } else {
                 setMessage('❌ ' + (res.message || 'Échec de l’ajout.'));
@@ -130,9 +133,27 @@ export default function AjouterProduit() {
                         <input
                             type="file"
                             accept="image/*"
-                            onChange={(e) => setImage(e.target.files[0])}
+                            onChange={(e) => {
+                                const file = e.target.files?.[0] || null;
+                                setImage(file);
+                                if (!file) {
+                                    setPreviewImageUrl(null);
+                                    return;
+                                }
+
+                                const reader = new FileReader();
+                                reader.onload = () => setPreviewImageUrl(reader.result);
+                                reader.readAsDataURL(file);
+                            }}
                             className="w-full p-3 rounded-lg bg-indigo-700 text-white"
                         />
+                        {previewImageUrl && (
+                            <img
+                                src={previewImageUrl}
+                                alt="Aperçu du produit"
+                                className="mt-3 w-full h-40 object-cover rounded-lg border border-white/10"
+                            />
+                        )}
                     </div>
                     <button
                         type="submit"

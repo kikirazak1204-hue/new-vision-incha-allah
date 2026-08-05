@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { getDashboardFournisseur, getProduitsFournisseur, deleteProduit, addProduit } from '../util/api';
+import { useNotification } from '../context/NotificationContext.jsx';
 import SoldeRetrait from '../components/SoldeRetrait';
 
 const API = import.meta.env.VITE_API_URL;
@@ -204,6 +205,7 @@ function BonInterventionModal({ missionId, onClose, token, onSuccess }) {
 // MODAL : AJOUTER UN PRODUIT (catégorie, quantité, tous types de fichiers)
 // ════════════════════════════════════════════════════════════════
 function AjouterProduitModal({ onClose, onSuccess }) {
+    const { showNotification } = useNotification();
     const [nom, setNom] = useState('');
     const [prix, setPrix] = useState('');
     const [categorie, setCategorie] = useState('');
@@ -234,6 +236,11 @@ function AjouterProduitModal({ onClose, onSuccess }) {
             const res = await addProduit(fd);
             if (res && res.success !== false) {
                 onSuccess(res.data || { id: Date.now(), nom: nom.trim(), prix, categorie: categorie.trim(), quantite });
+                showNotification({
+                    title: 'Produit ajouté',
+                    body: `L'article "${nom.trim()}" a bien été ajouté à votre boutique.`,
+                    categorie: 'Boutique',
+                });
                 onClose();
             } else {
                 setError(res?.message || "Échec de l'ajout du produit.");

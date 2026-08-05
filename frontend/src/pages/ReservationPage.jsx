@@ -38,6 +38,22 @@ const SERVICE_BACKGROUND_IMAGES = {
     peinture: '/backgrounds/peinture.jpg',
     maconnerie: '/backgrounds/maconnerie.jpg',
     agriculture: '/backgrounds/agriculture.png',
+    livraison: '/backgrounds/transport.png',
+    location: '/backgrounds/transport.png',
+    hotellerie: '/backgrounds/transport.png',
+    assurance: '/backgrounds/transport.png',
+    avocat: '/backgrounds/transport.png',
+    sport: '/backgrounds/transport.png',
+    entretien: '/backgrounds/transport.png',
+    menage: '/backgrounds/transport.png',
+    securite: '/backgrounds/transport.png',
+    menuiserie: '/backgrounds/maconnerie.jpg',
+    climatisation: '/backgrounds/sante.png',
+    reparation: '/backgrounds/mecanique.jpg',
+    beaute: '/backgrounds/coiffure.jpg',
+    alimentation: '/backgrounds/restauration.png',
+    artisanat: '/backgrounds/couture.jpg',
+    fleuriste: '/backgrounds/peinture.jpg',
 };
 
 const normalizeKey = (value = '') =>
@@ -59,8 +75,33 @@ export default function ReservationPage({ setCurrentView }) {
     const location = useLocation();
     const navigate = useNavigate();
 
-    // ✅ Récupère les vraies données transmises depuis FournisseursParService ou ServiceDetailPage
-    const { service, fournisseur } = location.state || {};
+    const parseStorage = (key) => {
+        try {
+            const raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : null;
+        } catch (err) {
+            return null;
+        }
+    };
+
+    const state = location.state || {};
+    const stateService = state.service;
+    const stateFournisseur = state.fournisseur;
+
+    const savedService = stateService || parseStorage('selectedService');
+    const savedFournisseur = stateFournisseur || parseStorage('selectedFournisseur');
+
+    const service = savedService;
+    const fournisseur = savedFournisseur;
+
+    useEffect(() => {
+        if (stateService) {
+            localStorage.setItem('selectedService', JSON.stringify(stateService));
+        }
+        if (stateFournisseur) {
+            localStorage.setItem('selectedFournisseur', JSON.stringify(stateFournisseur));
+        }
+    }, [stateService, stateFournisseur]);
 
     let user = {};
     try { user = JSON.parse(localStorage.getItem('user')) || {}; } catch { }
@@ -123,14 +164,11 @@ export default function ReservationPage({ setCurrentView }) {
             dateIntervention: formData.dateIntervention || null,
             type: formData.type,
             modePaiement: formData.modePaiement,
-            serviceId: service.id,
-            serviceNom: service.nom,
-            fournisseurId: fournisseur?.id || null,
+            serviceId: service?.id || service?._id || parseStorage('selectedServiceId'),
+            serviceNom: service?.nom || service?.name || 'service',
+            fournisseurId: fournisseur?.id || fournisseur?._id || null,
             parcours: fournisseur ? 'direct' : 'assignation',
             clientId: user?.id || null,
-            // ➕ AJOUT : quand un Admin assigne lui-même un prestataire (client qui a appelé),
-            // la mission est créée déjà validée : le numéro apparaîtra immédiatement
-            // dans le Dashboard Prestataire (statut aligné sur celui utilisé côté Fournisseur).
             ...(assignationDirecteAdmin ? {
                 statut: 'ACCEPTEE',
                 assignePar: 'admin',

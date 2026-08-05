@@ -44,6 +44,22 @@ const SERVICE_BACKGROUND_IMAGES = {
     peinture: '/backgrounds/peinture.jpg',
     maconnerie: '/backgrounds/maconnerie.jpg',
     agriculture: '/backgrounds/agriculture.png',
+    livraison: '/backgrounds/transport.png',
+    location: '/backgrounds/transport.png',
+    hotellerie: '/backgrounds/transport.png',
+    assurance: '/backgrounds/transport.png',
+    avocat: '/backgrounds/transport.png',
+    sport: '/backgrounds/transport.png',
+    entretien: '/backgrounds/transport.png',
+    menage: '/backgrounds/transport.png',
+    securite: '/backgrounds/transport.png',
+    menuiserie: '/backgrounds/maconnerie.jpg',
+    climatisation: '/backgrounds/sante.png',
+    reparation: '/backgrounds/mecanique.jpg',
+    beaute: '/backgrounds/coiffure.jpg',
+    alimentation: '/backgrounds/restauration.png',
+    artisanat: '/backgrounds/couture.jpg',
+    fleuriste: '/backgrounds/peinture.jpg',
 };
 
 const normalizeKey = (value = '') =>

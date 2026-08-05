@@ -44,9 +44,10 @@ export default function ServiceSelectionPage() {
     // ✅ Transmet la sélection via location.state vers ReservationPage
     const handleValider = () => {
         if (selectedServices.length === 0) return;
-        // ReservationPage attend { service, fournisseur } dans son state
-        // On transmet le premier service sélectionné (V1 = un seul service par réservation)
-        navigate('/reservation', { state: { service: selectedServices[0] } });
+        const service = selectedServices[0];
+        localStorage.setItem('selectedService', JSON.stringify(service));
+        localStorage.setItem('selectedServiceId', service.id || service._id);
+        navigate('/reservation', { state: { service } });
     };
 
     return (

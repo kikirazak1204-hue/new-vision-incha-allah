@@ -1,4 +1,6 @@
-// sw.js - Actif pour valider la PWA (Kanari) sans bloquer React
+// sw.js - Service Worker Kanari
+const CACHE_NAME = 'kanari-v1';
+
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
@@ -8,15 +10,15 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-    // 🚨 RÈGLE D'OR : On n'intercepte PAS les appels vers l'API Render ou localhost:5000 !
-    if (event.request.url.includes('/api/') || event.request.url.includes('onrender.com')) {
-        return; // Laisse le navigateur gérer l'API normalement
+    // 1. NE PAS INTERCEPTER les appels API (Backend Render)
+    if (event.request.url.includes('/api/')) {
+        return; 
     }
 
-    // Pour les fichiers de l'app (HTML, CSS, JS), on laisse passer de façon sécurisée
+    // 2. Stratégie réseau pour le reste du site
     event.respondWith(
         fetch(event.request).catch(() => {
-            // Si le réseau échoue (mode hors ligne), on évite le crash fatal "Uncaught Promise"
+            // Retourne une réponse en cas d'échec réseau (mode hors ligne)
             return new Response("Hors ligne", { status: 503, statusText: "Offline" });
         })
     );
