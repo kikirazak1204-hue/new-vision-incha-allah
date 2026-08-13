@@ -9,8 +9,9 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { PanierProvider } from './context/PanierContext';
 import { NavigationProvider } from './context/NavigationContext';
 
-// Composants de protection
+// Composants de protection et globaux
 import ProtectedRoute from './components/ProtectedRoute';
+import GlobalLocationBar from './components/GlobalLocationBar'; // 📍 Ajouté ici
 
 // Importations des pages
 import Accueil from './pages/Accueil';
@@ -81,6 +82,9 @@ export default function App() {
         <PanierProvider>
             <NavigationProvider>
                 <div className="min-h-screen bg-slate-950 font-sans text-slate-100 relative">
+
+                    {/* 📍 BARRE DE GÉOLOCALISATION GLOBALE */}
+                    <GlobalLocationBar />
 
                     {showInstallBtn && (
                         <div className="fixed bottom-4 left-4 right-4 z-50 bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-2xl flex items-center justify-between max-w-md mx-auto animate-bounce">
