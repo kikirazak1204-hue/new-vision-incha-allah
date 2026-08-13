@@ -19,6 +19,16 @@ try {
 const app = express();
 
 // ==========================================
+// 🛡️ NETTOYEUR DE DOUBLE SLASH (Anti-404 URL)
+// ==========================================
+app.use((req, res, next) => {
+    if (req.url.includes('//')) {
+        req.url = req.url.replace(/\/+/g, '/');
+    }
+    next();
+});
+
+// ==========================================
 // 📁 UPLOADS — dossier + route statique
 // ==========================================
 const uploadDir = path.join(__dirname, 'uploads');
@@ -40,7 +50,7 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Sert les fichiers uploadés (images produits, CNI, selfies...)
+// Sert les fichiers uploadés
 app.use('/uploads', express.static(uploadDir));
 
 // ==========================================
@@ -56,11 +66,9 @@ app.get('/api/health', (req, res) => {
 });
 
 // ==========================================
-// 3. ENREGISTREMENT DES ROUTES API (Avec Priorité Globale)
+// 3. ROUTE GLOBALE DE RÉSERVATION (MULTI-SERVICES)
 // ==========================================
 
-// 🌍 ROUTE GLOBALE DE RÉSERVATION (MULTI-SERVICES)
-// Placée stratégiquement ICI pour éviter tout conflit 404 avec le routeur de réservations
 app.post('/api/reservations/global', async (req, res) => {
     try {
         const {
@@ -74,7 +82,6 @@ app.post('/api/reservations/global', async (req, res) => {
             services
         } = req.body;
 
-        // Validation rapide
         if (!clientNom || !telephone || !adresse || !services || !Array.isArray(services) || services.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -91,7 +98,6 @@ app.post('/api/reservations/global', async (req, res) => {
             modePaiement
         });
 
-        // Réponse envoyée au frontend
         return res.status(201).json({
             success: true,
             id: simulatedId,
@@ -107,7 +113,10 @@ app.post('/api/reservations/global', async (req, res) => {
     }
 });
 
-// Enregistrement des autres routeurs
+// ==========================================
+// 4. ENREGISTREMENT DES ROUTES API
+// ==========================================
+
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/reservations', require('./routes/reservations'));
@@ -128,7 +137,7 @@ app.use('/api/missions', require('./routes/missions'));
 app.use('/api/whatsapp', require('./routes/whatsapp'));
 
 // ==========================================
-// 4. GESTION DES ROUTES INEXISTANTES (404)
+// 5. GESTION DES ROUTES INEXISTANTES (404)
 // ==========================================
 
 app.use((req, res, next) => {
@@ -138,7 +147,7 @@ app.use((req, res, next) => {
 });
 
 // ==========================================
-// 5. MIDDLEWARE GLOBAL DE GESTION D'ERREURS
+// 6. MIDDLEWARE GLOBAL DE GESTION D'ERREURS
 // ==========================================
 
 app.use((err, req, res, next) => {
@@ -194,25 +203,21 @@ const repairDatabase = async () => {
 };
 
 // ==========================================
-// 6. INITIALISATION ET DÉMARRAGE
+// 7. INITIALISATION ET DÉMARRAGE
 // ==========================================
 
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
     try {
-        // 1. Connexion MySQL
         await sequelize.authenticate();
         console.log('✅ Connexion réussie à la base de données MySQL.');
 
-        // 2. Ajout des colonnes requises si absentes
         await repairDatabase();
 
-        // 3. Synchronisation Sequelize globale
         await sequelize.sync();
         console.log('✅ Base de données synchronisée.');
 
-        // 4. Lancement d'Express
         app.listen(PORT, () => {
             console.log(`🚀 Serveur en écoute sur le port ${PORT}`);
         });
@@ -224,7 +229,6 @@ const startServer = async () => {
 
 startServer();
 
-// Arrêt propre du serveur
 process.on('SIGINT', async () => {
     console.log('\nFermeture du serveur et des connexions DB...');
     await sequelize.close();
