@@ -1,5 +1,5 @@
 const { BonIntervention, Reservation, Fournisseur, User } = require('../models');
-// Import de ton utilitaire Firebase (adapte le chemin selon l'emplacement de ton fichier)
+const { Op } = require('sequelize');
 const { sendPushNotification } = require('../utils/firebaseNotifier');
 
 // ── POST /api/bons-intervention — Le prestataire crée le bon ──
@@ -13,7 +13,7 @@ exports.creerBonIntervention = async (req, res) => {
             montantPiecesOutils
         } = req.body;
 
-        // 1. Validation de la requête
+        // 1. Validation des champs obligatoires
         if (!reservationId || !descriptionTravail || montantMainOeuvre === undefined) {
             return res.status(400).json({
                 success: false,
@@ -21,7 +21,13 @@ exports.creerBonIntervention = async (req, res) => {
             });
         }
 
-        // 2. Vérification de la réservation + Récupération des infos du Client pour la notif
+        // 2. Récupération du profil fournisseur connecté
+        const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
+        if (!fournisseur) {
+            return res.status(403).json({ success: false, message: 'Profil fournisseur introuvable.' });
+        }
+
+        // 3. Vérification de la réservation + Vérification de propriété
         const reservation = await Reservation.findByPk(reservationId, {
             include: [{ model: User, as: 'client', attributes: ['id', 'fcmToken', 'prenom', 'nom'] }]
         });
@@ -30,10 +36,9 @@ exports.creerBonIntervention = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
         }
 
-        // 3. Récupération du profil fournisseur de l'utilisateur connecté
-        const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
-        if (!fournisseur) {
-            return res.status(404).json({ success: false, message: 'Profil fournisseur introuvable.' });
+        // 🔒 Sécurité : Vérifier que la mission appartient bien à CE fournisseur
+        if (reservation.fournisseurId !== fournisseur.id) {
+            return res.status(403).json({ success: false, message: 'Cette réservation ne vous est pas assignée.' });
         }
 
         // 4. Empêcher les doublons
@@ -45,16 +50,16 @@ exports.creerBonIntervention = async (req, res) => {
             });
         }
 
-        // 5. Calculs sécurisés des montants
+        // 5. Calculs des montants
         const mainOeuvre = parseFloat(montantMainOeuvre) || 0;
         const montantPieces = montantPiecesOutils ? parseFloat(montantPiecesOutils) : 0;
         const montantFinal = mainOeuvre + montantPieces;
 
-        // 6. Date limite pour le dépôt de commission (48h)
+        // 6. Date limite commission (48h)
         const commissionDateLimite = new Date();
         commissionDateLimite.setHours(commissionDateLimite.getHours() + 48);
 
-        // 7. Enregistrement du Bon d'Intervention
+        // 7. Création du Bon
         const bon = await BonIntervention.create({
             reservationId,
             fournisseurId: fournisseur.id,
@@ -65,13 +70,13 @@ exports.creerBonIntervention = async (req, res) => {
             montantFinal
         });
 
-        // 8. Mise à jour de la réservation
+        // 8. Mise à jour statut réservation
         await reservation.update({
             statut: 'TERMINEE',
             commissionDateLimite
         });
 
-        // 📲 9. NOTIFICATION PUSH FIREBASE CLIENT (Non bloquante)
+        // 📲 9. NOTIFICATION PUSH CLIENT (Non bloquante)
         try {
             if (reservation.clientId && typeof sendPushNotification === 'function') {
                 await sendPushNotification({
@@ -86,7 +91,6 @@ exports.creerBonIntervention = async (req, res) => {
                 });
             }
         } catch (notifErr) {
-            // L'échec d'envoi de la notif ne bloque pas la création du bon
             console.error('⚠️ Avertissement notification push :', notifErr.message);
         }
 
@@ -111,9 +115,11 @@ exports.getBonParReservation = async (req, res) => {
                 { model: Fournisseur, as: 'fournisseurBon', attributes: ['id', 'nomEntreprise', 'telephone'] }
             ]
         });
+
         if (!bon) {
             return res.status(404).json({ success: false, message: 'Aucun bon d\'intervention pour cette réservation.' });
         }
+
         return res.json({ success: true, data: bon });
     } catch (err) {
         console.error('❌ Erreur getBonParReservation:', err.message);
@@ -130,10 +136,18 @@ exports.validerBon = async (req, res) => {
         if (!bon) {
             return res.status(404).json({ success: false, message: 'Bon d\'intervention introuvable.' });
         }
+
         if (bon.valide) {
             return res.status(400).json({ success: false, message: 'Ce bon a déjà été validé.' });
         }
 
+        // 🔒 Sécurité : Vérifier que c'est bien le client qui fait la validation
+        const reservation = await Reservation.findByPk(bon.reservationId);
+        if (!reservation || reservation.clientId !== req.user.id) {
+            return res.status(403).json({ success: false, message: 'Seul le client concerné peut valider cette prestation.' });
+        }
+
+        // 1. Validation du bon
         await bon.update({
             valide: true,
             valideLe: new Date(),
@@ -142,20 +156,23 @@ exports.validerBon = async (req, res) => {
             commentaire: commentaire || null,
         });
 
-        await Reservation.update(
-            { statut: 'VALIDEE' },
-            { where: { id: bon.reservationId } }
-        );
+        // 2. Clôture de la réservation
+        await reservation.update({ statut: 'VALIDEE' });
 
-        if (note) {
+        // 3. Mise à jour sécurisée de la moyenne du Fournisseur
+        if (note && !isNaN(note)) {
             const fournisseur = await Fournisseur.findByPk(bon.fournisseurId);
             if (fournisseur) {
-                const nouvelleMoyenne =
-                    (fournisseur.note * fournisseur.nombreAvis + parseInt(note)) /
-                    (fournisseur.nombreAvis + 1);
+                const noteSaisie = parseFloat(note);
+                const noteActuelle = parseFloat(fournisseur.note) || 0;
+                const nombreAvisActuel = parseInt(fournisseur.nombreAvis) || 0;
+
+                const nouveauNombreAvis = nombreAvisActuel + 1;
+                const nouvelleMoyenne = ((noteActuelle * nombreAvisActuel) + noteSaisie) / nouveauNombreAvis;
+
                 await fournisseur.update({
-                    note: nouvelleMoyenne,
-                    nombreAvis: fournisseur.nombreAvis + 1
+                    note: parseFloat(nouvelleMoyenne.toFixed(2)),
+                    nombreAvis: nouveauNombreAvis
                 });
             }
         }
@@ -177,7 +194,7 @@ exports.getBonsEnAttenteValidation = async (req, res) => {
         const bons = await BonIntervention.findAll({
             where: {
                 valide: false,
-                createdAt: { [require('sequelize').Op.lte]: limite24h }
+                createdAt: { [Op.lte]: limite24h }
             }
         });
 

@@ -22,7 +22,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// Middleware — vérifie que le fournisseur est propriétaire de la mission
+// Middleware — vérifie que l'utilisateur est bien un fournisseur
 const checkFournisseur = async (req, res, next) => {
     try {
         const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
@@ -35,7 +35,29 @@ const checkFournisseur = async (req, res, next) => {
     }
 };
 
-// GET /api/missions — Récupérer toutes les missions du fournisseur connecté
+// ==========================================
+// 🚀 NOUVELLE ROUTE : RÉSERVATIONS DU CLIENT
+// GET /api/missions/client
+// ==========================================
+router.get('/client', protect, async (req, res) => {
+    try {
+        const missions = await Reservation.findAll({
+            where: { clientId: req.user.id },
+            order: [['createdAt', 'DESC']]
+        });
+
+        // Renvoie toujours un tableau (même vide)
+        res.json({ success: true, data: missions });
+    } catch (err) {
+        console.error("Erreur récupération réservations client:", err);
+        res.status(500).json({ success: false, message: 'Erreur serveur lors de la récupération des réservations.' });
+    }
+});
+
+// ==========================================
+// ROUTE PRESTATAIRE : MISSIONS DU FOURNISSEUR
+// GET /api/missions
+// ==========================================
 router.get('/', protect, checkFournisseur, async (req, res) => {
     try {
         const missions = await Reservation.findAll({
@@ -44,7 +66,7 @@ router.get('/', protect, checkFournisseur, async (req, res) => {
         });
         res.json({ success: true, data: missions });
     } catch (err) {
-        console.error("Erreur récupération missions:", err);
+        console.error("Erreur récupération missions prestataire:", err);
         res.status(500).json({ success: false, message: 'Erreur serveur.' });
     }
 });
@@ -91,7 +113,7 @@ router.put('/:id/refuser', protect, checkFournisseur, async (req, res) => {
     }
 });
 
-// PUT /api/missions/:id/demarrer — Fournisseur démarre la mission
+// PUT /api/missions/:id/demarrer — Fournisseur démarrer la mission
 router.put('/:id/demarrer', protect, checkFournisseur, async (req, res) => {
     try {
         const mission = await Reservation.findOne({
@@ -167,7 +189,7 @@ router.put('/:id/materiel', protect, checkFournisseur, async (req, res) => {
     }
 });
 
-// POST /api/missions/:id/photos — Upload de justificatifs photo pour la mission
+// POST /api/missions/:id/photos — Upload de justificatifs photo
 router.post('/:id/photos', protect, checkFournisseur, upload.fields([
     { name: 'photoAvant', maxCount: 1 },
     { name: 'photoApres', maxCount: 1 }
