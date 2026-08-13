@@ -1,6 +1,5 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
-const Commande = require('./Commande');
 
 const Paiement = sequelize.define('Paiement', {
     id: {
@@ -17,14 +16,14 @@ const Paiement = sequelize.define('Paiement', {
         },
         onDelete: 'CASCADE'
     },
-    clientId: { // 👈 AJOUTÉ pour correspondre à ton controller
+    clientId: {
         type: DataTypes.INTEGER,
-        allowNull: true // ou false selon ta base de données
+        allowNull: true
     },
     transactionId: {
         type: DataTypes.STRING,
         allowNull: false,
-        unique: true
+        unique: 'unique_transaction_id'
     },
     montant: {
         type: DataTypes.FLOAT,
@@ -57,13 +56,11 @@ const Paiement = sequelize.define('Paiement', {
     referenceClient: {
         type: DataTypes.STRING,
         allowNull: true,
-        unique: true
+        unique: 'unique_reference_client'
     }
 }, {
     tableName: 'paiements',
     timestamps: true
 });
-
-Paiement.belongsTo(Commande, { foreignKey: 'commandeId', as: 'commande' });
 
 module.exports = Paiement;

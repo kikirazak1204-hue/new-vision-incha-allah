@@ -11,7 +11,6 @@ const User = sequelize.define('User', {
         type: DataTypes.STRING,
         allowNull: false
     },
-    // Ajout du prénom si présent dans la table agent
     prenom: {
         type: DataTypes.STRING,
         allowNull: true
@@ -27,15 +26,16 @@ const User = sequelize.define('User', {
     },
     telephone: DataTypes.STRING,
     role: {
-        // On passe en STRING pour plus de souplesse avec MySQL
         type: DataTypes.STRING,
         defaultValue: 'utilisateur'
     },
     ville: DataTypes.STRING,
-    // Suppression de 'verified' et 'avatar' s'ils n'existent pas dans ta table 'agent' 
-    // pour éviter les erreurs SQL "Unknown Column"
+    // ➕ Enregistre l'identifiant FCM du téléphone/navigateur
+    fcm_token: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    }
 }, {
-    // 🎯 ON CIBLE LA BONNE TABLE ICI
     tableName: 'users',
     timestamps: true
 });

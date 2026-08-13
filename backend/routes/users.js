@@ -3,6 +3,26 @@ const router = express.Router();
 const User = require('../models/User');
 const { protect, authorize } = require('../middleware/auth');
 
+// 🔐 PUT /api/users/fcm-token — Enregistrement du token Push FCM
+router.put('/fcm-token', protect, async (req, res) => {
+    try {
+        const { fcm_token } = req.body;
+
+        if (!fcm_token) {
+            return res.status(400).json({ success: false, message: 'Le token FCM est requis' });
+        }
+
+        await User.update(
+            { fcm_token },
+            { where: { id: req.user.id } }
+        );
+
+        res.json({ success: true, message: 'Token FCM mis à jour avec succès' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Erreur serveur', error: error.message });
+    }
+});
+
 // 🔐 GET /api/users — admin uniquement
 router.get('/', protect, authorize('admin'), async (req, res) => {
     try {

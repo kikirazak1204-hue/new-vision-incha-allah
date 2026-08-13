@@ -1,26 +1,47 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 
 // Importation de la connexion Sequelize
 const { sequelize } = require('./models');
 
+// ==========================================
+// 🔥 INITIALISATION FIREBASE ADMIN SDK
+// ==========================================
+try {
+    require('./config/firebase-admin');
+} catch (fbErr) {
+    console.warn('⚠️ Firebase Admin n’a pas pu être chargé au démarrage :', fbErr.message);
+}
+
 const app = express();
+
+// ==========================================
+// 📁 UPLOADS — dossier + route statique
+// ==========================================
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+    console.log('📁 Dossier "uploads" créé automatiquement.');
+}
 
 // ==========================================
 // 1. MIDDLEWARES DE SÉCURITÉ & PARSING
 // ==========================================
 
-// Configuration CORS dynamique
 app.use(cors({
     origin: process.env.CLIENT_URL || '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Parsing du JSON et des données de formulaires
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Sert les fichiers uploadés (images produits, CNI, selfies...)
+app.use('/uploads', express.static(uploadDir));
 
 // ==========================================
 // 2. ROUTES DE DIAGNOSTIC (Health Check)
@@ -35,10 +56,59 @@ app.get('/api/health', (req, res) => {
 });
 
 // ==========================================
-// 3. ENREGISTREMENT DES ROUTES API
+// 3. ROUTE GLOBALE DE RÉSERVATION (MULTI-SERVICES)
 // ==========================================
 
-// Enregistrement des routes API essentielles
+app.post('/api/reservations/global', async (req, res) => {
+    try {
+        const {
+            clientNom,
+            telephone,
+            adresse,
+            dateIntervention,
+            modePaiement,
+            commentaireGlobal,
+            fournisseurId,
+            services
+        } = req.body;
+
+        // Validation rapide
+        if (!clientNom || !telephone || !adresse || !services || services.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Informations incomplètes pour enregistrer le projet."
+            });
+        }
+
+        const simulatedId = "kanari_proj_" + Date.now();
+
+        console.log("✅ Projet global reçu par Kanari Backend :", {
+            client: clientNom,
+            telephone,
+            totalServices: services.length,
+            modePaiement
+        });
+
+        // Réponse envoyée au frontend
+        res.status(201).json({
+            success: true,
+            id: simulatedId,
+            message: "Projet global enregistré avec succès !"
+        });
+
+    } catch (error) {
+        console.error("❌ Erreur serveur /api/reservations/global :", error);
+        res.status(500).json({
+            success: false,
+            message: "Erreur interne du serveur Kanari."
+        });
+    }
+});
+
+// ==========================================
+// 4. ENREGISTREMENT DES ROUTES API
+// ==========================================
+
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/reservations', require('./routes/reservations'));
@@ -59,7 +129,7 @@ app.use('/api/missions', require('./routes/missions'));
 app.use('/api/whatsapp', require('./routes/whatsapp'));
 
 // ==========================================
-// 4. GESTION DES ROUTES INEXISTANTES (404)
+// 5. GESTION DES ROUTES INEXISTANTES (404)
 // ==========================================
 
 app.use((req, res, next) => {
@@ -69,13 +139,12 @@ app.use((req, res, next) => {
 });
 
 // ==========================================
-// 5. MIDDLEWARE GLOBAL DE GESTION D'ERREURS
+// 6. MIDDLEWARE GLOBAL DE GESTION D'ERREURS
 // ==========================================
 
 app.use((err, req, res, next) => {
     console.error('❌ ERREUR SERVEUR :', err);
 
-    // Capture spécifique des erreurs Sequelize / MySQL
     if (err.name === 'SequelizeDatabaseError') {
         return res.status(400).json({
             error: 'Erreur SQL (données tronquées, type invalide ou contrainte violée).',
@@ -94,58 +163,69 @@ app.use((err, req, res, next) => {
         return res.status(401).json({ error: 'Jeton d’authentification invalide ou expiré.' });
     }
 
-    // Erreur générique
     res.status(err.status || 500).json({
         error: err.message || 'Erreur interne du serveur.'
     });
 });
 
 // ==========================================
-// 6. INITIALISATION ET DÉMARRAGE
+// 🛠️ RÉPARATION AUTOMATIQUE DE COLONNES
+// ==========================================
+const repairDatabase = async () => {
+    const queries = [
+        "ALTER TABLE produits ADD COLUMN categorie VARCHAR(255);",
+        "ALTER TABLE produits ADD COLUMN quantite INT DEFAULT 0;",
+        "ALTER TABLE users ADD COLUMN fcm_token TEXT;"
+    ];
+
+    console.log("🛠️ Vérification des colonnes manquantes...");
+    for (const q of queries) {
+        try {
+            await sequelize.query(q);
+            console.log(`✅ Colonne ajoutée : ${q}`);
+        } catch (error) {
+            if (error.message.includes('Duplicate column') || error.message.includes('ER_DUP_FIELDNAME')) {
+                console.log(`ℹ️ Déjà présente, ignorée.`);
+            } else {
+                console.log(`⚠️ Erreur ignorée :`, error.message);
+            }
+        }
+    }
+    console.log("✅ Vérification des colonnes terminée.");
+};
+
+// ==========================================
+// 7. INITIALISATION ET DÉMARRAGE
 // ==========================================
 
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
     try {
-        // Vérification de la connexion à MySQL
+        // 1. Connexion MySQL
         await sequelize.authenticate();
         console.log('✅ Connexion réussie à la base de données MySQL.');
 
-        // ==============================================================
-        // 🚀 SCRIPT TEMPORAIRE POUR AIVEN (Contournement Proxy Bureau)
-        // ==============================================================
-        try {
-            console.log("⏳ Exécution de la mise à jour de la table reservations sur Aiven...");
-            await sequelize.query(`
-                ALTER TABLE reservations 
-                MODIFY statut VARCHAR(50) DEFAULT 'EN_ATTENTE',
-                MODIFY type VARCHAR(30) DEFAULT 'classique',
-                MODIFY parcours VARCHAR(30) DEFAULT 'assignation',
-                MODIFY modePaiement VARCHAR(50) NULL,
-                MODIFY commissionStatut VARCHAR(30) DEFAULT 'en_attente';
-            `);
-            console.log("✅ SUCCÈS : BASE AIVEN MISE À JOUR DEPUIS RENDER !");
-        } catch (e) {
-            console.log("⚠️ Info SQL (la table est peut-être déjà à jour) :", e.message);
-        }
-        // ==============================================================
+        // 2. Ajout des colonnes requises si absentes
+        await repairDatabase();
 
-        // Note : Évite { alter: true } en production pour ne pas altérer la structure par accident
-        // await sequelize.sync(); 
+        // 3. Synchronisation Sequelize globale
+        await sequelize.sync();
+        console.log('✅ Base de données synchronisée.');
 
+        // 4. Lancement d'Express
         app.listen(PORT, () => {
             console.log(`🚀 Serveur en écoute sur le port ${PORT}`);
         });
     } catch (error) {
-        console.error('❌ Impossible de se connecter à la base de données :', error);
+        console.error('❌ Impossible de se connecter ou de synchroniser la base de données :', error);
         process.exit(1);
     }
 };
 
 startServer();
 
-// Arrêt propre du serveur en cas d'interruption
+// Arrêt propre du serveur
 process.on('SIGINT', async () => {
     console.log('\nFermeture du serveur et des connexions DB...');
     await sequelize.close();

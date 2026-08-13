@@ -1,7 +1,9 @@
-const { Reservation, Fournisseur, Service, User } = require('../models');
 const admin = require('../config/firebase-admin');
 const { sendAdminNotificationEmail } = require('../services/notificationService');
 const { ADMIN_EMAIL } = require('../config/admin');
+
+// Helper pour charger les modèles dynamiquement et éviter les références circulaires
+const getModels = () => require('../models');
 
 const normalizeReservationStatut = (statut) => {
     if (typeof statut !== 'string') return null;
@@ -48,6 +50,7 @@ const sendNotification = async ({ token, topic, title, body, data }) => {
 // ── POST /api/reservations ─────────────────────────────────
 exports.createReservation = async (req, res) => {
     try {
+        const { Reservation, Fournisseur } = getModels();
         const { fournisseurId, serviceId, serviceNom } = req.body;
         const parcours = fournisseurId ? 'direct' : 'assignation';
 
@@ -106,6 +109,7 @@ exports.createReservation = async (req, res) => {
 // ── GET /api/reservations/mes-reservations ─────────────────
 exports.getMesReservations = async (req, res) => {
     try {
+        const { Reservation } = getModels();
         const clientId = req.user?.id || req.params.userId;
 
         const reservations = await Reservation.findAll({
@@ -121,6 +125,7 @@ exports.getMesReservations = async (req, res) => {
 // ── PUT /api/reservations/:id/statut — Admin générique ──────
 exports.updateStatut = async (req, res) => {
     try {
+        const { Reservation } = getModels();
         const reservation = await Reservation.findByPk(req.params.id);
         if (!reservation) return res.status(404).json({ success: false, message: 'Réservation non trouvée' });
 
@@ -138,6 +143,7 @@ exports.updateStatut = async (req, res) => {
 // ── PUT /api/reservations/:id/assigner — Admin assigne ─────
 exports.assignerFournisseur = async (req, res) => {
     try {
+        const { Reservation, Fournisseur } = getModels();
         const { fournisseurId } = req.body;
         const reservation = await Reservation.findByPk(req.params.id);
         if (!reservation) return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
@@ -156,7 +162,6 @@ exports.assignerFournisseur = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Prestataire introuvable.' });
         }
 
-        // ✅ Standardisation : la mission est désormais clairement assignée
         await reservation.update({
             fournisseurId: parsedFournisseurId,
             statut: 'ASSIGNEE',
@@ -187,6 +192,7 @@ exports.assignerFournisseur = async (req, res) => {
 // ── PUT /api/reservations/:id/presta-accepter ─────────────
 exports.prestaAccepter = async (req, res) => {
     try {
+        const { Reservation, Fournisseur } = getModels();
         const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
         if (!fournisseur) return res.status(404).json({ success: false, message: 'Profil fournisseur introuvable.' });
 
@@ -204,6 +210,7 @@ exports.prestaAccepter = async (req, res) => {
 // ── PUT /api/reservations/:id/presta-refuser ──────────────
 exports.prestaRefuser = async (req, res) => {
     try {
+        const { Reservation, Fournisseur } = getModels();
         const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
         if (!fournisseur) return res.status(404).json({ success: false, message: 'Profil fournisseur introuvable.' });
 
@@ -226,6 +233,7 @@ exports.prestaRefuser = async (req, res) => {
 // ── PUT /api/reservations/:id/autoriser ────────────────────
 exports.autoriserDemarrage = async (req, res) => {
     try {
+        const { Reservation, Fournisseur } = getModels();
         const reservation = await Reservation.findByPk(req.params.id);
         if (!reservation) return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
 
@@ -254,6 +262,7 @@ exports.autoriserDemarrage = async (req, res) => {
 // ── GET /api/reservations/disponibles ──────────────────────
 exports.getReservationsDisponibles = async (req, res) => {
     try {
+        const { Reservation, Fournisseur, Service, User } = getModels();
         const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
         if (!fournisseur) return res.status(404).json({ success: false, message: 'Profil fournisseur introuvable.' });
 
@@ -277,14 +286,13 @@ exports.getReservationsDisponibles = async (req, res) => {
 // ── POST /api/reservations/admin-creer ─────────────────────
 exports.adminCreerReservation = async (req, res) => {
     try {
+        const { Reservation, Fournisseur } = getModels();
         const { besoin, adresse, telephone, clientNom, serviceId, serviceNom, fournisseurId, type, dateIntervention } = req.body;
 
         if (!besoin || !adresse || !telephone || !serviceId) {
             return res.status(400).json({ success: false, message: 'Besoin, adresse, téléphone et service sont obligatoires.' });
         }
 
-        // ✅ CORRIGÉ : 'ASSIGNEE' → 'EN_ATTENTE' (même avec un fournisseurId déjà précisé,
-        // il doit encore accepter la mission — cohérent avec le reste du flux)
         const reservation = await Reservation.create({
             besoin, adresse, telephone, clientNom,
             serviceId, serviceNom,
@@ -326,6 +334,7 @@ exports.adminCreerReservation = async (req, res) => {
 // ── GET /api/admin/reservations ────────────────────────────
 exports.getAdminReservations = async (req, res) => {
     try {
+        const { Reservation, Fournisseur, Service, User } = getModels();
         const reservations = await Reservation.findAll({
             include: [
                 { model: Fournisseur, as: 'prestataire', attributes: ['id', 'nomEntreprise', 'telephone', 'note'] },
@@ -344,6 +353,7 @@ exports.getAdminReservations = async (req, res) => {
 // ── DELETE /api/reservations/:id ────────────────────────────
 exports.deleteReservation = async (req, res) => {
     try {
+        const { Reservation } = getModels();
         const reservation = await Reservation.findByPk(req.params.id);
         if (!reservation) return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
 
@@ -357,6 +367,7 @@ exports.deleteReservation = async (req, res) => {
 // ── POST /api/reservations/:id/terminer ───────────────────
 exports.terminerMission = async (req, res) => {
     try {
+        const { Reservation, Fournisseur } = getModels();
         const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
         if (!fournisseur) {
             return res.status(404).json({ success: false, message: 'Profil fournisseur introuvable.' });
