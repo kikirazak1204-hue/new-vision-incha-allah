@@ -1,14 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-    ArrowLeft, CalendarClock, Zap, FileSignature, Layers,
-    ShieldCheck, Mic, Square, ImagePlus, X, Trash2, Globe, CreditCard, CheckCircle2
+    ArrowLeft, Layers, CreditCard, CheckCircle2, Trash2
 } from 'lucide-react';
 import { useNotification } from '../context/NotificationContext.jsx';
 
 const API = import.meta.env.VITE_API_URL || '';
 
-// --- 🌍 GESTION DES LANGUES ---
 const DICT = {
     fr: {
         title: "Finaliser votre demande",
@@ -29,15 +27,13 @@ export default function ReservationPage() {
     const location = useLocation();
     const navigate = useNavigate();
     const { showNotification } = useNotification();
-    const [lang, setLang] = useState('fr');
+    const [lang] = useState('fr');
     const t = DICT[lang];
 
-    // Récupération des services (soit un seul transmis par le state, soit tout un panier/liste)
     const state = location.state || {};
     const singleService = state.service || JSON.parse(localStorage.getItem('selectedService') || 'null');
     const fournisseur = state.fournisseur || JSON.parse(localStorage.getItem('selectedFournisseur') || 'null');
 
-    // Gestion multi-services ou service unique unifié dans un tableau propre
     const [servicesSelectionnes, setServicesSelectionnes] = useState(() => {
         if (state.services && Array.isArray(state.services)) return state.services;
         if (singleService) return [singleService];
@@ -48,7 +44,6 @@ export default function ReservationPage() {
     let user = {};
     try { user = JSON.parse(localStorage.getItem('user') || '{}'); } catch { }
 
-    // 🎯 LE SOCLE COMMUN (Demandé une seule fois, peu importe le nombre de services)
     const [socle, setSocle] = useState({
         clientNom: user?.nom || '',
         telephone: user?.telephone || '',
@@ -58,9 +53,7 @@ export default function ReservationPage() {
         commentaireGlobal: ''
     });
 
-    // ⚙️ DETAILS SPECIFIQUES PAR SERVICE (Si un service demande une précision unique)
     const [detailsServices, setDetailsServices] = useState({});
-
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
 
@@ -99,12 +92,14 @@ export default function ReservationPage() {
         setLoading(true);
 
         try {
-            // Construction d'un payload ultra propre pour que Kanari comprenne tout d'un coup
+            const token = localStorage.getItem('token');
             const payload = {
                 clientNom: socle.clientNom,
                 telephone: socle.telephone,
                 adresse: socle.adresse,
-                dateIntervention: socle.dateIntervention || new Date(),
+                dateIntervention: socle.dateIntervention
+                    ? new Date(socle.dateIntervention).toISOString()
+                    : new Date().toISOString(),
                 modePaiement: socle.modePaiement,
                 commentaireGlobal: socle.commentaireGlobal,
                 fournisseurId: fournisseur?.id || fournisseur?._id || null,
@@ -117,7 +112,10 @@ export default function ReservationPage() {
 
             const res = await fetch(`${API}/api/reservations/global`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify(payload)
             });
 
@@ -130,7 +128,6 @@ export default function ReservationPage() {
                     categorie: 'Kanari Pro'
                 });
 
-                // Nettoyage
                 localStorage.removeItem('kanari_cart');
                 localStorage.removeItem('selectedService');
 
@@ -188,7 +185,7 @@ export default function ReservationPage() {
                     </div>
                 )}
 
-                {/* 📋 SECTION 1 : LE SOCLE COMMUN (Demandé une seule fois pour tout unifier) */}
+                {/* SECTION 1 : SOCLE COMMUN */}
                 <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 space-y-4 backdrop-blur-md">
                     <h2 className="text-sm font-bold text-purple-400 uppercase tracking-wider flex items-center gap-2">
                         <CheckCircle2 size={16} /> {t.socleTitle}
@@ -222,7 +219,7 @@ export default function ReservationPage() {
                     </div>
                 </div>
 
-                {/* 🧩 SECTION 2 : LES SERVICES SÉLECTIONNÉS (Intelligence des similitudes ou spécificités) */}
+                {/* SECTION 2 : SERVICES SÉLECTIONNÉS */}
                 <div className="space-y-3">
                     <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
                         <span>{t.servicesListTitle} ({servicesSelectionnes.length})</span>
@@ -251,7 +248,6 @@ export default function ReservationPage() {
                                         </button>
                                     </div>
 
-                                    {/* Champ de précision optionnel et intelligent si nécessaire pour ce service précis */}
                                     <input
                                         type="text"
                                         placeholder={`Précision spécifique pour ${srvNom} (optionnel)...`}
@@ -265,7 +261,7 @@ export default function ReservationPage() {
                     </div>
                 </div>
 
-                {/* 💳 SECTION 3 : PAIEMENT PRO */}
+                {/* SECTION 3 : PAIEMENT */}
                 <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 space-y-4 backdrop-blur-md">
                     <label className="block text-slate-300 text-sm font-semibold flex items-center gap-2">
                         <CreditCard size={18} className="text-purple-400" /> {t.payment}
@@ -291,7 +287,6 @@ export default function ReservationPage() {
                     <p className="text-[11px] text-slate-500 mt-2">{t.fourchetteInfo}</p>
                 </div>
 
-                {/* BOUTON DE VALIDATION UNIQUE HAUT DE GAMME */}
                 <button
                     onClick={handleSubmit}
                     disabled={loading}
