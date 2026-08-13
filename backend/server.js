@@ -56,9 +56,11 @@ app.get('/api/health', (req, res) => {
 });
 
 // ==========================================
-// 3. ROUTE GLOBALE DE RÉSERVATION (MULTI-SERVICES)
+// 3. ENREGISTREMENT DES ROUTES API (Avec Priorité Globale)
 // ==========================================
 
+// 🌍 ROUTE GLOBALE DE RÉSERVATION (MULTI-SERVICES)
+// Placée stratégiquement ICI pour éviter tout conflit 404 avec le routeur de réservations
 app.post('/api/reservations/global', async (req, res) => {
     try {
         const {
@@ -73,7 +75,7 @@ app.post('/api/reservations/global', async (req, res) => {
         } = req.body;
 
         // Validation rapide
-        if (!clientNom || !telephone || !adresse || !services || services.length === 0) {
+        if (!clientNom || !telephone || !adresse || !services || !Array.isArray(services) || services.length === 0) {
             return res.status(400).json({
                 success: false,
                 message: "Informations incomplètes pour enregistrer le projet."
@@ -90,7 +92,7 @@ app.post('/api/reservations/global', async (req, res) => {
         });
 
         // Réponse envoyée au frontend
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
             id: simulatedId,
             message: "Projet global enregistré avec succès !"
@@ -98,17 +100,14 @@ app.post('/api/reservations/global', async (req, res) => {
 
     } catch (error) {
         console.error("❌ Erreur serveur /api/reservations/global :", error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Erreur interne du serveur Kanari."
         });
     }
 });
 
-// ==========================================
-// 4. ENREGISTREMENT DES ROUTES API
-// ==========================================
-
+// Enregistrement des autres routeurs
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/reservations', require('./routes/reservations'));
@@ -129,7 +128,7 @@ app.use('/api/missions', require('./routes/missions'));
 app.use('/api/whatsapp', require('./routes/whatsapp'));
 
 // ==========================================
-// 5. GESTION DES ROUTES INEXISTANTES (404)
+// 4. GESTION DES ROUTES INEXISTANTES (404)
 // ==========================================
 
 app.use((req, res, next) => {
@@ -139,7 +138,7 @@ app.use((req, res, next) => {
 });
 
 // ==========================================
-// 6. MIDDLEWARE GLOBAL DE GESTION D'ERREURS
+// 5. MIDDLEWARE GLOBAL DE GESTION D'ERREURS
 // ==========================================
 
 app.use((err, req, res, next) => {
@@ -163,7 +162,7 @@ app.use((err, req, res, next) => {
         return res.status(401).json({ error: 'Jeton d’authentification invalide ou expiré.' });
     }
 
-    res.status(err.status || 500).json({
+    return res.status(err.status || 500).json({
         error: err.message || 'Erreur interne du serveur.'
     });
 });
@@ -195,7 +194,7 @@ const repairDatabase = async () => {
 };
 
 // ==========================================
-// 7. INITIALISATION ET DÉMARRAGE
+// 6. INITIALISATION ET DÉMARRAGE
 // ==========================================
 
 const PORT = process.env.PORT || 5000;
