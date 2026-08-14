@@ -2,12 +2,22 @@ const express = require('express');
 const router = express.Router();
 const { protect, adminOnly } = require('../middleware/auth');
 const resController = require('../controllers/reservationController');
+const { Reservation } = require('../models'); // 💾 Importation de la BDD
 
 // ── 🌍 Route Globale Multi-Services (Kanari Pro) ──────────
 // Placée tout en haut pour éviter les conflits avec les routes en `/:id`
 router.post('/global', async (req, res) => {
     try {
-        const { clientNom, telephone, adresse, services, modePaiement, commentaireGlobal, fournisseurId } = req.body;
+        const {
+            clientNom,
+            telephone,
+            adresse,
+            dateIntervention,
+            services,
+            modePaiement,
+            commentaireGlobal,
+            fournisseurId
+        } = req.body;
 
         if (!clientNom || !telephone || !adresse || !services || !Array.isArray(services) || services.length === 0) {
             return res.status(400).json({
@@ -16,22 +26,35 @@ router.post('/global', async (req, res) => {
             });
         }
 
-        // Simulation d'enregistrement propre (ou appel au contrôleur si tu préfères)
-        const newReservationId = "kanari_res_" + Date.now();
+        // 💾 SAUVEGARDE RÉELLE DANS LA BASE DE DONNÉES MYSQL
+        const nouvelleReservation = await Reservation.create({
+            clientNom,
+            telephone,
+            adresse,
+            dateIntervention: dateIntervention || new Date(),
+            modePaiement: modePaiement || 'direct_prestataire',
+            commentaireGlobal: commentaireGlobal || '',
+            fournisseurId: fournisseurId || null,
+            // Conversion en string JSON si votre colonne MySQL est de type TEXT/VARCHAR/JSON
+            services: typeof services === 'object' ? JSON.stringify(services) : services,
+            statut: 'en_attente'
+        });
 
-        console.log(`✅ Projet global Kanari validé : ${services.length} service(s) pour ${clientNom}`);
+        console.log(`✅ Projet global Kanari VRAIMENT enregistré en BDD - ID #${nouvelleReservation.id} pour ${clientNom}`);
 
         return res.status(201).json({
             success: true,
-            id: newReservationId,
-            message: "Projet multi-services enregistré avec succès !"
+            id: nouvelleReservation.id,
+            message: "Projet multi-services enregistré avec succès en BDD !",
+            reservation: nouvelleReservation
         });
 
     } catch (error) {
         console.error("❌ Erreur /reservations/global :", error);
         return res.status(500).json({
             success: false,
-            message: "Erreur interne du serveur."
+            message: "Erreur lors de la sauvegarde en BDD.",
+            error: error.message
         });
     }
 });
