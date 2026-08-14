@@ -3,7 +3,7 @@ const Commande = require('../models/Commande');
 const { Op } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
 
-// 🔐 Paiements du client connecté
+// 🔐 Paiements du client connecté (ou fournisseur)
 exports.getPaiementsClient = async (req, res) => {
     try {
         if (!req.user || !req.user.id) {
@@ -12,8 +12,11 @@ exports.getPaiementsClient = async (req, res) => {
 
         const paiements = await Paiement.findAll({
             where: { clientId: req.user.id },
-            // 🛡️ Code robuste : On retire l'alias 'as' qui provoquait l'erreur
-            include: [Commande],
+            // ✅ CORRECTION ICI : Ajout de l'alias 'as'
+            include: [{
+                model: Commande,
+                as: 'commande'
+            }],
             order: [['createdAt', 'DESC']]
         });
 
@@ -28,8 +31,11 @@ exports.getPaiementsClient = async (req, res) => {
 exports.getAllPaiements = async (req, res) => {
     try {
         const paiements = await Paiement.findAll({
-            // 🛡️ Code robuste : Pas d'alias
-            include: [Commande],
+            // ✅ CORRECTION ICI AUSSI
+            include: [{
+                model: Commande,
+                as: 'commande'
+            }],
             order: [['createdAt', 'DESC']]
         });
 
@@ -51,7 +57,11 @@ exports.verifyPaiement = async (req, res) => {
 
         const paiement = await Paiement.findOne({
             where: { transactionId: txId },
-            include: [Commande]
+            // ✅ CORRECTION ICI AUSSI
+            include: [{
+                model: Commande,
+                as: 'commande'
+            }]
         });
 
         if (!paiement) {
