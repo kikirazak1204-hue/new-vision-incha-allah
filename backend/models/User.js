@@ -30,9 +30,10 @@ const User = sequelize.define('User', {
         defaultValue: 'utilisateur'
     },
     ville: DataTypes.STRING,
-    // ➕ Enregistre l'identifiant FCM du téléphone/navigateur
-    fcm_token: {
+    // 💡 CORRECTION ICI : Utilisation de fcmToken en JS, lié à fcm_token en BDD
+    fcmToken: {
         type: DataTypes.TEXT,
+        field: 'fcm_token', 
         allowNull: true
     }
 }, {

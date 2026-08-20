@@ -25,18 +25,27 @@ async function envoyerNotificationPush(fcmToken, title, body, dataPayload = {}) 
     }
 
     try {
+        // 💡 CORRECTION ANTI-CRASH : Firebase exige que 'data' ne contienne QUE des chaînes de caractères (String)
+        const safeDataPayload = {};
+        if (dataPayload) {
+            for (const key in dataPayload) {
+                safeDataPayload[key] = String(dataPayload[key]);
+            }
+        }
+
         const message = {
             token: fcmToken,
             notification: { title, body },
-            data: dataPayload
+            data: safeDataPayload // On utilise le payload sécurisé
         };
 
         const response = await admin.messaging().send(message);
         console.log("🚀 Notification Push envoyée avec succès :", response);
         return response;
     } catch (error) {
+        // On catch l'erreur au lieu de laisser le serveur crasher
         console.error("❌ Échec envoi Push FCM :", error.message);
-        return null;
+        return null; 
     }
 }
 
