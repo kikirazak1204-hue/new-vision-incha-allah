@@ -7,7 +7,7 @@ import { useNavigation } from '../context/NavigationContext'; // 1. Import du no
 export default function Accueil() {
     const [services, setServices] = useState([]);
     const [loading, setLoading] = useState(true);
-    
+
     const navigate = useNavigate(); // Gardé pour la navigation dynamique interne
     const { navigateTo } = useNavigation(); // 2. Utilisation du contexte de navigation
 
@@ -42,9 +42,9 @@ export default function Accueil() {
         <AccueilPage
             services={services}
             loading={loading}
-            setSelectedService={handleServiceSelection} 
+            setSelectedService={handleServiceSelection}
             // 3. On passe navigateTo si AccueilPage en a besoin pour des boutons (ex: "Aller au login")
-            navigateTo={navigateTo} 
+            navigateTo={navigateTo}
         />
     );
 }

@@ -1,113 +1,88 @@
-// ============================================================
-// PanierContext.jsx — Gestion globale du panier (Production)
-// À placer dans : src/context/PanierContext.jsx
-// ============================================================
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
+// 1. Création du contexte
 const PanierContext = createContext();
 
+// 2. Hook personnalisé pour utiliser le contexte facilement
+export const usePanier = () => useContext(PanierContext);
+
+// 3. Provider du contexte
 export const PanierProvider = ({ children }) => {
-    // 🔄 Initialisation sécurisée depuis le localStorage
+    // Initialisation du panier depuis le localStorage (anti-perte de données au rechargement F5)
     const [panier, setPanier] = useState(() => {
         try {
-            const saved = localStorage.getItem('panier');
-            return saved ? JSON.parse(saved) : [];
+            const savedPanier = localStorage.getItem('monPanier');
+            return savedPanier ? JSON.parse(savedPanier) : [];
         } catch (error) {
-            console.error('Erreur de lecture du panier dans localStorage:', error);
+            console.error("Erreur lors de la lecture du panier:", error);
             return [];
         }
     });
 
-    // 💾 Synchronisation automatique avec le localStorage à chaque modification
+    // Sauvegarde automatique dans le localStorage à chaque fois que le panier change
     useEffect(() => {
-        try {
-            localStorage.setItem('panier', JSON.stringify(panier));
-        } catch (error) {
-            console.error('Erreur de sauvegarde du panier dans localStorage:', error);
-        }
+        localStorage.setItem('monPanier', JSON.stringify(panier));
     }, [panier]);
 
-    // ➕ Ajouter un produit (ou mettre à jour ses infos + incrémenter la quantité)
-    const ajouterAuPanier = (produit) => {
-        if (!produit || !produit.id) return;
+    // Calcul automatique du total du panier
+    const totalPanier = panier.reduce((total, item) => {
+        return total + (Number(item.prix) * Number(item.quantite));
+    }, 0);
 
-        setPanier(prev => {
-            const existe = prev.find(item => item.id === produit.id);
-            if (existe) {
-                return prev.map(item =>
-                    item.id === produit.id
-                        ? { ...produit, quantite: item.quantite + 1 } // 💡 Met à jour l'image/prix et augmente la quantité
-                        : item
-                );
+    // Fonction pour ajouter un article (utile pour tes pages produits)
+    const ajouterAuPanier = (produit) => {
+        setPanier((prevPanier) => {
+            const idProduit = produit.id || produit._id;
+            const index = prevPanier.findIndex(item => (item.id || item._id) === idProduit);
+
+            if (index !== -1) {
+                // Le produit existe déjà, on augmente juste sa quantité
+                const nouveauPanier = [...prevPanier];
+                nouveauPanier[index].quantite += (produit.quantite || 1);
+                return nouveauPanier;
             }
-            return [...prev, { ...produit, quantite: 1 }];
+            // C'est un nouveau produit, on l'ajoute avec une quantité de 1 (ou celle fournie)
+            return [...prevPanier, { ...produit, quantite: produit.quantite || 1 }];
         });
     };
 
-    // ➖ Retirer un produit du panier
-    const retirerDuPanier = (produitId) => {
-        setPanier(prev => prev.filter(item => item.id !== produitId));
-    };
-
-    // 🔢 Modifier directement la quantité
-    const modifierQuantite = (produitId, quantite) => {
-        const nouvelleQuantite = Number(quantite);
-
-        if (nouvelleQuantite <= 0) {
-            retirerDuPanier(produitId);
-            return;
-        }
-
-        setPanier(prev =>
-            prev.map(item =>
-                item.id === produitId ? { ...item, quantite: nouvelleQuantite } : item
+    // Fonction pour modifier la quantité (+ ou - dans la page Panier)
+    const modifierQuantite = (id, nouvelleQuantite) => {
+        if (nouvelleQuantite < 1) return; // Sécurité pour empêcher une quantité à 0 ou négative
+        
+        setPanier((prevPanier) =>
+            prevPanier.map((item) =>
+                (item.id === id || item._id === id) 
+                    ? { ...item, quantite: nouvelleQuantite } 
+                    : item
             )
         );
     };
 
-    // 🗑️ Vider complètement le panier
-    const viderPanier = () => {
-        setPanier([]);
-        try {
-            localStorage.removeItem('panier');
-        } catch (error) {
-            console.error('Erreur lors du nettoyage du localStorage:', error);
-        }
+    // Fonction pour supprimer un article
+    const retirerDuPanier = (id) => {
+        setPanier((prevPanier) => 
+            prevPanier.filter((item) => item.id !== id && item._id !== id)
+        );
     };
 
-    // 💰 Calcul du total du panier (FCFA)
-    const totalPanier = panier.reduce(
-        (acc, item) => acc + (Number(item.prix) || 0) * (Number(item.quantite) || 1),
-        0
-    );
-
-    // 🔢 Nombre total d'articles dans le panier
-    const nombreArticles = panier.reduce(
-        (acc, item) => acc + (Number(item.quantite) || 1),
-        0
-    );
+    // Fonction pour vider entièrement le panier
+    const viderPanier = () => {
+        setPanier([]);
+    };
 
     return (
-        <PanierContext.Provider value={{
-            panier,
-            totalPanier,
-            nombreArticles,
-            ajouterAuPanier,
-            retirerDuPanier,
-            modifierQuantite,
-            viderPanier
-        }}>
+        <PanierContext.Provider
+            value={{
+                panier,
+                totalPanier,
+                ajouterAuPanier,
+                modifierQuantite,
+                retirerDuPanier,
+                viderPanier
+            }}
+        >
             {children}
         </PanierContext.Provider>
     );
-};
-
-// 🪝 Hook personnalisé pour utiliser le panier partout dans l'application
-export const usePanier = () => {
-    const context = useContext(PanierContext);
-    if (!context) {
-        throw new Error('usePanier doit être utilisé à l\'intérieur d\'un PanierProvider');
-    }
-    return context;
 };

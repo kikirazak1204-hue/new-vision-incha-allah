@@ -1,7 +1,3 @@
-// ============================================================
-// Fichier : src/pages/AccueilPage/index.jsx
-// ============================================================
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePanier } from '../../context/PanierContext';
@@ -194,9 +190,9 @@ const AccueilPage = ({ services, loading, setSelectedService }) => {
                             const imageUrl = getServiceImage(service);
                             return (
                                 <button
-                                    key={service.id}
+                                    key={service.id || service._id}
                                     onClick={() => setSelectedService(service)}
-                                    className="bg-[#131921] border border-slate-800 hover:border-purple-500/50 hover:bg-[#1b232e] p-0 rounded-2xl transition-all duration-300 group overflow-hidden text-left"
+                                    className="bg-[#131921] border border-slate-800 hover:border-purple-500/50 hover:bg-[#1b232e] p-0 rounded-2xl transition-all duration-300 group overflow-hidden text-left flex flex-col justify-between"
                                 >
                                     <div className="h-40 w-full overflow-hidden bg-slate-950">
                                         <img
@@ -206,9 +202,16 @@ const AccueilPage = ({ services, loading, setSelectedService }) => {
                                             onError={(e) => { e.target.onerror = null; e.target.src = '/backgrounds/transport.png'; }}
                                         />
                                     </div>
-                                    <div className="p-5 space-y-2 text-left">
+                                    <div className="p-4 space-y-1.5 text-left w-full">
                                         <h3 className="text-sm font-semibold text-white line-clamp-1">{service.nom}</h3>
-                                        <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold italic">Expertise certifiée</p>
+                                        <p className="text-[11px] text-slate-400 line-clamp-1">
+                                            {service.description || service.categorie || 'Service professionnel'}
+                                        </p>
+                                        {service.prix ? (
+                                            <p className="text-xs font-bold text-purple-400 pt-1">
+                                                {Number(service.prix).toLocaleString()} FCFA
+                                            </p>
+                                        ) : null}
                                     </div>
                                 </button>
                             );

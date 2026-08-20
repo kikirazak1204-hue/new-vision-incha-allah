@@ -1,307 +1,297 @@
-// ============================================================
+// ==========================================
 // Fichier : src/pages/PaiementPage.jsx
-// Gestion Paiements Niger (MyNita, Amana, Airtel, Zamani)
-// ============================================================
+// Version corrigée et synchronisée backend
+// ==========================================
 
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { usePanier } from '../context/PanierContext';
-
-const API = import.meta.env.VITE_API_URL || '';
+import { useNavigate, useLocation } from 'react-router-dom';
+import axios from 'axios';
 
 export default function PaiementPage() {
-    const location = useLocation();
     const navigate = useNavigate();
-    const { panier: panierContext, totalPanier: totalContext, viderPanier } = usePanier();
+    const location = useLocation();
 
-    const [commande, setCommande] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    // Mode de paiement sélectionné
-    const [modePaiement, setModePaiement] = useState('mynita');
-
-    // Champs du formulaire
+    const [reservation, setReservation] = useState(null);
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('mobile_money');
     const [telephone, setTelephone] = useState('');
-    const [referenceTransaction, setReferenceTransaction] = useState('');
-    const [adresse, setAdresse] = useState('');
+    const [nomPayer, setNomPayer] = useState('');
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [errorMsg, setErrorMsg] = useState('');
 
-    const [enCoursDePaiement, setEnCoursDePaiement] = useState(false);
-    const [erreur, setErreur] = useState('');
+    // Configuration dynamique de l'URL API (Vite / CRA / Localhost)
+    const API_BASE_URL = 
+        (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || 
+        process.env.REACT_APP_API_URL || 
+        'http://localhost:5000';
 
-    // Vrais numéros de compte de votre entreprise au Niger
-    const NUMEROS_RECEPTION = {
-        mynita: '+227 90 00 00 00',
-        amanata: '+227 96 00 00 00',
-        airtel: '+227 99 00 00 00',
-        zamani: '+227 97 00 00 00'
-    };
-
-    const token = localStorage.getItem('token');
-
+    // 🛡️ Récupération sécurisée du payload
     useEffect(() => {
-        let donneesCommande = null;
-
-        if (location.state?.commande) {
-            donneesCommande = location.state.commande;
+        const payload = location.state?.reservation || JSON.parse(localStorage.getItem('reservationPayload') || 'null');
+        
+        if (payload) {
+            setReservation(payload);
+            localStorage.setItem('reservationPayload', JSON.stringify(payload));
+            
+            // Pré-remplir les données utilisateur si présent dans le payload
+            if (payload.reservationDetails?.nom) {
+                setNomPayer(payload.reservationDetails.nom);
+            }
+            if (payload.reservationDetails?.telephone) {
+                setTelephone(payload.reservationDetails.telephone);
+            }
         } else {
-            const saved = localStorage.getItem('commandeCourante');
-            if (saved) {
-                try { donneesCommande = JSON.parse(saved); } catch (e) { }
-            }
+            console.warn("⚠️ Aucune réservation/commande détectée. Redirection.");
+            navigate('/');
         }
+    }, [location.state, navigate]);
 
-        if (!donneesCommande && panierContext && panierContext.length > 0) {
-            donneesCommande = {
-                id: 'CMD-' + Math.floor(100000 + Math.random() * 900000),
-                articles: panierContext,
-                montantTotal: totalContext,
-                devise: 'FCFA'
-            };
-        }
+    // 💳 Validation et Envoi du Paiement
+    const handleFinalPayment = async () => {
+        setErrorMsg('');
 
-        setCommande(donneesCommande);
-        setLoading(false);
-    }, [location.state, panierContext, totalContext]);
-
-    // Validation du paiement avec appel API réel vers le backend
-    const handlePayer = async (e) => {
-        e.preventDefault();
-        setErreur('');
-
-        if (['mynita', 'amanata', 'airtel', 'zamani'].includes(modePaiement)) {
-            if (!telephone || telephone.trim().length < 8) {
-                setErreur('Veuillez saisir votre numéro de téléphone.');
-                return;
-            }
-            if (!referenceTransaction || referenceTransaction.trim().length < 4) {
-                setErreur('Veuillez saisir l\'ID / Référence de transaction reçu par SMS.');
-                return;
-            }
-        }
-
-        if (!adresse || adresse.trim().length < 5) {
-            setErreur('Veuillez indiquer votre adresse ou quartier.');
+        // Validation du numéro de téléphone
+        if (!telephone.trim()) {
+            setErrorMsg("Veuillez saisir votre numéro de téléphone pour le paiement.");
             return;
         }
 
-        setEnCoursDePaiement(true);
+        setIsProcessing(true);
 
         try {
-            // Appel API vers ton backend pour enregister la transaction / réservation
-            const response = await fetch(`${API}/api/paiements`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    commandeId: commande.id,
-                    articles: commande.articles,
-                    montant: commande.montantTotal,
-                    modePaiement,
-                    telephone,
-                    referenceTransaction,
-                    adresse
-                })
-            });
+            const token = localStorage.getItem('token');
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-            const data = await response.json();
+            // Conversion du mode de paiement pour respecter les types attendus par le backend
+            let modeBackend = 'mobile_money';
+            if (selectedPaymentMethod === 'carte') modeBackend = 'carte_bancaire';
+            if (selectedPaymentMethod === 'sur_place') modeBackend = 'especes';
 
-            if (!response.ok || (data && data.success === false)) {
-                throw new Error(data?.message || "Erreur lors de l'enregistrement du paiement.");
+            // Calcul du montant total sécurisé
+            const montantTotal = reservation.montantTotal || reservation.prixTotal || reservation.total || 0;
+
+            const payloadPaiement = {
+                reservationId: reservation.id || reservation.reservationId || null,
+                commandeId: reservation.commandeId || null,
+                montant: montantTotal,
+                telephone: telephone.trim(),
+                nom: nomPayer.trim() || user.nom || 'Client',
+                modePaiement: modeBackend,
+                referenceClient: `PAY-${Date.now()}`,
+                messageClient: reservation.reservationDetails?.notes || 'Paiement effectué depuis le site'
+            };
+
+            // Configuration du header HTTP (Gestion des utilisateurs invités et connectés)
+            const configHeaders = {
+                'Content-Type': 'application/json'
+            };
+            if (token) {
+                configHeaders['Authorization'] = `Bearer ${token}`;
             }
 
-            localStorage.removeItem('commandeCourante');
-            if (viderPanier) viderPanier();
+            // Appel à l'API Backend
+            const response = await axios.post(
+                `${API_BASE_URL}/api/paiements/mobile-money`,
+                payloadPaiement,
+                { headers: configHeaders }
+            );
 
-            alert('🎉 Paiement enregistré avec succès ! Votre transaction est validée.');
-            navigate('/dashboard-client', { replace: true });
-        } catch (err) {
-            console.error(err);
-            setErreur(err.message || "Une erreur est survenue lors de la communication avec le serveur.");
+            if (response.data.success) {
+                // Nettoyage des données temporaires de réservation
+                localStorage.removeItem('selectedServices');
+                localStorage.removeItem('reservationPayload');
+
+                alert("✅ Paiement enregistré avec succès ! En attente de validation.");
+                
+                // Redirection selon le statut d'authentification
+                if (token) {
+                    navigate('/dashboard-client');
+                } else {
+                    navigate('/');
+                }
+            }
+
+        } catch (error) {
+            console.error("Erreur lors du paiement :", error);
+            const message = error.response?.data?.message || "Une erreur est survenue lors du traitement du paiement.";
+            setErrorMsg(message);
         } finally {
-            setEnCoursDePaiement(false);
+            setIsProcessing(false);
         }
     };
 
-    if (loading) {
+    if (!reservation) {
         return (
-            <div className="min-h-screen bg-[#0f1111] text-white flex items-center justify-center">
-                <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="min-h-screen bg-[#050608] text-white flex items-center justify-center">
+                <p className="animate-pulse">Chargement sécurisé du module de paiement...</p>
             </div>
         );
     }
 
-    if (!commande || !commande.articles || commande.articles.length === 0) {
-        return (
-            <div className="min-h-screen bg-[#0f1111] text-slate-100 flex items-center justify-center p-6 text-center">
-                <div className="bg-[#131921] border border-slate-800 p-8 rounded-3xl max-w-md w-full space-y-4">
-                    <h2 className="text-xl font-bold text-white mb-2">Aucune commande en cours</h2>
-                    <Link to="/panier" className="block bg-indigo-600 text-white font-bold py-3 rounded-xl">
-                        ← Retour au panier
-                    </Link>
-                </div>
-            </div>
-        );
-    }
-
-    const totalTTC = commande.montantTotal || 0;
-    const totalHT = Math.round(totalTTC / 1.19);
+    const { services, reservationDetails } = reservation;
+    const totalAffichage = reservation.montantTotal || reservation.prixTotal || reservation.total || 0;
 
     return (
-        <div className="min-h-screen bg-[#0f1111] text-slate-100 font-sans pb-24">
-            <header className="bg-[#131921] border-b border-slate-800 px-6 py-4 sticky top-0 z-40">
-                <div className="max-w-6xl mx-auto flex items-center justify-between">
-                    <button onClick={() => navigate('/panier')} className="text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-1.5 transition-colors">
-                        ← Retour au panier
-                    </button>
-                    <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                        🔒 Paiement sécurisé
-                    </span>
-                </div>
-            </header>
-
-            <main className="max-w-6xl mx-auto px-4 sm:px-6 mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-
-                {/* FORMULAIRE DE PAIEMENT */}
-                <div className="lg:col-span-7 bg-[#131921] border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl text-left">
-                    <div className="flex justify-between items-center mb-1">
-                        <h1 className="text-lg font-bold text-white">Finaliser le paiement</h1>
-                        <button onClick={() => navigate('/panier')} className="text-xs text-indigo-400 hover:underline">Modifier le panier</button>
+        <div className="min-h-screen bg-[#050608] text-slate-100 font-sans p-4 md:p-8 pb-32">
+            <div className="max-w-5xl mx-auto">
+                
+                {/* Header */}
+                <header className="mb-10 border-b border-slate-800 pb-6 flex flex-col md:flex-row justify-between items-start md:items-center">
+                    <div>
+                        <h1 className="text-4xl font-black tracking-tight">Finalisation & Paiement</h1>
+                        <p className="text-slate-400 mt-2">Choisissez votre mode de règlement pour valider votre dossier.</p>
                     </div>
-                    <p className="text-xs text-slate-400 mb-6">Choisissez votre moyen de paiement habituel.</p>
+                    <button onClick={() => navigate(-1)} className="mt-4 md:mt-0 px-6 py-2 bg-slate-800 rounded-lg hover:bg-slate-700 transition">
+                        Modifier le dossier
+                    </button>
+                </header>
 
-                    {erreur && (
-                        <div className="mb-6 bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs p-4 rounded-xl">
-                            ⚠️ {erreur}
-                        </div>
-                    )}
+                {errorMsg && (
+                    <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-2xl text-red-400 text-sm">
+                        ⚠️ {errorMsg}
+                    </div>
+                )}
 
-                    <form onSubmit={handlePayer} className="space-y-6">
-                        <div>
-                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-                                Moyen de paiement
-                            </label>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                {[
-                                    { id: 'mynita', label: 'MyNita', logo: 'https://play-lh.googleusercontent.com/XmjOjGGRqwZa7AFgXjiV_WpH-0DBl7X6X9sxLOigbQR_0zvraVoozgJE9QwYs1Hd2ino1s5g3jnCtRMTeL1Qug' },
-                                    { id: 'amanata', label: 'AmanaTa', logo: 'https://play-lh.googleusercontent.com/VXDu6FNrz0TrAR0VZ-txL1oKfUTTgfUTB8Rl6VgPTA83PSiW458bo7FECzaiPQIg7LFbg8dsEDT22R2iDfxFrSM' },
-                                    { id: 'airtel', label: 'Airtel Money', logo: 'https://encrypted-tbn0.gstatic.com/licensed-image?q=tbn:ANd9GcRVgKvwzzapX-uj4muwH3wSqDtyaUfSyNHg6nJq_KKFOsHuUSrBMpRTxMMoE-6DcJoT5rJtIVRlAfmKlD8' },
-                                    { id: 'zamani', label: 'Zamani Cash', logo: 'https://www.zamanitelecom.com/sites/default/files/inline-images/Logo-Zamani-Cash%20%281%29.png' },
-                                ].map((mode) => (
-                                    <button
-                                        type="button"
-                                        key={mode.id}
-                                        onClick={() => { setModePaiement(mode.id); setErreur(''); }}
-                                        className={`p-3 rounded-2xl border flex flex-col items-center justify-center gap-2 transition ${modePaiement === mode.id
-                                            ? 'bg-slate-800 border-indigo-500 text-white shadow-lg'
-                                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
-                                            }`}
-                                    >
-                                        <img src={mode.logo} alt={mode.label} className="w-10 h-10 object-contain rounded-lg" />
-                                        <span className="text-xs font-medium">{mode.label}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    
+                    {/* COLONNE GAUCHE : OPTIONS DE PAIEMENT (2/3) */}
+                    <div className="lg:col-span-2 space-y-6">
+                        
+                        <div className="bg-[#131921] border border-slate-800 p-8 rounded-3xl shadow-2xl">
+                            <h2 className="text-xl font-bold mb-6">Modes de paiement acceptés</h2>
 
-                        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 space-y-4">
-                            <div className="text-xs text-slate-300 space-y-2">
-                                <p className="font-bold text-white text-sm">Instruction de transfert :</p>
-                                <p className="text-slate-400">
-                                    Faites un transfert de <strong className="text-indigo-400 font-mono">{totalTTC.toLocaleString()} FCFA</strong> vers notre compte officiel :
-                                </p>
-                                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center font-mono font-bold text-indigo-400 text-base">
-                                    {NUMEROS_RECEPTION[modePaiement]}
-                                </div>
-                            </div>
-
-                            <div className="space-y-3 pt-2">
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-300 mb-1">Votre numéro de téléphone</label>
-                                    <input
-                                        type="tel"
-                                        required
-                                        placeholder="Ex: 90 00 00 00"
-                                        value={telephone}
-                                        onChange={(e) => setTelephone(e.target.value)}
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 font-mono"
-                                    />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                
+                                {/* Option 1 : Mobile Money */}
+                                <div 
+                                    onClick={() => setSelectedPaymentMethod('mobile_money')}
+                                    className={`p-6 rounded-2xl border cursor-pointer transition-all flex items-start gap-4 ${
+                                        selectedPaymentMethod === 'mobile_money'
+                                            ? 'bg-indigo-600/10 border-indigo-500 shadow-lg shadow-indigo-950'
+                                            : 'bg-[#0a0f16] border-slate-800 hover:border-slate-700'
+                                    }`}
+                                >
+                                    <div className="w-12 h-12 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-400 text-xl font-black flex-shrink-0">
+                                        📱
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-white text-base">Mobile Money</h3>
+                                        <p className="text-xs text-slate-400 mt-1">Orange, MTN, Moov (Paiement direct sécurisé)</p>
+                                    </div>
                                 </div>
 
+                                {/* Option 2 : Carte Bancaire */}
+                                <div 
+                                    onClick={() => setSelectedPaymentMethod('carte')}
+                                    className={`p-6 rounded-2xl border cursor-pointer transition-all flex items-start gap-4 ${
+                                        selectedPaymentMethod === 'carte'
+                                            ? 'bg-indigo-600/10 border-indigo-500 shadow-lg shadow-indigo-950'
+                                            : 'bg-[#0a0f16] border-slate-800 hover:border-slate-700'
+                                    }`}
+                                >
+                                    <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400 text-xl font-black flex-shrink-0">
+                                        💳
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-white text-base">Carte Bancaire</h3>
+                                        <p className="text-xs text-slate-400 mt-1">Visa, Mastercard (Paiement 3D Secure)</p>
+                                    </div>
+                                </div>
+
+                                {/* Option 3 : Paiement sur place */}
+                                <div 
+                                    onClick={() => setSelectedPaymentMethod('sur_place')}
+                                    className={`p-6 rounded-2xl border cursor-pointer transition-all flex items-start gap-4 sm:col-span-2 ${
+                                        selectedPaymentMethod === 'sur_place'
+                                            ? 'bg-indigo-600/10 border-indigo-500 shadow-lg shadow-indigo-950'
+                                            : 'bg-[#0a0f16] border-slate-800 hover:border-slate-700'
+                                    }`}
+                                >
+                                    <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 text-xl font-black flex-shrink-0">
+                                        🤝
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-white text-base">Paiement sur place / Espèces</h3>
+                                        <p className="text-xs text-slate-400 mt-1">Règlement direct auprès du prestataire lors de l'intervention physique</p>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            {/* Formulaire d'information de règlement */}
+                            <div className="mt-6 pt-6 border-t border-slate-800 space-y-4">
                                 <div>
-                                    <label className="block text-xs font-medium text-slate-300 mb-1">
-                                        ID / Référence de transaction (reçu par SMS)
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                                        Numéro de téléphone pour la transaction *
                                     </label>
                                     <input
-                                        type="text"
-                                        required
-                                        placeholder="Ex: TXN-894021"
-                                        value={referenceTransaction}
-                                        onChange={(e) => setReferenceTransaction(e.target.value)}
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 font-mono uppercase"
+                                        type="tel"
+                                        placeholder="Ex: 0102030405"
+                                        value={telephone}
+                                        onChange={(e) => setTelephone(e.target.value)}
+                                        className="w-full bg-[#0a0f16] border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition"
                                     />
                                 </div>
                             </div>
+
+                            <button
+                                onClick={handleFinalPayment}
+                                disabled={isProcessing}
+                                className="w-full mt-8 bg-indigo-600 hover:bg-indigo-500 text-white py-5 rounded-2xl font-black text-lg transition-all shadow-xl shadow-indigo-950 disabled:opacity-50 active:scale-95"
+                            >
+                                {isProcessing ? "Traitement en cours..." : `Payer et Valider (${totalAffichage} FCFA)`}
+                            </button>
                         </div>
+                    </div>
 
-                        <div className="space-y-2">
-                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                Lieu de prestation / Adresse
-                            </label>
-                            <textarea
-                                required
-                                rows={2}
-                                placeholder="Quartier, rue ou indication exacte..."
-                                value={adresse}
-                                onChange={(e) => setAdresse(e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 resize-none"
-                            ></textarea>
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={enCoursDePaiement}
-                            className={`w-full font-bold text-sm py-4 rounded-xl transition shadow-lg ${enCoursDePaiement ? 'bg-indigo-600/50 cursor-not-allowed' : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-95 text-white'}`}
-                        >
-                            {enCoursDePaiement ? 'Enregistrement en cours...' : `Confirmer le paiement (${totalTTC.toLocaleString()} FCFA)`}
-                        </button>
-                    </form>
-                </div>
-
-                {/* COLONNE RÉCAPITULATIF */}
-                <div className="lg:col-span-5 bg-[#131921] border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4 text-left">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 pb-3">
-                        Récapitulatif de la commande
-                    </h3>
-
-                    <div className="space-y-3 max-h-52 overflow-y-auto text-sm divide-y divide-slate-800/60">
-                        {commande.articles.map((item, idx) => (
-                            <div key={idx} className="pt-2 first:pt-0 flex justify-between items-center">
-                                <div>
-                                    <p className="font-semibold text-slate-200">{item.nom}</p>
-                                    <p className="text-xs text-slate-500">Qté : {item.quantite || 1}</p>
-                                </div>
-                                <span className="font-mono text-slate-300 font-bold">
-                                    {(item.prix * (item.quantite || 1)).toLocaleString()} FCFA
-                                </span>
+                    {/* COLONNE DROITE : RÉCAPITULATIF (1/3) */}
+                    <div className="lg:col-span-1 space-y-6">
+                        <div className="bg-[#131921] border border-slate-800 p-6 rounded-3xl shadow-xl sticky top-8 space-y-6">
+                            
+                            {/* Montant Total */}
+                            <div className="bg-indigo-600/10 border border-indigo-500/30 p-4 rounded-2xl text-center">
+                                <span className="text-xs text-indigo-400 font-bold uppercase tracking-widest block">Total à régler</span>
+                                <span className="text-3xl font-black text-white mt-1 block">{totalAffichage} FCFA</span>
                             </div>
-                        ))}
+
+                            {/* Liste des services */}
+                            <div>
+                                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Services sélectionnés ({services?.length || 0})</h3>
+                                <div className="space-y-3">
+                                    {services?.map((s, idx) => (
+                                        <div key={idx} className="bg-[#0a0f16] p-3 rounded-xl border border-slate-800 flex justify-between items-center">
+                                            <p className="font-bold text-sm text-white">{s.nom || s.titre}</p>
+                                            {s.prix && <span className="text-xs text-indigo-400 font-bold">{s.prix} FCFA</span>}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Détails de planification */}
+                            <div className="border-t border-slate-800 pt-4 space-y-3">
+                                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Informations de rendez-vous</h3>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-400">Date :</span>
+                                    <span className="font-bold text-white">{reservationDetails?.date || 'Non définie'}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-400">Heure :</span>
+                                    <span className="font-bold text-white">{reservationDetails?.heure || 'Non définie'}</span>
+                                </div>
+                                {reservationDetails?.notes && (
+                                    <div className="mt-2">
+                                        <span className="text-xs text-slate-400 block mb-1">Instructions :</span>
+                                        <p className="text-xs text-slate-300 bg-[#0a0f16] p-3 rounded-xl border border-slate-800 italic">
+                                            {reservationDetails.notes}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                        </div>
                     </div>
 
-                    <div className="border-t border-slate-800 pt-4 space-y-2 text-xs">
-                        <div className="flex justify-between text-slate-400">
-                            <span>Prix Total Hors Taxes (HT)</span>
-                            <span className="font-mono text-slate-300">{totalHT.toLocaleString()} FCFA</span>
-                        </div>
-                        <div className="flex justify-between items-baseline text-base font-bold text-white pt-3 border-t border-slate-800">
-                            <span>Prix Total avec Taxe (TTC)</span>
-                            <span className="text-xl text-indigo-400 font-mono font-black">{totalTTC.toLocaleString()} FCFA</span>
-                        </div>
-                    </div>
                 </div>
-
-            </main>
+            </div>
         </div>
     );
 }

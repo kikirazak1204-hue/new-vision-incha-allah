@@ -1,301 +1,352 @@
-import React, { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import {
-    ArrowLeft, Layers, CreditCard, CheckCircle2, Trash2
-} from 'lucide-react';
-import { useNotification } from '../context/NotificationContext.jsx';
+// ============================================================
+// Fichier : src/pages/ReservationPage.jsx
+// Architecture : Moteur de Formulaire Multi-Services Intelligent
+// ============================================================
 
-const API = import.meta.env.VITE_API_URL || '';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { CONFIG_SERVICES } from '../config/servicesConfig';
 
-const DICT = {
-    fr: {
-        title: "Finaliser votre demande",
-        subtitle: "Kanari regroupe vos services pour une prise en charge fluide.",
-        socleTitle: "1. Vos Coordonnées & Lieu",
-        servicesListTitle: "2. Vos Services Sélectionnés",
-        name: "Votre Nom complet *", phone: "Téléphone direct *", address: "Adresse ou Lieu global *",
-        dateGlobal: "📅 Date et heure souhaitées *",
-        payment: "💳 Mode de règlement", payKanari: "Paiement sécurisé via Kanari", payDirect: "Paiement direct au prestataire",
-        btnConfirm: "VALIDER MON PROJET", loading: "Transmission en cours au réseau Kanari...",
-        errFill: "❌ Merci de remplir les champs obligatoires (Nom, Téléphone, Adresse).",
-        errServer: "❌ Erreur de connexion avec le serveur Kanari.",
-        fourchetteInfo: "💡 Pour les dépannages, le prix exact sera évalué sur place sous forme de fourchette par le prestataire."
-    }
-};
-
-export default function ReservationPage() {
-    const location = useLocation();
+const ReservationPage = () => {
     const navigate = useNavigate();
-    const { showNotification } = useNotification();
-    const [lang] = useState('fr');
-    const t = DICT[lang];
+    const location = useLocation();
 
-    const state = location.state || {};
-    const singleService = state.service || JSON.parse(localStorage.getItem('selectedService') || 'null');
-    const fournisseur = state.fournisseur || JSON.parse(localStorage.getItem('selectedFournisseur') || 'null');
+    const [services, setServices] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const [servicesSelectionnes, setServicesSelectionnes] = useState(() => {
-        if (state.services && Array.isArray(state.services)) return state.services;
-        if (singleService) return [singleService];
-        const cart = JSON.parse(localStorage.getItem('kanari_cart') || '[]');
-        return cart.length > 0 ? cart.map(item => item.service || item) : [];
-    });
-
-    let user = {};
-    try { user = JSON.parse(localStorage.getItem('user') || '{}'); } catch { }
-
-    const [socle, setSocle] = useState({
-        clientNom: user?.nom || '',
-        telephone: user?.telephone || '',
+    // 👤 Coordonnées globales du client & date d'intervention
+    const [coordonnees, setCoordonnees] = useState({
+        clientNom: '',
+        telephone: '',
         adresse: '',
         dateIntervention: '',
-        modePaiement: 'direct_prestataire',
+        heureIntervention: '09:00',
         commentaireGlobal: ''
     });
 
-    const [detailsServices, setDetailsServices] = useState({});
-    const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState('');
+    // 🧠 Stockage des réponses dynamiques pour CHAQUE service
+    // Format : { "service_id_1": { "typePneud": "SUV", ... }, ... }
+    const [formulaires, setFormulaires] = useState({});
 
-    const handleSocleChange = (field) => (e) => {
-        setSocle(prev => ({ ...prev, [field]: e.target.value }));
+    useEffect(() => {
+        const loadData = () => {
+            // 1. Chargement des services sélectionnés
+            const savedServices = location.state?.services || JSON.parse(localStorage.getItem('selectedServices') || '[]');
+            
+            if (savedServices.length > 0) {
+                setServices(savedServices);
+                localStorage.setItem('selectedServices', JSON.stringify(savedServices));
+
+                // Initialisation de l'état des questionnaires dynamiques
+                const initForms = {};
+                savedServices.forEach(s => { 
+                    initForms[s.id || s._id] = {}; 
+                });
+                setFormulaires(initForms);
+            } else {
+                navigate('/');
+                return;
+            }
+
+            // 2. Pré-remplissage des coordonnées si l'utilisateur est connecté
+            const userStr = localStorage.getItem('user');
+            if (userStr) {
+                try {
+                    const u = JSON.parse(userStr);
+                    setCoordonnees(prev => ({
+                        ...prev,
+                        clientNom: u.nom || u.name || `${u.prenom || ''} ${u.nom || ''}`.trim(),
+                        telephone: u.telephone || u.phone || '',
+                        adresse: u.adresse || u.address || ''
+                    }));
+                } catch (e) {
+                    console.error("Erreur lecture utilisateur:", e);
+                }
+            }
+
+            setIsLoading(false);
+        };
+
+        loadData();
+    }, [location.state, navigate]);
+
+    // ⚡️ Gestionnaire de saisie des coordonnées globales
+    const handleCoordChange = (e) => {
+        const { name, value } = e.target;
+        setCoordonnees(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleDetailChange = (serviceId, field) => (e) => {
-        setDetailsServices(prev => ({
+    // ⚡️ Gestionnaire de saisie dynamique par service
+    const handleInputChange = (serviceId, champId, valeur) => {
+        setFormulaires(prev => ({
             ...prev,
             [serviceId]: {
-                ...(prev[serviceId] || {}),
-                [field]: e.target.value
+                ...prev[serviceId],
+                [champId]: valeur
             }
         }));
     };
 
-    const handleRemoveService = (indexToRemove) => {
-        const updated = servicesSelectionnes.filter((_, idx) => idx !== indexToRemove);
-        setServicesSelectionnes(updated);
-        if (updated.length === 0) {
-            localStorage.removeItem('selectedService');
-            localStorage.removeItem('kanari_cart');
-        }
+    // 🧮 Calcul du montant total estimé
+    const montantTotal = services.reduce((acc, s) => acc + (parseFloat(s.prix) || 0), 0);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        // 🏗️ Formate le Payload pour correspondre exactement à `createGlobalReservation`
+        const reservationPayload = {
+            clientNom: coordonnees.clientNom,
+            telephone: coordonnees.telephone,
+            adresse: coordonnees.adresse,
+            dateIntervention: coordonnees.dateIntervention,
+            heureIntervention: coordonnees.heureIntervention,
+            commentaireGlobal: coordonnees.commentaireGlobal,
+            fournisseurId: location.state?.fournisseurId || null,
+            montantTotal: montantTotal,
+            services: services.map(service => {
+                const sId = service.id || service._id;
+                return {
+                    serviceId: String(sId),
+                    nom: service.nom || service.titre,
+                    prix: parseFloat(service.prix) || 0,
+                    detailsParticuliers: formulaires[sId] || {}
+                };
+            })
+        };
+
+        console.log("🚀 PAYLOAD MULTI-SERVICES GÉNÉRÉ :", reservationPayload);
+        localStorage.setItem('reservationPayload', JSON.stringify(reservationPayload));
+
+        // Redirection vers la page de paiement
+        navigate('/paiement', { state: { reservation: reservationPayload } });
     };
 
-    const handleSubmit = async () => {
-        setMessage('');
-        if (!socle.clientNom || !socle.telephone || !socle.adresse) {
-            return setMessage(t.errFill);
-        }
-        if (servicesSelectionnes.length === 0) {
-            return setMessage("❌ Aucun service sélectionné.");
-        }
-
-        setLoading(true);
-
-        try {
-            const token = localStorage.getItem('token');
-            const payload = {
-                clientNom: socle.clientNom,
-                telephone: socle.telephone,
-                adresse: socle.adresse,
-                dateIntervention: socle.dateIntervention
-                    ? new Date(socle.dateIntervention).toISOString()
-                    : new Date().toISOString(),
-                modePaiement: socle.modePaiement,
-                commentaireGlobal: socle.commentaireGlobal,
-                fournisseurId: fournisseur?.id || fournisseur?._id || null,
-                services: servicesSelectionnes.map(srv => ({
-                    serviceId: srv.id || srv._id || srv.serviceId,
-                    nom: srv.nom || srv.serviceNom,
-                    detailsParticuliers: detailsServices[srv.id || srv._id] || {}
-                }))
-            };
-
-            const res = await fetch(`${API}/api/reservations/global`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                },
-                body: JSON.stringify(payload)
-            });
-
-            const data = await res.json();
-
-            if (res.ok && (data.success || data.id)) {
-                showNotification({
-                    title: 'Projet Transmis avec Succès',
-                    body: `${servicesSelectionnes.length} service(s) pris en charge par Kanari.`,
-                    categorie: 'Kanari Pro'
-                });
-
-                localStorage.removeItem('kanari_cart');
-                localStorage.removeItem('selectedService');
-
-                if (socle.modePaiement === 'depot_kanari') {
-                    navigate('/paiement', { state: { reservationId: data.id || data.reservation?._id, payload } });
-                } else {
-                    navigate('/');
-                }
-            } else {
-                setMessage('❌ ' + (data.message || t.errServer));
-            }
-        } catch (err) {
-            setMessage(t.errServer);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    if (servicesSelectionnes.length === 0) {
+    if (isLoading) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center text-center px-6 bg-[#0B0F19] text-white">
-                <p className="text-2xl font-black mb-2">Votre dossier est vide</p>
-                <p className="text-slate-400 mb-6">Veuillez sélectionner au moins un service pour continuer.</p>
-                <button onClick={() => navigate('/')} className="px-6 py-3 bg-purple-600 rounded-2xl font-bold text-white shadow-lg">
-                    Retour à l'accueil
-                </button>
+            <div className="min-h-screen bg-[#050608] text-white flex justify-center items-center font-sans">
+                <div className="text-center space-y-3">
+                    <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p className="text-slate-400 font-medium">Analyse et préparation des formulaires...</p>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen text-white p-6 pb-28 font-sans selection:bg-purple-500/30" style={{ background: '#0B0F19' }}>
-            <div className="max-w-2xl mx-auto space-y-6">
+        <div className="min-h-screen bg-[#050608] text-slate-100 font-sans p-4 md:p-8">
+            <div className="max-w-4xl mx-auto space-y-8">
 
-                {/* EN-TÊTE PRO */}
-                <div className="flex justify-between items-center">
-                    <button onClick={() => navigate(-1)} className="text-slate-500 hover:text-white transition flex items-center gap-2">
-                        <ArrowLeft size={18} /> Retour
-                    </button>
-                    <span className="text-xs bg-purple-500/10 text-purple-300 px-3 py-1 rounded-full border border-purple-500/20 font-bold flex items-center gap-1.5">
-                        <Layers size={13} /> Espace Pro Kanari
-                    </span>
-                </div>
-
-                <div>
-                    <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">
-                        {t.title}
+                <header className="text-center space-y-2">
+                    <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white">
+                        Détails de votre demande
                     </h1>
-                    <p className="text-slate-400 text-sm mt-1">{t.subtitle}</p>
-                </div>
+                    <p className="text-slate-400 text-sm md:text-base">
+                        Veuillez préciser vos coordonnées et répondre aux détails de chaque prestation ({services.length})
+                    </p>
+                </header>
 
-                {message && (
-                    <div className={`rounded-2xl p-4 text-center font-semibold text-sm border ${message.startsWith('❌') ? 'bg-rose-500/10 text-rose-300 border-rose-500/20' : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'}`}>
-                        {message}
-                    </div>
-                )}
+                <form onSubmit={handleSubmit} className="space-y-8">
 
-                {/* SECTION 1 : SOCLE COMMUN */}
-                <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 space-y-4 backdrop-blur-md">
-                    <h2 className="text-sm font-bold text-purple-400 uppercase tracking-wider flex items-center gap-2">
-                        <CheckCircle2 size={16} /> {t.socleTitle}
-                    </h2>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-xs text-slate-400 mb-1 block">Nom & Prénom *</label>
-                            <input type="text" placeholder="Ex: Moussa Abdou" value={socle.clientNom} onChange={handleSocleChange('clientNom')} className="w-full bg-white/[0.03] p-3.5 rounded-xl border border-white/10 focus:border-purple-500 outline-none text-sm" />
+                    {/* 👤 SECTION 1 : COORDONNÉES ET DATE D'INTERVENTION */}
+                    <div className="bg-[#131921] border border-slate-800 rounded-3xl p-6 md:p-8 shadow-xl space-y-6">
+                        <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
+                            <span className="text-2xl">📍</span>
+                            <div>
+                                <h2 className="text-xl font-bold text-white">Lieu & Date d'intervention</h2>
+                                <p className="text-xs text-slate-400">Où et quand les prestataires doivent-ils intervenir ?</p>
+                            </div>
                         </div>
-                        <div>
-                            <label className="text-xs text-slate-400 mb-1 block">Téléphone direct *</label>
-                            <input type="tel" placeholder="Ex: +227 90 00 00 00" value={socle.telephone} onChange={handleSocleChange('telephone')} className="w-full bg-white/[0.03] p-3.5 rounded-xl border border-white/10 focus:border-purple-500 outline-none text-sm" />
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">
+                                    Nom complet <span className="text-indigo-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    name="clientNom"
+                                    required
+                                    value={coordonnees.clientNom}
+                                    onChange={handleCoordChange}
+                                    placeholder="Ex: Jean Dupont"
+                                    className="w-full bg-[#0a0f16] border border-slate-700 p-4 rounded-xl text-white outline-none focus:border-indigo-500 transition-colors"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">
+                                    Téléphone de contact <span className="text-indigo-500">*</span>
+                                </label>
+                                <input
+                                    type="tel"
+                                    name="telephone"
+                                    required
+                                    value={coordonnees.telephone}
+                                    onChange={handleCoordChange}
+                                    placeholder="Ex: +227 90 00 00 00"
+                                    className="w-full bg-[#0a0f16] border border-slate-700 p-4 rounded-xl text-white outline-none focus:border-indigo-500 transition-colors"
+                                />
+                            </div>
+
+                            <div className="md:col-span-2">
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">
+                                    Adresse exacte d'intervention <span className="text-indigo-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    name="adresse"
+                                    required
+                                    value={coordonnees.adresse}
+                                    onChange={handleCoordChange}
+                                    placeholder="Quartier, Rue, Repère à proximité..."
+                                    className="w-full bg-[#0a0f16] border border-slate-700 p-4 rounded-xl text-white outline-none focus:border-indigo-500 transition-colors"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">
+                                    Date souhaitée <span className="text-indigo-500">*</span>
+                                </label>
+                                <input
+                                    type="date"
+                                    name="dateIntervention"
+                                    required
+                                    value={coordonnees.dateIntervention}
+                                    onChange={handleCoordChange}
+                                    className="w-full bg-[#0a0f16] border border-slate-700 p-4 rounded-xl text-white outline-none focus:border-indigo-500 transition-colors"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">
+                                    Heure approximative
+                                </label>
+                                <input
+                                    type="time"
+                                    name="heureIntervention"
+                                    value={coordonnees.heureIntervention}
+                                    onChange={handleCoordChange}
+                                    className="w-full bg-[#0a0f16] border border-slate-700 p-4 rounded-xl text-white outline-none focus:border-indigo-500 transition-colors"
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    <div>
-                        <label className="text-xs text-slate-400 mb-1 block">Lieu ou Adresse d'intervention / de la sortie *</label>
-                        <input type="text" placeholder="Ex: Quartier Yantala, près de la pharmacie..." value={socle.adresse} onChange={handleSocleChange('adresse')} className="w-full bg-white/[0.03] p-3.5 rounded-xl border border-white/10 focus:border-purple-500 outline-none text-sm" />
-                    </div>
+                    {/* 🔄 SECTION 2 : BOUCLE SUR CHAQUE SERVICE */}
+                    {services.map((service, index) => {
+                        const sId = service.id || service._id;
+                        const serviceType = service.type || 'rendez_vous'; 
+                        const config = CONFIG_SERVICES[serviceType] || CONFIG_SERVICES.rendez_vous;
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-xs text-slate-400 mb-1 block">{t.dateGlobal}</label>
-                            <input type="datetime-local" value={socle.dateIntervention} onChange={handleSocleChange('dateIntervention')} className="w-full bg-white/[0.03] p-3.5 rounded-xl border border-white/10 focus:border-purple-500 outline-none text-sm" style={{ colorScheme: 'dark' }} />
-                        </div>
-                        <div>
-                            <label className="text-xs text-slate-400 mb-1 block">Commentaire / Instructions globales</label>
-                            <input type="text" placeholder="Ex: Précautions particulières..." value={socle.commentaireGlobal} onChange={handleSocleChange('commentaireGlobal')} className="w-full bg-white/[0.03] p-3.5 rounded-xl border border-white/10 focus:border-purple-500 outline-none text-sm" />
-                        </div>
-                    </div>
-                </div>
-
-                {/* SECTION 2 : SERVICES SÉLECTIONNÉS */}
-                <div className="space-y-3">
-                    <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
-                        <span>{t.servicesListTitle} ({servicesSelectionnes.length})</span>
-                        <span className="text-xs text-purple-400 normal-case font-normal">Analysé et unifié par Kanari</span>
-                    </h2>
-
-                    <div className="space-y-3">
-                        {servicesSelectionnes.map((srv, index) => {
-                            const srvId = srv.id || srv._id || index;
-                            const srvNom = srv.nom || srv.serviceNom || 'Service';
-
-                            return (
-                                <div key={srvId} className="bg-white/[0.03] border border-white/10 rounded-2xl p-4 flex flex-col gap-3 relative group">
-                                    <div className="flex justify-between items-center">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-300 font-bold text-sm">
-                                                {index + 1}
-                                            </div>
-                                            <div>
-                                                <h3 className="font-bold text-white text-sm">{srvNom}</h3>
-                                                <p className="text-xs text-slate-400">Pris en compte dans votre dossier global</p>
-                                            </div>
-                                        </div>
-                                        <button onClick={() => handleRemoveService(index)} className="text-slate-500 hover:text-rose-400 p-2 transition">
-                                            <Trash2 size={16} />
-                                        </button>
+                        return (
+                            <div key={sId || index} className="bg-[#131921] border border-slate-800 rounded-3xl p-6 md:p-8 shadow-xl space-y-6">
+                                <div className="flex items-center gap-4 border-b border-slate-800 pb-4">
+                                    <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center font-black text-white shrink-0">
+                                        {index + 1}
                                     </div>
-
-                                    <input
-                                        type="text"
-                                        placeholder={`Précision spécifique pour ${srvNom} (optionnel)...`}
-                                        value={detailsServices[srvId]?.precision || ''}
-                                        onChange={handleDetailChange(srvId, 'precision')}
-                                        className="w-full bg-black/20 p-2.5 rounded-xl border border-white/5 text-xs text-slate-300 outline-none focus:border-purple-500"
-                                    />
+                                    <div className="flex-1">
+                                        <h2 className="text-xl font-bold text-white">{service.nom || service.titre}</h2>
+                                        <span className="text-xs text-indigo-400 uppercase tracking-wider font-semibold">
+                                            {config.titre || 'Détails du service'}
+                                        </span>
+                                    </div>
+                                    {service.prix > 0 && (
+                                        <div className="text-right">
+                                            <span className="text-xs text-slate-400 block">Tarif estimé</span>
+                                            <span className="text-lg font-black text-emerald-400">
+                                                {Number(service.prix).toLocaleString()} FCFA
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
-                            );
-                        })}
+
+                                {/* 🎛️ GÉNÉRATION DES CHAMPS SPÉCIFIQUES POUR CE SERVICE */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {config.champs?.map((champ) => {
+                                        const isVisible = champ.conditionAffiche 
+                                            ? champ.conditionAffiche(formulaires[sId]) 
+                                            : true;
+                                        
+                                        if (!isVisible) return null;
+
+                                        return (
+                                            <div key={champ.id} className={champ.demiLargeur ? "" : "md:col-span-2"}>
+                                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">
+                                                    {champ.label} {champ.requis && <span className="text-indigo-500">*</span>}
+                                                </label>
+
+                                                {champ.type === 'select' ? (
+                                                    <select 
+                                                        required={champ.requis} 
+                                                        value={formulaires[sId]?.[champ.id] || ''}
+                                                        onChange={(e) => handleInputChange(sId, champ.id, e.target.value)} 
+                                                        className="w-full bg-[#0a0f16] border border-slate-700 p-4 rounded-xl text-white outline-none focus:border-indigo-500 transition-colors"
+                                                    >
+                                                        <option value="">Sélectionnez...</option>
+                                                        {champ.options?.map(opt => (
+                                                            <option key={opt} value={opt}>{opt}</option>
+                                                        ))}
+                                                    </select>
+                                                ) : champ.type === 'textarea' ? (
+                                                    <textarea 
+                                                        required={champ.requis} 
+                                                        placeholder={champ.placeholder} 
+                                                        value={formulaires[sId]?.[champ.id] || ''}
+                                                        onChange={(e) => handleInputChange(sId, champ.id, e.target.value)} 
+                                                        className="w-full bg-[#0a0f16] border border-slate-700 p-4 rounded-xl text-white outline-none focus:border-indigo-500 h-24 transition-colors resize-none"
+                                                    ></textarea>
+                                                ) : (
+                                                    <input 
+                                                        type={champ.type || 'text'} 
+                                                        required={champ.requis} 
+                                                        placeholder={champ.placeholder} 
+                                                        value={formulaires[sId]?.[champ.id] || ''}
+                                                        onChange={(e) => handleInputChange(sId, champ.id, e.target.value)} 
+                                                        className="w-full bg-[#0a0f16] border border-slate-700 p-4 rounded-xl text-white outline-none focus:border-indigo-500 transition-colors"
+                                                    />
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    })}
+
+                    {/* 📝 COMMENTAIRE GLOBAL OPTIONNEL */}
+                    <div className="bg-[#131921] border border-slate-800 rounded-3xl p-6 md:p-8 shadow-xl">
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2">
+                            Instructions ou consignes particulières (Optionnel)
+                        </label>
+                        <textarea
+                            name="commentaireGlobal"
+                            value={coordonnees.commentaireGlobal}
+                            onChange={handleCoordChange}
+                            placeholder="Informations complémentaires pour le ou les prestataires..."
+                            className="w-full bg-[#0a0f16] border border-slate-700 p-4 rounded-xl text-white outline-none focus:border-indigo-500 h-20 transition-colors resize-none"
+                        ></textarea>
                     </div>
-                </div>
 
-                {/* SECTION 3 : PAIEMENT */}
-                <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 space-y-4 backdrop-blur-md">
-                    <label className="block text-slate-300 text-sm font-semibold flex items-center gap-2">
-                        <CreditCard size={18} className="text-purple-400" /> {t.payment}
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <button
-                            type="button"
-                            onClick={() => setSocle(p => ({ ...p, modePaiement: 'direct_prestataire' }))}
-                            className={`p-4 rounded-xl border text-left transition-all ${socle.modePaiement === 'direct_prestataire' ? 'bg-purple-600/20 border-purple-500 text-white shadow-lg' : 'bg-white/[0.02] border-white/5 text-slate-400 hover:bg-white/[0.05]'}`}
+                    {/* 💳 BOUTON STICKY DE VALIDATION */}
+                    <div className="sticky bottom-4 z-10 p-4 md:p-5 bg-[#131921]/95 backdrop-blur-md border border-slate-800 rounded-2xl flex justify-between items-center shadow-2xl">
+                        <div>
+                            <p className="text-slate-400 text-xs md:text-sm">Total estimé ({services.length} prestation{services.length > 1 ? 's' : ''})</p>
+                            <p className="text-white font-black text-xl md:text-2xl text-emerald-400">
+                                {montantTotal > 0 ? `${montantTotal.toLocaleString()} FCFA` : 'Sur devis'}
+                            </p>
+                        </div>
+                        <button 
+                            type="submit" 
+                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 md:px-8 py-3.5 md:py-4 rounded-xl font-black text-base md:text-lg shadow-lg shadow-indigo-900/50 transition-all active:scale-95"
                         >
-                            <p className="font-bold text-sm mb-1">💵 Main à main</p>
-                            <p className="text-xs opacity-70">Paiement direct sur place avec le prestataire</p>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setSocle(p => ({ ...p, modePaiement: 'depot_kanari' }))}
-                            className={`p-4 rounded-xl border text-left transition-all ${socle.modePaiement === 'depot_kanari' ? 'bg-purple-600/20 border-purple-500 text-white shadow-lg' : 'bg-white/[0.02] border-white/5 text-slate-400 hover:bg-white/[0.05]'}`}
-                        >
-                            <p className="font-bold text-sm mb-1">📱 Via Kanari</p>
-                            <p className="text-xs opacity-70">Paiement sécurisé ou cagnotte via l'application</p>
+                            Passer au Paiement →
                         </button>
                     </div>
-                    <p className="text-[11px] text-slate-500 mt-2">{t.fourchetteInfo}</p>
-                </div>
 
-                <button
-                    onClick={handleSubmit}
-                    disabled={loading}
-                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl font-black text-[15px] tracking-wide active:scale-95 transition-all flex justify-center items-center shadow-xl shadow-purple-500/20 disabled:opacity-50"
-                >
-                    {loading ? t.loading : t.btnConfirm}
-                </button>
-
+                </form>
             </div>
         </div>
     );
-}
+};
+
+export default ReservationPage;

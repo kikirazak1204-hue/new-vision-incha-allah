@@ -1,7 +1,3 @@
-// ============================================================
-// Fichier : src/pages/PanierPage/index.jsx
-// ============================================================
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePanier } from '../../context/PanierContext';
@@ -129,7 +125,8 @@ export default function PanierPage() {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                         <div className="lg:col-span-2 space-y-4">
                             {panier.map((item) => {
-                                const itemId = item.id;
+                                // 🔒 Sécurité ID ajoutée ici
+                                const itemId = item.id || item._id; 
                                 const rawImage = item.image || item.photo || item.imageUrl || item.image_url;
                                 const fullImageUrl = getImageUrl(rawImage);
 
@@ -174,7 +171,8 @@ export default function PanierPage() {
                                         <div className="flex items-center justify-between sm:justify-end gap-6 border-t border-slate-800/60 sm:border-0 pt-3 sm:pt-0">
                                             <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1">
                                                 <button
-                                                    onClick={() => modifierQuantite(itemId, item.quantite - 1)}
+                                                    // 🔒 Sécurité quantité (ne descend pas sous 1)
+                                                    onClick={() => modifierQuantite(itemId, Math.max(1, item.quantite - 1))} 
                                                     className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white font-bold transition rounded-lg hover:bg-slate-800"
                                                 >
                                                     -
@@ -233,7 +231,6 @@ export default function PanierPage() {
                                 <p className="text-2xl font-black text-purple-400">{formatPrix(totalPanier)}</p>
                             </div>
 
-                            {/* ⭐ APPEL DE LA FONCTION DE REDIRECTION */}
                             <button
                                 onClick={handleProcederPaiement}
                                 className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 text-white font-black text-sm py-4 rounded-xl transition shadow-lg shadow-purple-900/30 active:scale-[0.98]"

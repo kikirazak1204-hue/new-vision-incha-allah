@@ -11,7 +11,7 @@ import { NavigationProvider } from './context/NavigationContext';
 
 // Composants de protection et globaux
 import ProtectedRoute from './components/ProtectedRoute';
-import GlobalLocationBar from './components/GlobalLocationBar'; // 📍 Ajouté ici
+import GlobalLocationBar from './components/GlobalLocationBar';
 
 // Importations des pages
 import Accueil from './pages/Accueil';
@@ -26,7 +26,7 @@ import DashboardFournisseur from './pages/DashboardFournisseur';
 import DashboardAdmin from './pages/AdminDashboard';
 import ReservationPage from './pages/ReservationPage';
 import PaiementPage from './pages/PaiementPage';
-import HistoriquePaiements from './pages/HistoriquePaiements'; // ⭐ ROUTE HISTORIQUE AJOUTÉE
+import HistoriquePaiements from './pages/HistoriquePaiements';
 import FournisseurProfilePage from './pages/FournisseurProfilePage';
 import ProduitsParFournisseur from './pages/Produitsparfournisseur';
 import PanierPage from './pages/PanierPage';
@@ -102,7 +102,7 @@ export default function App() {
                     )}
 
                     <Routes>
-                        {/* Pages Publiques */}
+                        {/* 🟢 PAGES PUBLIQUES */}
                         <Route path="/" element={<Accueil />} />
                         <Route path="/produits" element={<VoirProduits />} />
                         <Route path="/login" element={<Login />} />
@@ -111,46 +111,51 @@ export default function App() {
                         <Route path="/register-prestataire" element={<RegisterPrestataire />} />
                         <Route path="/selection" element={<ServiceSelectionPage />} />
 
-                        {/* Pages dynamiques publiques */}
                         <Route path="/service/:id" element={<ServiceDetailPage />} />
                         <Route path="/produits/:fournisseurId" element={<ProduitsParFournisseur />} />
                         <Route path="/produits/service/:serviceId" element={<ProduitsParService />} />
-                        <Route path="/reservation" element={<ReservationPage />} />
                         <Route path="/fournisseur-profil/:id?" element={<FournisseurProfilePage />} />
-                        <Route path="/paiement" element={<PaiementPage />} />
-                        <Route path="/historique-paiements" element={<HistoriquePaiements />} /> {/* ⭐ ROUTE HISTORIQUE PAIEMENTS ACTIVE */}
                         <Route path="/panier" element={<PanierPage />} />
 
-                        {/* 🛡️ DASHBOARDS */}
+                        {/* Page Paiement (publique pour test) */}
+                        <Route path="/paiement" element={<PaiementPage />} />
+
+                        {/* 🟢 PAGE RÉSERVATION (Devenue publique pour tous les utilisateurs / prestataires / inconnus) */}
+                        <Route path="/reservation" element={<ReservationPage />} />
+
+                        {/* 🟠 PAGES SÉCURISÉES - CLIENTS */}
+                        <Route path="/historique-paiements" element={
+                            <ProtectedRoute role="client">
+                                <HistoriquePaiements />
+                            </ProtectedRoute>
+                        } />
+
+                        {/* Dashboards Client avec redirection propre */}
                         <Route path="/dashboard-client" element={
                             <ProtectedRoute role="client">
                                 <DashboardClient />
                             </ProtectedRoute>
                         } />
-                        <Route path="/dashboard/client" element={
-                            <ProtectedRoute role="client">
-                                <DashboardClient />
-                            </ProtectedRoute>
-                        } />
+                        <Route path="/dashboard/client" element={<Navigate to="/dashboard-client" replace />} />
 
+
+                        {/* 🔵 PAGES SÉCURISÉES - FOURNISSEURS */}
                         <Route path="/dashboard-fournisseur" element={
                             <ProtectedRoute role="fournisseur">
                                 <DashboardFournisseur />
                             </ProtectedRoute>
                         } />
-                        <Route path="/dashboard/fournisseur" element={
-                            <ProtectedRoute role="fournisseur">
-                                <DashboardFournisseur />
-                            </ProtectedRoute>
-                        } />
+                        <Route path="/dashboard/fournisseur" element={<Navigate to="/dashboard-fournisseur" replace />} />
 
+
+                        {/* 🔴 PAGES SÉCURISÉES - ADMIN */}
                         <Route path="/admin" element={
                             <ProtectedRoute role="admin">
                                 <DashboardAdmin />
                             </ProtectedRoute>
                         } />
 
-                        {/* Redirection par défaut */}
+                        {/* 🔀 REDIRECTION PAR DÉFAUT */}
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                 </div>
