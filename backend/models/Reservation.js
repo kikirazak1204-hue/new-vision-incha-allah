@@ -2,17 +2,15 @@ const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
 const Reservation = sequelize.define('Reservation', {
-    // Clé primaire
     id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true
     },
 
-    // Champs de base
     besoin: {
         type: DataTypes.TEXT,
-        allowNull: false
+        allowNull: true
     },
     adresse: {
         type: DataTypes.STRING,
@@ -27,11 +25,32 @@ const Reservation = sequelize.define('Reservation', {
         allowNull: true
     },
     dateIntervention: {
-        type: DataTypes.DATE,
+        type: DataTypes.DATEONLY,
+        allowNull: true
+    },
+    // 💡 Ajout de l'heure d'intervention
+    heureIntervention: {
+        type: DataTypes.STRING(20),
         allowNull: true
     },
 
-    // 🛠️ CORRECTION PRODUCTION : STRING au lieu de ENUM
+    // Stockage JSON des services (compatible MySQL Aiven)
+    services: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        defaultValue: []
+    },
+
+    montantTotal: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+        defaultValue: 0.00
+    },
+    commentaireGlobal: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+
     type: {
         type: DataTypes.STRING(30),
         defaultValue: 'classique',
@@ -43,7 +62,6 @@ const Reservation = sequelize.define('Reservation', {
         }
     },
 
-    // 🛠️ CORRECTION PRODUCTION : STRING au lieu de ENUM
     parcours: {
         type: DataTypes.STRING(30),
         defaultValue: 'assignation',
@@ -55,7 +73,6 @@ const Reservation = sequelize.define('Reservation', {
         }
     },
 
-    // 🛠️ CORRECTION PRODUCTION : STRING au lieu de ENUM (Plus de crash MySQL !)
     statut: {
         type: DataTypes.STRING(50),
         defaultValue: 'EN_ATTENTE',
@@ -66,28 +83,40 @@ const Reservation = sequelize.define('Reservation', {
                     'ACCEPTEE', 'EN_PREPARATION', 'EN_COURS',
                     'VALIDEE', 'TERMINEE', 'ANNULEE'
                 ]],
-                msg: "Le statut envoyé par le frontend n'est pas reconnu."
+                msg: "Statut de réservation invalide."
             }
         }
     },
 
-    // 🛠️ CORRECTION PRODUCTION : STRING au lieu de ENUM
+    // 💡 Mise à jour des modes de paiement acceptés par le système
     modePaiement: {
         type: DataTypes.STRING(50),
         allowNull: true,
         validate: {
             isIn: {
-                args: [['direct_prestataire', 'depot_kanari']],
-                msg: "Mode de paiement invalide."
+                args: [['mobile_money', 'carte_bancaire', 'especes', 'depot_kanari', 'direct_prestataire']],
+                msg: "Mode de paiement non pris en charge."
             }
         }
     },
+
+    // 💡 Ajout du suivi de l'état financier du dossier
+    statutPaiement: {
+        type: DataTypes.STRING(30),
+        defaultValue: 'non_paye',
+        validate: {
+            isIn: {
+                args: [['non_paye', 'en_attente', 'paye', 'echoue']],
+                msg: "Statut de paiement invalide."
+            }
+        }
+    },
+
     codePrestataireUtilise: {
         type: DataTypes.STRING,
         allowNull: true
     },
 
-    // 🛠️ CORRECTION PRODUCTION : STRING au lieu de ENUM
     commissionStatut: {
         type: DataTypes.STRING(30),
         defaultValue: 'en_attente',
@@ -103,33 +132,24 @@ const Reservation = sequelize.define('Reservation', {
         allowNull: true
     },
 
-    // Clés étrangères déclarées explicitement
+    // Clés étrangères
     clientId: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        references: {
-            model: 'users',
-            key: 'id'
-        },
+        references: { model: 'users', key: 'id' },
         onDelete: 'SET NULL'
     },
     fournisseurId: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        references: {
-            model: 'fournisseurs',
-            key: 'id'
-        },
+        references: { model: 'fournisseurs', key: 'id' },
         onDelete: 'SET NULL'
     },
     serviceId: {
         type: DataTypes.INTEGER,
-        allowNull: false,
-        references: {
-            model: 'services',
-            key: 'id'
-        },
-        onDelete: 'CASCADE'
+        allowNull: true,
+        references: { model: 'services', key: 'id' },
+        onDelete: 'SET NULL'
     },
     serviceNom: {
         type: DataTypes.STRING,
@@ -140,10 +160,7 @@ const Reservation = sequelize.define('Reservation', {
     refusePar: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        references: {
-            model: 'users',
-            key: 'id'
-        },
+        references: { model: 'users', key: 'id' },
         onDelete: 'SET NULL'
     },
     motifRefus: {
@@ -156,7 +173,7 @@ const Reservation = sequelize.define('Reservation', {
         defaultValue: false
     },
 
-    // Champs Bon d'intervention 
+    // Bon d'intervention 
     descriptionTravail: {
         type: DataTypes.TEXT,
         allowNull: true

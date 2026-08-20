@@ -18,7 +18,9 @@ const BonIntervention = require('./BonIntervention');
 
 // 2. Définition des associations
 
-// Service ↔ Fournisseur / Produit / Reservation
+// ==========================================
+// Service
+// ==========================================
 Service.hasMany(Fournisseur, { foreignKey: 'serviceId', as: 'fournisseursService' });
 Fournisseur.belongsTo(Service, { foreignKey: 'serviceId', as: 'serviceFournisseur' });
 
@@ -28,7 +30,9 @@ Produit.belongsTo(Service, { foreignKey: 'serviceId', as: 'produitService' });
 Service.hasMany(Reservation, { foreignKey: 'serviceId', as: 'reservationsService' });
 Reservation.belongsTo(Service, { foreignKey: 'serviceId', as: 'service' });
 
-// Fournisseur ↔ User / Produit / Commande / Reservation
+// ==========================================
+// Fournisseur
+// ==========================================
 User.hasOne(Fournisseur, { foreignKey: 'userId', as: 'profilFournisseur' });
 Fournisseur.belongsTo(User, { foreignKey: 'userId', as: 'userFournisseur' });
 
@@ -41,51 +45,70 @@ Commande.belongsTo(Fournisseur, { foreignKey: 'fournisseurId', as: 'fournisseurC
 Fournisseur.hasMany(Reservation, { foreignKey: 'fournisseurId', as: 'missionsPrestataire' });
 Reservation.belongsTo(Fournisseur, { foreignKey: 'fournisseurId', as: 'prestataire' });
 
-// Commande ↔ User / Facture / Paiement
+// ==========================================
+// Commande & Produits
+// ==========================================
 User.hasMany(Commande, { foreignKey: 'clientId', as: 'commandesClient' });
 Commande.belongsTo(User, { foreignKey: 'clientId', as: 'clientCommande' });
 
 Commande.hasMany(Facture, { foreignKey: 'commandeId', as: 'facturesCommande' });
 Facture.belongsTo(Commande, { foreignKey: 'commandeId', as: 'factureCommande' });
 
-Commande.hasMany(Paiement, { foreignKey: 'commandeId', as: 'paiementsCommande' });
-Paiement.belongsTo(Commande, { foreignKey: 'commandeId', as: 'commandePaiement' });
+// 💡 CORRECTION PAIEMENT - L'alias est passé à "as: 'commande'" pour correspondre au contrôleur
+Commande.hasMany(Paiement, { foreignKey: 'commandeId', as: 'paiements' });
+Paiement.belongsTo(Commande, { foreignKey: 'commandeId', as: 'commande' });
 
-// Commande ↔ Produits via CommandeProduit
 Commande.hasMany(CommandeProduit, { foreignKey: 'commandeId', as: 'itemsCommande' });
 CommandeProduit.belongsTo(Commande, { foreignKey: 'commandeId', as: 'commandeProduit' });
 Produit.hasMany(CommandeProduit, { foreignKey: 'produitId', as: 'commandeProduits' });
 CommandeProduit.belongsTo(Produit, { foreignKey: 'produitId', as: 'produitCommandeProduit' });
 
-// Reservation ↔ User (client)
+// ==========================================
+// Reservation
+// ==========================================
 User.hasMany(Reservation, { foreignKey: 'clientId', as: 'reservationsClient' });
 Reservation.belongsTo(User, { foreignKey: 'clientId', as: 'client' });
 
-// Reservation ↔ Message
+// 💡 AJOUT PAIEMENT - Création de la relation Paiement ↔ Reservation manquante
+Reservation.hasMany(Paiement, { foreignKey: 'reservationId', as: 'paiements' });
+Paiement.belongsTo(Reservation, { foreignKey: 'reservationId', as: 'reservation' });
+
 Reservation.hasMany(Message, { foreignKey: 'reservationId', as: 'messages' });
 Message.belongsTo(Reservation, { foreignKey: 'reservationId', as: 'reservationMessage' });
 
-// Message ↔ User (expéditeur)
+// ==========================================
+// Paiement (Relation User)
+// ==========================================
+// 💡 AJOUT PAIEMENT - Lier le paiement au client pour la méthode getPaiementsClient
+User.hasMany(Paiement, { foreignKey: 'clientId', as: 'paiements' });
+Paiement.belongsTo(User, { foreignKey: 'clientId', as: 'client' });
+
+// ==========================================
+// Messages & Devis
+// ==========================================
 User.hasMany(Message, { foreignKey: 'senderId', as: 'messagesEnvoyes' });
 Message.belongsTo(User, { foreignKey: 'senderId', as: 'expediteur' });
 
-// Devis ↔ Reservation / Fournisseur
 Reservation.hasMany(Devis, { foreignKey: 'reservationId', as: 'devis' });
 Devis.belongsTo(Reservation, { foreignKey: 'reservationId', as: 'reservationDevis' });
 
 Fournisseur.hasMany(Devis, { foreignKey: 'fournisseurId', as: 'devisFournisseur' });
 Devis.belongsTo(Fournisseur, { foreignKey: 'fournisseurId', as: 'fournisseurDevis' });
 
-// Solde / Retrait ↔ Fournisseur
+// ==========================================
+// Finances Fournisseur (Solde & Retrait)
+// ==========================================
 Fournisseur.hasOne(Solde, { foreignKey: 'fournisseurId', as: 'soldeFournisseur' });
 Solde.belongsTo(Fournisseur, { foreignKey: 'fournisseurId', as: 'fournisseurSolde' });
 
 Fournisseur.hasMany(Retrait, { foreignKey: 'fournisseurId', as: 'retraits' });
 Retrait.belongsTo(Fournisseur, { foreignKey: 'fournisseurId', as: 'fournisseurRetrait' });
 
-// BonIntervention ↔ Reservation / Fournisseur
+// ==========================================
+// Bon Intervention
+// ==========================================
 Reservation.hasOne(BonIntervention, { foreignKey: 'reservationId', as: 'bonIntervention' });
-BonIntervention.belongsTo(Reservation, { foreignKey: 'reservationId', as: 'reservation' });
+BonIntervention.belongsTo(Reservation, { foreignKey: 'reservationId', as: 'reservationBon' });
 
 Fournisseur.hasMany(BonIntervention, { foreignKey: 'fournisseurId', as: 'bonsIntervention' });
 BonIntervention.belongsTo(Fournisseur, { foreignKey: 'fournisseurId', as: 'fournisseurBon' });
