@@ -155,7 +155,10 @@ const repairDatabase = async () => {
         "ALTER TABLE reservations ADD COLUMN besoin TEXT;",
         "ALTER TABLE reservations ADD COLUMN heureIntervention VARCHAR(20);",
         // ── Colonnes services ──
-        "ALTER TABLE services ADD COLUMN categorie VARCHAR(50) DEFAULT 'default';"
+        "ALTER TABLE services ADD COLUMN categorie VARCHAR(50) DEFAULT 'default';",
+        // ── Confirmées manquantes par les logs de production (09/09) ──
+        "ALTER TABLE reservations ADD COLUMN commentaireGlobal TEXT;",
+        "ALTER TABLE paiements ADD COLUMN reservationId INT;"
     ];
 
     console.log("🛠️ Vérification des colonnes manquantes...");
