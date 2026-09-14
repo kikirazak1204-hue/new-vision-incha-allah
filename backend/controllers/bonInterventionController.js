@@ -2,7 +2,7 @@ const { BonIntervention, Reservation, Fournisseur, User, Setting } = require('..
 const { Op } = require('sequelize');
 const { sendPushNotification } = require('../utils/firebaseNotifier');
 
-const TAUX_COMMISSION_DEFAUT = 10; // utilisé uniquement si le paramètre est introuvable en base
+const TAUX_COMMISSION_DEFAUT = 10;
 
 async function getTauxCommission() {
     try {
@@ -62,10 +62,6 @@ exports.creerBonIntervention = async (req, res) => {
         const montantPieces = montantPiecesOutils ? parseFloat(montantPiecesOutils) : 0;
         const montantFinal = mainOeuvre + montantPieces;
 
-        // ── Calcul réel de la commission Kanari ──
-        // Le taux appliqué est figé sur CE bon au moment de sa création :
-        // si le taux standard change plus tard, ce bon garde son taux
-        // d'origine (cohérent avec la règle "jamais rétroactif").
         const tauxCommission = await getTauxCommission();
         const montantCommission = Math.round((montantFinal * tauxCommission) / 100 * 100) / 100;
         const montantNet = Math.round((montantFinal - montantCommission) * 100) / 100;
@@ -156,7 +152,12 @@ exports.validerBon = async (req, res) => {
         }
 
         const reservation = await Reservation.findByPk(bon.reservationId);
-        if (!reservation || reservation.clientId !== req.user.id) {
+        if (!reservation) {
+            return res.status(404).json({ success: false, message: 'Réservation associée introuvable.' });
+        }
+
+        const isClientAuthorized = reservation.clientId === req.user.id || (req.user.telephone && reservation.telephone === req.user.telephone);
+        if (!isClientAuthorized) {
             return res.status(403).json({ success: false, message: 'Seul le client concerné peut valider cette prestation.' });
         }
 

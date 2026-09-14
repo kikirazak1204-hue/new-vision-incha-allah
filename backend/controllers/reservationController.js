@@ -1,20 +1,6 @@
-const { sequelize, Reservation, Fournisseur } = require('../models');
+const { sequelize, Reservation, Fournisseur, BonIntervention } = require('../models');
 const { sendNotification } = require('../utils/notifications');
-
-// ════════════════════════════════════════════════════════════════
-// Ce fichier a été nettoyé : il contenait plusieurs fonctions
-// (prestaAccepter, prestaRefuser, terminerMission, assignerFournisseur,
-// autoriserDemarrage, adminCreerReservation, updateStatut,
-// deleteReservation) qui dupliquaient — en moins bien, et parfois de
-// façon dangereuse (aucune vérification de propriété, statuts invalides,
-// contournement complet du bon d'intervention) — ce que
-// backend/routes/missions.js et backend/routes/admin.js font déjà
-// correctement et que le frontend appelle réellement.
-//
-// Ce fichier ne garde désormais que ce qui n'existe NULLE PART ailleurs :
-// la création de réservation, et les deux listes en lecture seule
-// utilisées par le client et le prestataire.
-// ════════════════════════════════════════════════════════════════
+const { Op } = require('sequelize');
 
 function formaterBesoin(detailsParticuliers = {}) {
     const lignes = Object.entries(detailsParticuliers)
@@ -24,7 +10,6 @@ function formaterBesoin(detailsParticuliers = {}) {
 }
 
 // ── POST /api/reservations/global (et /api/reservations) ───────
-// Crée UNE Reservation par service sélectionné (voir formaterBesoin).
 exports.createGlobalReservation = async (req, res) => {
     const transaction = await sequelize.transaction();
     try {
@@ -129,8 +114,18 @@ exports.createGlobalReservation = async (req, res) => {
 // ── GET /api/reservations/mes-reservations — Espace Client ─────
 exports.getMesReservations = async (req, res) => {
     try {
+        // Recherche large et robuste par ID client ET/OU par numéro de téléphone
+        const conditions = [{ clientId: req.user.id }];
+        if (req.user.telephone) {
+            conditions.push({ telephone: req.user.telephone });
+        }
+
         const reservations = await Reservation.findAll({
-            where: { clientId: req.user.id },
+            where: { [Op.or]: conditions },
+            include: [
+                { model: Fournisseur, as: 'fournisseur', attributes: ['id', 'nomEntreprise', 'telephone', 'note'] },
+                { model: BonIntervention, as: 'BonIntervention' }
+            ],
             order: [['createdAt', 'DESC']]
         });
         return res.status(200).json({ success: true, data: reservations });
@@ -141,11 +136,6 @@ exports.getMesReservations = async (req, res) => {
 };
 
 // ── GET /api/reservations/disponibles — Espace Prestataire ─────
-//
-// ✅ CORRIGÉ : retournait TOUTES les demandes EN_ATTENTE de la plateforme,
-// tous services confondus — un plombier voyait des demandes de traiteur.
-// Filtre désormais sur la spécialité du prestataire (son serviceId) et
-// exclut les demandes déjà assignées à quelqu'un d'autre.
 exports.getReservationsDisponibles = async (req, res) => {
     try {
         const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
