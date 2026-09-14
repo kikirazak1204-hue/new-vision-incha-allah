@@ -1,345 +1,573 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { getServices, registerUser, registerFournisseur } from '../util/api';
 
-const SERVICES_DIPLOME = ['médecin', 'docteur', 'avocat', 'enseignant', 'professeur', 'comptable', 'architecte', 'ingénieur', 'pharmacien', 'infirmier', 'notaire'];
+/*
+  KANARI — inscription simple et fiable
+  Principes :
+  - Un profil peut choisir PLUSIEURS services.
+  - Les champs secondaires restent optionnels au premier passage.
+  - Les documents de transport ne sont demandés que pour les activités
+    Livraison / Transport (ou un service dont le nom contient ces mots).
+  - Les informations manquantes peuvent être complétées plus tard par Kanari.
+  - Le contrat dépend du type de profil et sa version est envoyée au backend.
+*/
 
-const requiresDiplome = (serviceName) => {
-    if (!serviceName) return false;
-    return SERVICES_DIPLOME.some((s) => serviceName.toLowerCase().includes(s));
+const TYPES = {
+  prestataire: 'Prestataire',
+  partenaire: 'Partenaire',
+  fournisseur: 'Fournisseur',
 };
 
-function FileUpload({ label, preview, onChange, optional }) {
-    return (
-        <label className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-800 bg-slate-900/60 p-4 cursor-pointer hover:border-purple-500/40 transition min-h-[140px]">
-            {preview ? (
-                <img src={preview} alt="aperçu" className="h-24 w-full object-cover rounded-xl" />
-            ) : (
-                <span className="text-slate-500 text-sm text-center">
-                    {label}{optional && <span className="ml-1 text-slate-600">(optionnel)</span>}
-                </span>
-            )}
-            <input type="file" accept="image/*,.pdf" onChange={onChange} className="hidden" />
-            <span className="text-xs text-slate-600">
-                {preview ? '✅ Fichier sélectionné — cliquer pour changer' : 'Cliquer pour choisir'}
-            </span>
-        </label>
-    );
+const PAYMENTS = [
+  { id: 'NITA', name: 'NITA', mark: 'N', note: 'Paiement / transfert' },
+  { id: 'AMANA', name: 'AMANA', mark: 'A', note: 'Paiement / transfert' },
+  { id: 'Z CASH', name: 'Z CASH', mark: 'Z', note: 'Paiement / transfert' },
+  { id: 'AIRTEL MONEY', name: 'Airtel Money', mark: 'A', note: 'Mobile money' },
+  { id: 'CORIS BANK', name: 'Coris Bank', mark: 'CB', note: 'Compte bancaire' },
+  { id: 'ORABANK', name: 'Orabank', mark: 'O', note: 'Compte bancaire' },
+  { id: 'AUTRE', name: 'Autre', mark: '+', note: 'À préciser' },
+];
+
+const CONTRACTS = {
+  prestataire: {
+    title: 'Contrat de collaboration — Prestataire de services',
+    text: 'Kanari organise la réception des demandes, la coordination, le suivi de la mission et la relation avec le client.',
+    clauses: [
+      'Les informations communiquées doivent être exactes et mises à jour.',
+      'Le Prestataire exécute les prestations correspondant aux services qu’il a déclarés.',
+      'Kanari peut recevoir, coordonner, suivre et documenter les missions.',
+      'Le Prestataire reste responsable de l’exécution technique de son intervention.',
+      'Les paiements, commissions, annulations et litiges sont tracés par référence de mission.',
+      'Aucun volume minimum de missions n’est garanti sauf accord écrit spécifique.',
+    ],
+  },
+  partenaire: {
+    title: 'Contrat de partenariat commercial — Partenaire',
+    text: 'Kanari structure une relation commerciale avec le Partenaire pour les produits, services ou opportunités convenus.',
+    clauses: [
+      'Le Partenaire fournit des informations exactes sur son activité et ses représentants.',
+      'Kanari peut assurer visibilité, réception de demandes, coordination et suivi.',
+      'Les conditions commerciales, commissions et responsabilités sont définies avant opération.',
+      'Aucune exclusivité n’est présumée sans accord écrit.',
+      'Les commandes et transactions éligibles doivent rester traçables.',
+    ],
+  },
+  fournisseur: {
+    title: 'Contrat fournisseur / approvisionnement — Kanari',
+    text: 'Profil destiné aux fournisseurs de produits ou ressources, au Niger ou à l’étranger.',
+    clauses: [
+      'Le Fournisseur communique son identité, son pays d’établissement et les documents disponibles.',
+      'Produits, prix, délais, livraison et paiement sont définis avant chaque opération.',
+      'Kanari peut organiser les commandes, le suivi et la traçabilité des opérations convenues.',
+      'Les documents fiscaux, commerciaux, douaniers ou réglementaires requis peuvent être demandés.',
+      'Toute commission, marge ou rémunération de Kanari est définie avant l’opération.',
+    ],
+  },
+};
+
+const Input = ({ label, name, value, onChange, type = 'text', required = false, placeholder = '' }) => (
+  <label className="block">
+    <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+      {label}{required && <b className="text-amber-500"> *</b>}
+    </span>
+    <input
+      name={name}
+      type={type}
+      value={value}
+      onChange={onChange}
+      required={required}
+      placeholder={placeholder}
+      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm !text-[#061a3a] placeholder:!text-slate-400 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20"
+    />
+  </label>
+);
+
+const Select = ({ label, name, value, onChange, required = false, children }) => (
+  <label className="block">
+    <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+      {label}{required && <b className="text-amber-500"> *</b>}
+    </span>
+    <select
+      name={name}
+      value={value}
+      onChange={onChange}
+      required={required}
+      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm !text-[#061a3a] placeholder:!text-slate-400 outline-none focus:border-amber-400"
+    >
+      {children}
+    </select>
+  </label>
+);
+
+const FileBox = ({ label, file, onChange, required = false, hint = 'JPG, PNG ou PDF' }) => (
+  <label className="block cursor-pointer rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 hover:border-amber-400">
+    <span className="block text-sm font-semibold text-slate-700">
+      {label}{required && <b className="text-amber-500"> *</b>}
+    </span>
+    <span className="mt-1 block text-xs text-slate-500">{file ? file.name : hint}</span>
+    <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={onChange} className="mt-3 w-full text-xs" />
+  </label>
+);
+
+function PaymentCard({ payment, selected, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition ${
+        selected ? 'border-amber-400 bg-amber-50 ring-2 ring-amber-300/30' : 'border-slate-200 bg-white hover:border-amber-300'
+      }`}
+    >
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#061a3a] text-sm font-black text-amber-400">
+        {payment.mark}
+      </span>
+      <span>
+        <span className="block text-sm font-black text-[#061a3a]">{payment.name}</span>
+        <span className="block text-xs text-slate-500">{payment.note}</span>
+      </span>
+      {selected && <span className="ml-auto text-lg font-black text-amber-500">✓</span>}
+    </button>
+  );
 }
 
-export default function RegisterPrestataire({ setCurrentView }) {
-    const [form, setForm] = useState({
-        nom: '',
-        nomEntreprise: '',
-        email: '',
-        password: '',
-        telephone: '',
-        ville: '',
-        adresse: '',
-        quartier: '',
-        secteur: '',
-        description: '',
-        serviceId: '',
-        hasTransport: false,
-        hasMateriel: false,
-        immatriculation: '',
-        anneesExperience: '',
-        saitLireEcrire: '',
-        referenceClient: '',
+function Title({ n, title, desc }) {
+  return (
+    <div className="mb-7">
+      <div className="mb-2 text-xs font-black uppercase tracking-[.2em] text-amber-500">{n}</div>
+      <h2 className="text-2xl font-black text-[#061a3a]">{title}</h2>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">{desc}</p>
+    </div>
+  );
+}
+
+
+const FORM_CONTROL_STYLE =
+  "bg-white !text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] selection:bg-amber-200 selection:text-[#061a3a]";
+
+export default function RegisterPartenaireKanari({ setCurrentView }) {
+  const [step, setStep] = useState(1);
+  const [services, setServices] = useState([]);
+  const [selectedServiceNames, setSelectedServiceNames] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
+
+  const [form, setForm] = useState({
+    typeProfil: 'prestataire',
+    nom: '',
+    email: '',
+    password: '',
+    telephone: '',
+    numeroUrgence: '',
+    pays: 'Niger',
+    ville: '',
+    quartier: '',
+    secteur: '',
+    adresse: '',
+    langues: '',
+    serviceIds: [],
+    nomEntreprise: '',
+    statutJuridique: '',
+    nif: '',
+    rccm: '',
+    numeroRegistreEtranger: '',
+    paysImmatriculation: '',
+    experience: '',
+    description: '',
+    saitLireEcrire: '',
+    hasMateriel: false,
+    methodePaiement: '',
+    numeroPaiement: '',
+    devisePaiement: 'FCFA',
+    accepteContrat: false,
+    accepteConditions: false,
+  });
+
+  const [files, setFiles] = useState({
+    cniRecto: null,
+    cniVerso: null,
+    selfie: null,
+    diplome: null,
+    vehicule: null,
+    justificatifVehicule: null,
+    justificatifEntreprise: null,
+    documentFiscal: null,
+    catalogue: null,
+  });
+
+  useEffect(() => {
+    getServices()
+      .then((r) => setServices(r.data || []))
+      .catch(() => setServices([]));
+  }, []);
+
+  const contract = CONTRACTS[form.typeProfil];
+  const international = form.pays !== 'Niger';
+
+  // Le véhicule n'est demandé que si l'un des services sélectionnés est lié au transport/livraison.
+  const transportRequired = useMemo(() => {
+    const text = selectedServiceNames.join(' ').toLowerCase();
+    return /transport|livraison|chauffeur|taxi|moto|coursier|logistique/.test(text);
+  }, [selectedServiceNames]);
+
+  const diplomaPossible = useMemo(() => {
+    const text = selectedServiceNames.join(' ').toLowerCase();
+    return /médecin|docteur|avocat|enseignant|professeur|comptable|architecte|ingénieur|pharmacien|infirmier|notaire/.test(text);
+  }, [selectedServiceNames]);
+
+  const change = (e) => {
+    const { name, value, type, checked } = e.target;
+    setForm((p) => ({
+      ...p,
+      [name]: type === 'checkbox' ? checked : value,
+      ...(name === 'typeProfil' ? { accepteContrat: false } : {}),
+    }));
+  };
+
+  const toggleService = (id) => {
+    const service = services.find((s) => String(s.id) === String(id));
+    setForm((p) => {
+      const exists = p.serviceIds.some((x) => String(x) === String(id));
+      const next = exists ? p.serviceIds.filter((x) => String(x) !== String(id)) : [...p.serviceIds, id];
+      return { ...p, serviceIds: next };
     });
-
-    const [files, setFiles] = useState({
-        cniRecto: null,
-        cniVerso: null,
-        selfie: null,
-        diplome: null,
-        vehicule: null,
+    setSelectedServiceNames((current) => {
+      if (!service) return current;
+      const exists = form.serviceIds.some((x) => String(x) === String(id));
+      return exists ? current.filter((x) => x !== service.nom) : [...current, service.nom];
     });
+  };
 
-    const [previews, setPreviews] = useState({
-        cniRecto: null,
-        cniVerso: null,
-        selfie: null,
-        diplome: null,
-        vehicule: null,
-    });
+  const file = (key) => (e) => setFiles((p) => ({ ...p, [key]: e.target.files?.[0] || null }));
 
-    const [services, setServices] = useState([]);
-    const [selectedServiceName, setSelectedServiceName] = useState('');
-    const [message, setMessage] = useState('');
-    const [loading, setLoading] = useState(false);
+  const validate = () => {
+    // Seulement les informations vraiment nécessaires au premier passage sont obligatoires.
+    if (step === 1 && (!form.nom || !form.telephone || !form.password)) {
+      return 'Nom, téléphone et mot de passe sont obligatoires.';
+    }
+    if (step === 2 && form.typeProfil === 'prestataire' && form.serviceIds.length === 0) {
+      return 'Sélectionnez au moins un service.';
+    }
+    if (step === 2 && !form.nomEntreprise) return 'Indiquez au moins votre nom professionnel ou votre activité.';
+    if (step === 3 && (!form.pays || !form.ville)) return 'Le pays et la ville sont obligatoires.';
+    if (step === 4 && form.typeProfil === 'prestataire' && !files.cniRecto) {
+      return 'Une pièce d’identité est nécessaire pour commencer la vérification.';
+    }
+    if (step === 4 && transportRequired && !files.vehicule) {
+      return 'Pour un service de transport/livraison, ajoutez la photo du véhicule.';
+    }
+    if (step === 5 && !form.methodePaiement) return 'Choisissez un moyen de paiement/reversement.';
+    if (step === 5 && !form.numeroPaiement) return 'Indiquez le numéro ou la référence de paiement.';
+    if (step === 6 && (!form.accepteContrat || !form.accepteConditions)) {
+      return 'Acceptez le contrat et les conditions pour terminer.';
+    }
+    return null;
+  };
 
-    useEffect(() => {
-        getServices()
-            .then((res) => setServices(res.data || []))
-            .catch((err) => { console.error('Erreur chargement services :', err); setServices([]); });
-    }, []);
+  const next = () => {
+    const err = validate();
+    if (err) return setMessage({ type: 'error', text: err });
+    setMessage({});
+    setStep((s) => Math.min(6, s + 1));
+  };
 
-    const handleChange = (e) => {
-        const { name, value, type, checked } = e.target;
-        if (name === 'serviceId') {
-            const svc = services.find((s) => String(s.id) === String(value));
-            setSelectedServiceName(svc ? svc.nom : '');
-        }
-        setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
-    };
+  const prev = () => {
+    setMessage({});
+    setStep((s) => Math.max(1, s - 1));
+  };
 
-    const handleFile = (field) => (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        setFiles((prev) => ({ ...prev, [field]: file }));
-        setPreviews((prev) => ({ ...prev, [field]: URL.createObjectURL(file) }));
-    };
+  const submit = async (e) => {
+    e.preventDefault();
+    const err = validate();
+    if (err) return setMessage({ type: 'error', text: err });
+    setLoading(true);
+    setMessage({});
 
-    const diplomeRequired = requiresDiplome(selectedServiceName);
+    try {
+      // Conserver la compatibilité avec l'API actuelle.
+      const auth = await registerUser({
+        nom: form.nom,
+        email: form.email || undefined,
+        password: form.password,
+        telephone: form.telephone,
+        ville: form.ville,
+        role: 'fournisseur',
+      });
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setMessage('');
+      if (!auth?.success || !auth?.token) throw new Error(auth?.message || 'Création du compte impossible.');
+      localStorage.setItem('token', auth.token);
+      localStorage.setItem('user', JSON.stringify(auth.user));
 
-        if (!form.nom || !form.email || !form.password || !form.nomEntreprise || !form.serviceId) {
-            setMessage('❌ Merci de remplir les champs obligatoires.'); return;
-        }
-        if (!files.cniRecto) { setMessage('❌ La photo CNI (recto) est obligatoire.'); return; }
-        if (!files.cniVerso) { setMessage('❌ La photo CNI (verso) est obligatoire.'); return; }
-        if (!files.selfie) { setMessage('❌ La photo personnelle (selfie) est obligatoire.'); return; }
-        if (!form.saitLireEcrire) { setMessage('❌ Veuillez indiquer si vous savez lire et écrire le français.'); return; }
-        if (diplomeRequired && !files.diplome) { setMessage('❌ Un diplôme ou certificat est obligatoire pour ce service.'); return; }
-        if (form.hasTransport && !files.vehicule) { setMessage('❌ La photo du véhicule est obligatoire si vous avez le transport.'); return; }
+      const data = new FormData();
+      data.append('userId', auth.user.id);
 
-        setLoading(true);
-        try {
-            const auth = await registerUser({
-                nom: form.nom,
-                email: form.email,
-                password: form.password,
-                telephone: form.telephone,
-                ville: form.ville,
-                role: 'fournisseur',
-            });
+      Object.entries(form).forEach(([key, value]) => {
+        if (key === 'password' || key === 'serviceIds') return;
+        if (value !== '' && value != null) data.append(key, String(value));
+      });
 
-            if (!auth.success || !auth.token) throw new Error(auth.message || 'Erreur lors de la création du compte.');
+      // Plusieurs services : envoyer le tableau sous forme répétée et JSON pour faciliter le backend.
+      form.serviceIds.forEach((id) => data.append('serviceIds[]', String(id)));
+      data.append('serviceIds', JSON.stringify(form.serviceIds));
+      data.append('serviceNames', JSON.stringify(selectedServiceNames));
 
-            localStorage.setItem('token', auth.token);
-            localStorage.setItem('user', JSON.stringify(auth.user));
+      data.append('contractType', form.typeProfil);
+      data.append('contractVersion', '1.1');
+      data.append('contractTitle', contract.title);
+      data.append('contractAccepted', String(form.accepteContrat));
+      data.append('transportRequired', String(transportRequired));
+      data.append('registrationMode', 'simple_progressive');
 
-            const formData = new FormData();
-            formData.append('userId', auth.user.id);
-            formData.append('serviceId', form.serviceId);
-            formData.append('nomEntreprise', form.nomEntreprise);
-            formData.append('adresse', form.adresse);
-            formData.append('quartier', form.quartier);
-            formData.append('secteur', form.secteur);
-            formData.append('telephone', form.telephone);
-            formData.append('description', form.description);
-            formData.append('hasTransport', form.hasTransport);
-            formData.append('hasMateriel', form.hasMateriel);
-            formData.append('anneesExperience', form.anneesExperience);
-            formData.append('saitLireEcrire', form.saitLireEcrire);
-            formData.append('referenceClient', form.referenceClient);
-            if (form.hasTransport) formData.append('immatriculation', form.immatriculation);
+      Object.entries(files).forEach(([key, value]) => {
+        if (value) data.append(key, value);
+      });
 
-            formData.append('cniRecto', files.cniRecto);
-            formData.append('cniVerso', files.cniVerso);
-            formData.append('selfie', files.selfie);
-            if (files.diplome) formData.append('diplome', files.diplome);
-            if (files.vehicule) formData.append('photoVehicule', files.vehicule);
+      const profile = await registerFournisseur(data, auth.token);
+      if (!profile?.success) throw new Error(profile?.message || 'Erreur lors de la création du profil.');
 
-            const profil = await registerFournisseur(formData, auth.token);
+      setMessage({
+        type: 'success',
+        text: 'Dossier envoyé. Kanari peut maintenant vérifier le profil et compléter les informations manquantes si nécessaire.',
+      });
+      setTimeout(() => setCurrentView?.('dashboardPrestataire'), 1800);
+    } catch (err) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setMessage({ type: 'error', text: err.message || 'Erreur serveur.' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-            if (!profil.success) {
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-                throw new Error(profil.message || 'Erreur création profil fournisseur.');
-            }
+  const steps = ['Compte', 'Services', 'Localisation', 'Vérification', 'Paiement', 'Contrat'];
 
-            setMessage('✅ Inscription réussie ! Redirection en cours...');
-            setTimeout(() => setCurrentView && setCurrentView('dashboardPrestataire'), 1200);
-        } catch (err) {
-            console.error('Erreur inscription fournisseur :', err);
-            setMessage('❌ ' + (err.message || 'Erreur serveur. Réessayez plus tard.'));
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased px-4 py-10">
-            <div className="max-w-4xl mx-auto bg-slate-900/60 backdrop-blur-md border border-slate-800 rounded-3xl p-8 shadow-xl">
-
-                <div className="mb-8 text-center">
-                    <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full text-xs font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20 mb-4">
-                        🏢 Espace prestataire
-                    </span>
-                    <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">Inscription Fournisseur</h1>
-                    <p className="mt-3 text-slate-400 text-sm sm:text-base">
-                        Rejoignez la plateforme pour proposer vos prestations et accéder à votre espace prestataire.
-                    </p>
-                </div>
-
-                {message && (
-                    <div className={`mb-6 rounded-2xl p-4 text-center font-semibold text-sm border ${message.startsWith('✅') ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' : 'bg-red-500/10 text-red-300 border-red-500/20'}`}>
-                        {message}
-                    </div>
-                )}
-
-                <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
-
-                    {/* ── SECTION 1 ── */}
-                    <div className="col-span-2">
-                        <p className="text-slate-500 text-xs uppercase tracking-widest mb-3 border-b border-slate-800 pb-2 flex items-center gap-2">
-                            <span className="w-1.5 h-4 bg-purple-500 rounded-full" /> Informations personnelles
-                        </p>
-                    </div>
-
-                    <input name="nom" type="text" value={form.nom} onChange={handleChange}
-                        placeholder="Votre nom *" className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:border-purple-500/50 outline-none transition" />
-                    <input name="email" type="email" value={form.email} onChange={handleChange}
-                        placeholder="Email *" className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:border-purple-500/50 outline-none transition" />
-                    <input name="password" type="password" value={form.password} onChange={handleChange}
-                        placeholder="Mot de passe *" className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:border-purple-500/50 outline-none transition" />
-                    <input name="telephone" type="tel" value={form.telephone} onChange={handleChange}
-                        placeholder="Téléphone" className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:border-purple-500/50 outline-none transition" />
-                    <input name="ville" type="text" value={form.ville} onChange={handleChange}
-                        placeholder="Ville" className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:border-purple-500/50 outline-none transition" />
-                    <input name="adresse" type="text" value={form.adresse} onChange={handleChange}
-                        placeholder="Adresse" className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:border-purple-500/50 outline-none transition" />
-                    <input name="quartier" type="text" value={form.quartier} onChange={handleChange}
-                        placeholder="Quartier" className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:border-purple-500/50 outline-none transition" />
-                    <input name="secteur" type="text" value={form.secteur} onChange={handleChange}
-                        placeholder="Secteur" className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:border-purple-500/50 outline-none transition" />
-
-                    {/* ── SECTION 2 ── */}
-                    <div className="col-span-2 mt-2">
-                        <p className="text-slate-500 text-xs uppercase tracking-widest mb-3 border-b border-slate-800 pb-2 flex items-center gap-2">
-                            <span className="w-1.5 h-4 bg-purple-500 rounded-full" /> Entreprise & Service
-                        </p>
-                    </div>
-
-                    <input name="nomEntreprise" type="text" value={form.nomEntreprise} onChange={handleChange}
-                        placeholder="Nom de l'entreprise *" className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:border-purple-500/50 outline-none transition" />
-                    <select name="serviceId" value={form.serviceId} onChange={handleChange}
-                        className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 text-white focus:border-purple-500/50 outline-none transition">
-                        <option value="">Sélectionnez votre service *</option>
-                        {services.map((service) => (
-                            <option key={service.id} value={service.id} className="bg-slate-900 text-white">{service.nom}</option>
-                        ))}
-                    </select>
-
-                    <textarea name="description" value={form.description} onChange={handleChange}
-                        placeholder="Description de votre activité"
-                        className="w-full col-span-2 p-4 rounded-2xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:border-purple-500/50 outline-none transition min-h-[100px]" />
-
-                    {/* ── SECTION 3 ── */}
-                    <div className="col-span-2 mt-2">
-                        <p className="text-slate-500 text-xs uppercase tracking-widest mb-3 border-b border-slate-800 pb-2 flex items-center gap-2">
-                            <span className="w-1.5 h-4 bg-purple-500 rounded-full" /> Expérience & Compétences
-                        </p>
-                    </div>
-
-                    <div className="col-span-2 md:col-span-1">
-                        <label className="block text-slate-400 text-sm mb-2">Depuis combien d'années exercez-vous ce travail ?</label>
-                        <select name="anneesExperience" value={form.anneesExperience} onChange={handleChange}
-                            className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 text-white focus:border-purple-500/50 outline-none transition">
-                            <option value="">Sélectionnez</option>
-                            <option value="moins1" className="bg-slate-900">Moins d'1 an</option>
-                            <option value="1-2" className="bg-slate-900">1 à 2 ans</option>
-                            <option value="3-5" className="bg-slate-900">3 à 5 ans</option>
-                            <option value="6-10" className="bg-slate-900">6 à 10 ans</option>
-                            <option value="plus10" className="bg-slate-900">Plus de 10 ans</option>
-                        </select>
-                    </div>
-
-                    <div className="col-span-2 md:col-span-1">
-                        <label className="block text-slate-400 text-sm mb-2">Savez-vous lire et écrire le français ? *</label>
-                        <div className="flex gap-3">
-                            <label className="flex-1 flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 cursor-pointer hover:border-purple-500/30 transition">
-                                <input type="radio" name="saitLireEcrire" value="oui" checked={form.saitLireEcrire === 'oui'} onChange={handleChange} className="h-4 w-4 accent-purple-500" />
-                                <span className="text-sm text-slate-200">✅ Oui</span>
-                            </label>
-                            <label className="flex-1 flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 cursor-pointer hover:border-purple-500/30 transition">
-                                <input type="radio" name="saitLireEcrire" value="non" checked={form.saitLireEcrire === 'non'} onChange={handleChange} className="h-4 w-4 accent-purple-500" />
-                                <span className="text-sm text-slate-200">❌ Non</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div className="col-span-2">
-                        <label className="block text-slate-400 text-sm mb-2">
-                            Numéro d'un client ou d'une entreprise satisfait(e) <span className="text-slate-600">(optionnel)</span>
-                        </label>
-                        <input name="referenceClient" type="tel" value={form.referenceClient} onChange={handleChange}
-                            placeholder="Ex: +227 90 00 00 00"
-                            className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:border-purple-500/50 outline-none transition" />
-                    </div>
-
-                    {/* ── SECTION 4 ── */}
-                    <div className="col-span-2 mt-2">
-                        <p className="text-slate-500 text-xs uppercase tracking-widest mb-3 border-b border-slate-800 pb-2 flex items-center gap-2">
-                            <span className="w-1.5 h-4 bg-purple-500 rounded-full" /> Capacités
-                        </p>
-                    </div>
-
-                    <div className="col-span-2 grid gap-4 md:grid-cols-2">
-                        <label className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 cursor-pointer hover:border-purple-500/30 transition">
-                            <input type="checkbox" name="hasTransport" checked={form.hasTransport} onChange={handleChange} className="h-4 w-4 rounded accent-purple-500" />
-                            <span className="text-slate-200">🚗 Transport disponible</span>
-                        </label>
-                        <label className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 cursor-pointer hover:border-purple-500/30 transition">
-                            <input type="checkbox" name="hasMateriel" checked={form.hasMateriel} onChange={handleChange} className="h-4 w-4 rounded accent-purple-500" />
-                            <span className="text-slate-200">🛠️ Matériel disponible</span>
-                        </label>
-                    </div>
-
-                    {form.hasTransport && (
-                        <div className="col-span-2 grid gap-4 md:grid-cols-2">
-                            <FileUpload label="📸 Photo du véhicule *" preview={previews.vehicule} onChange={handleFile('vehicule')} />
-                            <input name="immatriculation" type="text" value={form.immatriculation} onChange={handleChange}
-                                placeholder="Numéro d'immatriculation"
-                                className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:border-purple-500/50 outline-none transition self-start" />
-                        </div>
-                    )}
-
-                    {/* ── SECTION 5 ── */}
-                    <div className="col-span-2 mt-2">
-                        <p className="text-slate-500 text-xs uppercase tracking-widest mb-3 border-b border-slate-800 pb-2 flex items-center gap-2">
-                            <span className="w-1.5 h-4 bg-purple-500 rounded-full" /> Documents d'identité
-                        </p>
-                    </div>
-
-                    <div className="col-span-2 grid gap-4 md:grid-cols-3">
-                        <FileUpload label="🪪 CNI Recto *" preview={previews.cniRecto} onChange={handleFile('cniRecto')} />
-                        <FileUpload label="🪪 CNI Verso *" preview={previews.cniVerso} onChange={handleFile('cniVerso')} />
-                        <FileUpload label="🤳 Photo personnelle (selfie) *" preview={previews.selfie} onChange={handleFile('selfie')} />
-                    </div>
-
-                    <div className="col-span-2">
-                        {diplomeRequired && (
-                            <p className="text-amber-400 text-sm mb-2 font-semibold">
-                                ⚠️ Ce service exige un diplôme ou certificat professionnel.
-                            </p>
-                        )}
-                        <FileUpload
-                            label={diplomeRequired ? "🎓 Diplôme / Certification *" : "🎓 Diplôme / Certification"}
-                            preview={previews.diplome}
-                            onChange={handleFile('diplome')}
-                            optional={!diplomeRequired}
-                        />
-                    </div>
-
-                    {/* ── BOUTON ── */}
-                    <button type="submit" disabled={loading}
-                        className={`col-span-2 py-4 rounded-2xl font-bold transition mt-4 ${loading ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/10 hover:shadow-purple-600/20 hover:opacity-95'}`}>
-                        {loading ? '⏳ Inscription en cours...' : "✅ S'inscrire comme fournisseur"}
-                    </button>
-                </form>
-
-                <p className="mt-6 text-center text-slate-500 text-sm">
-                    Déjà inscrit ?{' '}
-                    <button onClick={() => setCurrentView && setCurrentView('login')} className="text-purple-400 hover:text-purple-300 font-semibold transition">
-                        Connectez-vous
-                    </button>
-                </p>
+  return (
+    <div className="min-h-screen bg-slate-50 px-4 py-8">
+      <div className="mx-auto max-w-5xl overflow-hidden rounded-3xl bg-white shadow-xl">
+        <header className="bg-[#061a3a] px-6 py-7 text-white md:px-10">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-xs font-black uppercase tracking-[.25em] text-amber-400">KANARI SERVICE</div>
+              <h1 className="mt-1 text-2xl font-black md:text-3xl">Créer votre profil professionnel</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                Inscription rapide. Les informations secondaires peuvent être complétées après l’inscription.
+              </p>
             </div>
-        </div>
-    );
+            <div className="hidden h-14 w-14 place-items-center rounded-2xl bg-amber-400 text-3xl font-black text-[#061a3a] md:grid">K</div>
+          </div>
+
+          <div className="mt-7 grid grid-cols-3 gap-2 md:grid-cols-6">
+            {steps.map((s, i) => (
+              <div key={s} className={`rounded-xl px-2 py-2 text-center text-xs font-bold ${step === i + 1 ? 'bg-amber-400 text-[#061a3a]' : step > i + 1 ? 'bg-white/15 text-white' : 'bg-white/5 text-slate-400'}`}>
+                {i + 1}. {s}
+              </div>
+            ))}
+          </div>
+        </header>
+
+        <form onSubmit={submit} className="p-6 md:p-10">
+          {message.text && (
+            <div className={`mb-6 rounded-2xl p-4 text-sm font-semibold ${message.type === 'error' ? 'border border-red-200 bg-red-50 text-red-700' : 'border border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+              {message.text}
+            </div>
+          )}
+
+          {step === 1 && (
+            <>
+              <Title n="01 — COMPTE" title="Qui êtes-vous ?" desc="Nous demandons uniquement le nécessaire pour créer le compte." />
+              <div className="mb-6 grid gap-3 md:grid-cols-3">
+                {Object.entries(TYPES).map(([id, label]) => (
+                  <label key={id} className={`cursor-pointer rounded-2xl border p-4 ${form.typeProfil === id ? 'border-amber-400 bg-amber-50' : 'border-slate-200'}`}>
+                    <input type="radio" name="typeProfil" value={id} checked={form.typeProfil === id} onChange={change} className="mr-2 accent-amber-400" />
+                    <span className="font-black text-[#061a3a]">{label}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input label="Nom complet / représentant" name="nom" value={form.nom} onChange={change} required />
+                <Input label="Téléphone principal" name="telephone" type="tel" value={form.telephone} onChange={change} required />
+                <Input label="Email" name="email" type="email" value={form.email} onChange={change} placeholder="Optionnel" />
+                <Input label="Numéro d'urgence" name="numeroUrgence" type="tel" value={form.numeroUrgence} onChange={change} placeholder="Optionnel" />
+                <Input label="Mot de passe" name="password" type="password" value={form.password} onChange={change} required />
+                <Input label="Langues parlées" name="langues" value={form.langues} onChange={change} placeholder="Français, Zarma, Haoussa..." />
+              </div>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              <Title n="02 — SERVICES" title="Que proposez-vous ?" desc="Vous pouvez sélectionner plusieurs services. Ne remplissez pas ce qui ne vous concerne pas." />
+              {form.typeProfil === 'prestataire' && (
+                <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-slate-700">
+                  <b className="text-[#061a3a]">Plusieurs services autorisés :</b> sélectionnez tous les métiers que vous pouvez réellement assurer.
+                </div>
+              )}
+
+              {form.typeProfil === 'prestataire' && (
+                <div className="grid max-h-80 gap-3 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
+                  {services.length ? services.map((s) => {
+                    const active = form.serviceIds.some((id) => String(id) === String(s.id));
+                    return (
+                      <label key={s.id} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 ${active ? 'border-amber-400 bg-white' : 'border-slate-200 bg-white'}`}>
+                        <input type="checkbox" checked={active} onChange={() => toggleService(s.id)} className="h-5 w-5 accent-amber-400" />
+                        <span className="text-sm font-semibold text-slate-700">{s.nom}</span>
+                      </label>
+                    );
+                  }) : <p className="text-sm text-slate-500">Impossible de charger les services. Vérifiez l’API.</p>}
+                </div>
+              )}
+
+              {selectedServiceNames.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {selectedServiceNames.map((name) => <span key={name} className="rounded-full bg-[#061a3a] px-3 py-1 text-xs font-bold text-white">{name}</span>)}
+                </div>
+              )}
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <Input label="Nom professionnel / activité" name="nomEntreprise" value={form.nomEntreprise} onChange={change} required placeholder="Ex. Abdo Électricité" />
+                <Select label="Statut juridique" name="statutJuridique" value={form.statutJuridique} onChange={change}>
+                  <option value="">Non renseigné</option>
+                  <option>Indépendant</option>
+                  <option>Entreprise Individuelle</option>
+                  <option>SARL / Société</option>
+                  <option>Association / Organisation</option>
+                  <option>Coopérative</option>
+                  <option>Autre</option>
+                </Select>
+                <Select label="Expérience" name="experience" value={form.experience} onChange={change}>
+                  <option value="">Non renseignée</option>
+                  <option>Débutant</option>
+                  <option>Intermédiaire</option>
+                  <option>Confirmé</option>
+                  <option>Expert</option>
+                </Select>
+                <Input label="NIF" name="nif" value={form.nif} onChange={change} placeholder="Optionnel au départ" />
+                <Input label="RCCM" name="rccm" value={form.rccm} onChange={change} placeholder="Optionnel au départ" />
+                <label className="flex items-center rounded-xl border border-slate-200 p-4 text-sm font-semibold">
+                  <input type="checkbox" name="hasMateriel" checked={form.hasMateriel} onChange={change} className="mr-3 h-5 w-5 accent-amber-400" /> Matériel disponible
+                </label>
+                <div className="md:col-span-2">
+                  <textarea name="description" value={form.description} onChange={change} rows="4" placeholder="Spécialités, zones couvertes, produits ou précisions... (optionnel)" className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-amber-400" />
+                </div>
+              </div>
+            </>
+          )}
+
+          {step === 3 && (
+            <>
+              <Title n="03 — LOCALISATION" title="Où intervenez-vous ?" desc="Le pays et la ville suffisent pour commencer. Le reste peut être ajouté plus tard." />
+              <div className="grid gap-4 md:grid-cols-2">
+                <Select label="Pays" name="pays" value={form.pays} onChange={change} required>
+                  <option>Niger</option><option>Nigeria</option><option>Bénin</option><option>Togo</option><option>Ghana</option><option>Côte d'Ivoire</option><option>Sénégal</option><option>France</option><option>Autre</option>
+                </Select>
+                <Input label="Ville" name="ville" value={form.ville} onChange={change} required />
+                <Input label="Quartier / zone" name="quartier" value={form.quartier} onChange={change} placeholder="Optionnel" />
+                <Input label="Secteur / arrondissement" name="secteur" value={form.secteur} onChange={change} placeholder="Optionnel" />
+                <div className="md:col-span-2"><Input label="Adresse professionnelle" name="adresse" value={form.adresse} onChange={change} placeholder="Optionnel au départ" /></div>
+              </div>
+              {international && (
+                <div className="mt-5 grid gap-4 rounded-2xl border border-blue-200 bg-blue-50 p-5 md:grid-cols-2">
+                  <div className="md:col-span-2 text-sm font-semibold text-blue-900">Profil hors Niger : les documents d’immatriculation seront complétés selon le pays.</div>
+                  <Input label="N° d'immatriculation étranger" name="numeroRegistreEtranger" value={form.numeroRegistreEtranger} onChange={change} placeholder="Optionnel au premier passage" />
+                  <Input label="Pays d'immatriculation" name="paysImmatriculation" value={form.paysImmatriculation} onChange={change} placeholder="Optionnel au premier passage" />
+                </div>
+              )}
+            </>
+          )}
+
+          {step === 4 && (
+            <>
+              <Title n="04 — VÉRIFICATION" title="Les documents essentiels" desc="Nous évitons de demander des documents inutiles. Kanari pourra demander les pièces complémentaires après étude." />
+              <div className="grid gap-4 md:grid-cols-2">
+                {form.typeProfil === 'prestataire' ? (
+                  <>
+                    <FileBox label="Pièce d’identité — Recto" file={files.cniRecto} onChange={file('cniRecto')} required />
+                    <FileBox label="Pièce d’identité — Verso" file={files.cniVerso} onChange={file('cniVerso')} hint="Optionnel si non nécessaire" />
+                    <FileBox label="Selfie de vérification" file={files.selfie} onChange={file('selfie')} hint="Optionnel — pourra être demandé par Kanari" />
+                    <FileBox label="Diplôme / certificat" file={files.diplome} onChange={file('diplome')} required={diplomaPossible} hint={diplomaPossible ? 'Recommandé / requis selon le métier' : 'Optionnel selon le service'} />
+                    {transportRequired && (
+                      <>
+                        <FileBox label="Photo du véhicule" file={files.vehicule} onChange={file('vehicule')} required hint="Obligatoire pour Transport / Livraison" />
+                        <FileBox label="Carte grise / immatriculation" file={files.justificatifVehicule} onChange={file('justificatifVehicule')} hint="Photo ou PDF — obligatoire selon le véhicule et le service" />
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <FileBox label="Justificatif d'entreprise / activité" file={files.justificatifEntreprise} onChange={file('justificatifEntreprise')} hint="Optionnel au premier passage" />
+                    <FileBox label="Document fiscal / registre" file={files.documentFiscal} onChange={file('documentFiscal')} hint="NIF, RCCM ou équivalent — optionnel au départ" />
+                    <FileBox label="Catalogue / offre commerciale" file={files.catalogue} onChange={file('catalogue')} hint="Optionnel" />
+                  </>
+                )}
+              </div>
+
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+                <b className="text-[#061a3a]">Principe Kanari :</b> inscription ≠ validation définitive. Un dossier peut être créé avec les informations essentielles puis passer en vérification. Les éléments manquants pourront être demandés plus tard.
+              </div>
+            </>
+          )}
+
+          {step === 5 && (
+            <>
+              <Title n="05 — PAIEMENT" title="Où recevoir vos règlements ?" desc="Choisissez le moyen que Kanari utilisera pour les reversements ou règlements. Les autres informations peuvent être complétées plus tard." />
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {PAYMENTS.map((p) => <PaymentCard key={p.id} payment={p} selected={form.methodePaiement === p.id} onClick={() => setForm((x) => ({ ...x, methodePaiement: p.id }))} />)}
+              </div>
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <Input label="Numéro / référence de paiement" name="numeroPaiement" value={form.numeroPaiement} onChange={change} required placeholder="Ex. numéro mobile ou compte" />
+                <Select label="Devise" name="devisePaiement" value={form.devisePaiement} onChange={change}>
+                  <option>FCFA</option><option>EUR</option><option>USD</option><option>Autre</option>
+                </Select>
+              </div>
+              <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-slate-700">
+                <b className="text-[#061a3a]">Important :</b> ces cartes sont des repères visuels intégrés à l’interface. Si Kanari dispose des logos officiels des opérateurs, remplacez le carré avec la lettre par leur image officielle dans <code>PaymentCard</code>.
+              </div>
+            </>
+          )}
+
+          {step === 6 && (
+            <>
+              <Title n="06 — CONTRAT" title="Dernière étape" desc="Le document présenté correspond au type de profil choisi au début." />
+              <div className="overflow-hidden rounded-2xl border border-amber-200">
+                <div className="bg-[#061a3a] p-5 text-white">
+                  <div className="mb-2 text-xs font-bold uppercase tracking-widest text-amber-400">Document contractuel</div>
+                  <h3 className="text-lg font-black">{contract.title}</h3>
+                  <p className="mt-2 text-sm text-slate-300">{contract.text}</p>
+                </div>
+                <div className="max-h-72 overflow-y-auto p-5">
+                  <ol className="space-y-3 text-sm leading-6 text-slate-700">
+                    {contract.clauses.map((c, i) => <li key={i}><b className="mr-2 text-amber-500">{i + 1}.</b>{c}</li>)}
+                  </ol>
+                </div>
+                <label className="flex gap-3 border-t bg-slate-50 p-5 text-sm leading-6">
+                  <input type="checkbox" checked={form.accepteContrat} onChange={(e) => setForm((p) => ({ ...p, accepteContrat: e.target.checked }))} className="mt-1 h-5 w-5 accent-amber-400" />
+                  <span>Je confirme avoir lu le document correspondant à mon profil et j’accepte les conditions présentées par Kanari.<b className="text-amber-500"> *</b></span>
+                </label>
+              </div>
+              <label className="mt-5 flex gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm leading-6">
+                <input type="checkbox" name="accepteConditions" checked={form.accepteConditions} onChange={change} className="mt-1 h-5 w-5 accent-amber-400" />
+                <span>Je confirme que les informations fournies sont exactes et j’accepte les règles générales de vérification, suivi, paiement, commission et gestion des incidents Kanari.<b className="text-amber-500"> *</b></span>
+              </label>
+            </>
+          )}
+
+          <div className="mt-8 flex justify-between border-t border-slate-200 pt-6">
+            {step > 1 ? (
+              <button type="button" onClick={prev} className="rounded-xl border px-6 py-3 text-sm font-bold">Retour</button>
+            ) : (
+              <button type="button" onClick={() => setCurrentView?.('login')} className="text-sm font-semibold text-slate-500">J’ai déjà un compte</button>
+            )}
+            {step < 6 ? (
+              <button type="button" onClick={next} className="rounded-xl bg-[#061a3a] px-7 py-3 text-sm font-bold text-white">Continuer</button>
+            ) : (
+              <button type="submit" disabled={loading} className="rounded-xl bg-amber-400 px-7 py-3 text-sm font-black text-[#061a3a] disabled:opacity-60">
+                {loading ? 'Envoi du dossier...' : 'Créer mon profil Kanari'}
+              </button>
+            )}
+          </div>
+        </form>
+
+        <footer className="bg-slate-50 py-6 text-center text-xs text-slate-400">KANARI SERVICE — Un réseau pour tous</footer>
+      </div>
+    </div>
+  );
 }
