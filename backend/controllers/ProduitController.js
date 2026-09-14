@@ -1,5 +1,4 @@
 const { Produit, Fournisseur, Service } = require('../models');
-// 📡 Importation de Firebase (s'adapte automatiquement en local ou sur Render)
 const admin = require('../config/firebase-admin');
 
 // 🔍 Obtenir tous les produits avec relations
@@ -8,7 +7,7 @@ exports.getAll = async (req, res) => {
         const produits = await Produit.findAll({
             order: [['createdAt', 'DESC']],
             include: [
-                { model: Fournisseur, as: 'fournisseur' },
+                { model: Fournisseur, as: 'fournisseur', attributes: ['id', 'nomEntreprise', 'telephone'] },
                 { model: Service, as: 'service' }
             ]
         });
@@ -24,7 +23,7 @@ exports.getById = async (req, res) => {
     try {
         const produit = await Produit.findByPk(req.params.id, {
             include: [
-                { model: Fournisseur, as: 'fournisseur' },
+                { model: Fournisseur, as: 'fournisseur', attributes: ['id', 'nomEntreprise', 'telephone'] },
                 { model: Service, as: 'service' }
             ]
         });
@@ -37,50 +36,55 @@ exports.getById = async (req, res) => {
     }
 };
 
-// 📝 Créer un produit avec notification Movie Box !
+// 📝 Créer un produit avec notification Movie Box
 exports.create = async (req, res) => {
     try {
-        // 1. Création du produit en BDD (Ton code d'origine)
+        // Récupérer le bon ID fournisseur lié à l'utilisateur connecté
+        let fournisseurId = req.body.fournisseurId;
+        if (req.user) {
+            const fournisseurProfil = await Fournisseur.findOne({ where: { userId: req.user.id } });
+            if (fournisseurProfil) {
+                fournisseurId = fournisseurProfil.id;
+            }
+        }
+
+        const imageName = req.file ? req.file.filename : (req.body.image || null);
+
         const produit = await Produit.create({
             ...req.body,
-            fournisseurId: req.user?.id || req.body.fournisseurId
+            image: imageName,
+            fournisseurId: fournisseurId || null
         });
 
-        // 2. 🚀 ENVOI DE LA NOTIFICATION MOVIE BOX EN ARRIÈRE-PLAN
+        // 🚀 Notification en arrière-plan
         try {
-            // On récupère le nom du fournisseur pour personnaliser le message
-            const fournisseur = await Fournisseur.findByPk(produit.fournisseurId);
+            const fournisseur = await Fournisseur.findByPk(fournisseurId);
             const nomFournisseur = fournisseur ? fournisseur.nomEntreprise : 'Un prestataire';
-
-            // On récupère l'image s'il y en a une (gère Multer req.file ou req.body.image)
-            const imageName = req.file ? req.file.filename : (produit.image || req.body.image || null);
-            const imageUrl = imageName ? `https://ton-api-render.onrender.com/uploads/${imageName}` : '';
+            
+            const baseUrl = `${req.protocol}://${req.get('host')}`;
+            const imageUrl = imageName ? `${baseUrl}/uploads/${imageName}` : '';
 
             admin.messaging().send({
                 notification: {
                     title: `🛍️ Nouveau produit : ${produit.nom}`,
                     body: `${nomFournisseur} vient d'ajouter une nouveauté à sa boutique.`
                 },
-                // Les métadonnées lues par ton composant React Movie Box
                 data: {
                     categorie: 'Boutique',
                     produitId: String(produit.id),
-                    image: String(imageUrl) // L'image qui s'affichera style "Affiche de film"
+                    image: String(imageUrl)
                 },
-                topic: 'nouveaux_produits' // Diffusé à tous les clients abonnés au catalogue
-            }).then(() => {
-                console.log(`📣 Notif envoyée pour le produit : ${produit.nom}`);
+                topic: 'nouveaux_produits'
             }).catch(e => {
-                console.warn('⚠️ Notification Firebase ignorée ou non configurée :', e.message);
+                console.warn('⚠️ Notification Firebase ignorée :', e.message);
             });
-
         } catch (notifError) {
-            // Si la préparation de la notif échoue, on loggue mais on ne bloque pas la création du produit
-            console.error('⚠️ Erreur lors de la préparation de la notification :', notifError.message);
+            console.error('⚠️ Erreur préparation notification :', notifError.message);
         }
 
-        res.status(201).json({ success: true, message: 'Produit créé - Incha Allah', data: produit });
+        res.status(201).json({ success: true, message: 'Produit créé avec succès', data: produit });
     } catch (error) {
+        console.error('Erreur create produit:', error);
         res.status(500).json({ success: false, message: 'Erreur serveur', error: error.message });
     }
 };
@@ -93,12 +97,15 @@ exports.update = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Produit non trouvé' });
         }
 
-        if (produit.fournisseurId !== req.user.id && req.user.role !== 'admin') {
+        const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
+        const estProprietaire = fournisseur && produit.fournisseurId === fournisseur.id;
+
+        if (!estProprietaire && req.user.role !== 'admin') {
             return res.status(403).json({ success: false, message: 'Non autorisé' });
         }
 
         const updated = await produit.update(req.body);
-        res.json({ success: true, message: 'Produit mis à jour - Incha Allah', data: updated });
+        res.json({ success: true, message: 'Produit mis à jour', data: updated });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Erreur serveur', error: error.message });
     }
@@ -112,12 +119,15 @@ exports.delete = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Produit non trouvé' });
         }
 
-        if (produit.fournisseurId !== req.user.id && req.user.role !== 'admin') {
+        const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
+        const estProprietaire = fournisseur && produit.fournisseurId === fournisseur.id;
+
+        if (!estProprietaire && req.user.role !== 'admin') {
             return res.status(403).json({ success: false, message: 'Non autorisé' });
         }
 
         await produit.destroy();
-        res.json({ success: true, message: 'Produit supprimé - Incha Allah' });
+        res.json({ success: true, message: 'Produit supprimé' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Erreur serveur', error: error.message });
     }

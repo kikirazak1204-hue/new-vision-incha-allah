@@ -1,6 +1,7 @@
-const { Commande, CommandeProduit, Produit } = require('../models');
+const { Commande, CommandeProduit, Produit, Fournisseur, User } = require('../models');
+const { sendNotification } = require('../utils/notifications');
 
-// 📝 Créer une commande complète (Panier)
+// 📝 Créer une commande complète (Panier) avec notification des fournisseurs
 exports.create = async (req, res) => {
     try {
         const { produits, fraisLivraison } = req.body;
@@ -10,15 +11,28 @@ exports.create = async (req, res) => {
         }
 
         let montantTotal = 0;
-        // Calcul du montant sécurisé
+        const itemsDetails = [];
+
+        // 1. Validation des produits et calcul du total + regroupement par fournisseur
         for (const item of produits) {
-            const produit = await Produit.findByPk(item.produitId);
+            const produit = await Produit.findByPk(item.produitId, {
+                include: [{ model: Fournisseur, as: 'fournisseur' }]
+            });
             if (produit) {
-                montantTotal += produit.prix * item.quantite;
+                const sousTotal = produit.prix * item.quantite;
+                montantTotal += sousTotal;
+                itemsDetails.push({
+                    produit,
+                    quantite: item.quantite,
+                    sousTotal,
+                    fournisseurId: produit.fournisseurId
+                });
             }
         }
+
         montantTotal += (fraisLivraison || 0);
 
+        // 2. Création de la commande globale
         const commande = await Commande.create({
             clientId: req.user.id,
             fraisLivraison: fraisLivraison || 0,
@@ -26,7 +40,7 @@ exports.create = async (req, res) => {
             statut: 'EN_ATTENTE'
         });
 
-        // Insertion dans CommandeProduit
+        // 3. Association des produits à la commande
         for (const item of produits) {
             await CommandeProduit.create({
                 commandeId: commande.id,
@@ -35,12 +49,50 @@ exports.create = async (req, res) => {
             });
         }
 
+        // 4. 🔔 Notification automatique des fournisseurs concernés
+        // Regrouper les articles par fournisseur pour envoyer une seule notification claire par fournisseur
+        const fournisseursMap = {};
+        for (const detail of itemsDetails) {
+            if (detail.fournisseurId) {
+                if (!fournisseursMap[detail.fournisseurId]) {
+                    fournisseursMap[detail.fournisseurId] = [];
+                }
+                fournisseursMap[detail.fournisseurId].push(detail);
+            }
+        }
+
+        for (const [fournisseurId, articles] of Object.entries(fournisseursMap)) {
+            try {
+                const fournisseur = await Fournisseur.findByPk(fournisseurId);
+                if (fournisseur && fournisseur.fcmToken) {
+                    const resumeArticles = articles
+                        .map(a => `- ${a.produit.nom} (x${a.quantite})`)
+                        .join('\n');
+
+                    await sendNotification({
+                        token: fournisseur.fcmToken,
+                        title: '🛍️ Nouvelle Commande Reçue !',
+                        body: `Commande #${commande.id}\n${resumeArticles}`,
+                        data: {
+                            type: 'COMMANDE',
+                            commandeId: String(commande.id)
+                        }
+                    });
+                }
+            } catch (notifErr) {
+                console.error(`Erreur notification fournisseur #${fournisseurId} :`, notifErr.message);
+            }
+        }
+
         res.status(201).json({
             success: true,
             commandeId: commande.id,
-            montant_total: montantTotal
+            montant_total: montantTotal,
+            message: 'Commande validée et transmise aux fournisseurs avec succès.'
         });
+
     } catch (error) {
+        console.error('Erreur create commande:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -54,7 +106,11 @@ exports.getAll = async (req, res) => {
             include: [{
                 model: CommandeProduit,
                 as: 'itemsCommande',
-                include: [{ model: Produit, as: 'produitCommandeProduit' }]
+                include: [{
+                    model: Produit,
+                    as: 'produitCommandeProduit',
+                    include: [{ model: Fournisseur, as: 'fournisseur', attributes: ['id', 'nomEntreprise', 'telephone'] }]
+                }]
             }],
             order: [['createdAt', 'DESC']]
         });
@@ -71,8 +127,12 @@ exports.getById = async (req, res) => {
             include: [{
                 model: CommandeProduit,
                 as: 'itemsCommande',
-                include: [{ model: Produit, as: 'produitCommandeProduit' }]
-            }]
+                include: [{
+                    model: Produit,
+                    as: 'produitCommandeProduit',
+                    include: [{ model: Fournisseur, as: 'fournisseur', attributes: ['id', 'nomEntreprise', 'telephone'] }]
+                }]
+             }]
         });
         if (!commande) return res.status(404).json({ success: false, message: 'Commande non trouvée' });
         res.json({ success: true, data: commande });

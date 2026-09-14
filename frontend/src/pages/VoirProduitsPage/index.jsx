@@ -44,78 +44,76 @@ export default function VoirProduits() {
     }
 
     return (
-        <div className="min-h-screen bg-[#0b0d10] text-slate-100 p-6 md:p-12">
+        <div className="min-h-screen bg-[#0b0d10] text-slate-100 p-4 md:p-10">
             {/* Header & Navigation */}
-            <div className="max-w-7xl mx-auto mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-slate-800/80 pb-6">
+            <div className="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-6">
                 <button
                     onClick={() => navigate('/')}
-                    className="text-slate-400 hover:text-white flex items-center gap-2 transition-all w-fit bg-slate-900/90 px-4 py-2.5 rounded-xl border border-slate-800 hover:border-slate-700 text-sm font-medium shadow-sm"
+                    className="text-slate-400 hover:text-white flex items-center gap-2 transition-all w-fit bg-slate-900/90 px-4 py-2 rounded-xl border border-slate-800 hover:border-slate-700 text-sm font-medium"
                 >
                     ← Retour à l'accueil
                 </button>
                 <div>
-                    <h1 className="text-3xl md:text-4xl font-black tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-                        🛍️ Catalogue Produits
+                    <h1 className="text-2xl md:text-3xl font-black tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+                        🛍️ Catalogue Produits & Équipements
                     </h1>
-                    <p className="text-sm text-slate-400 mt-1">Articles et équipements sélectionnés par nos partenaires</p>
+                    <p className="text-xs text-slate-400 mt-1">Articles vérifiés proposés par nos prestataires partenaires</p>
                 </div>
             </div>
 
             {/* Message d'erreur */}
             {message && (
-                <div className="max-w-7xl mx-auto text-center mb-8 p-4 bg-red-950/40 border border-red-500/30 rounded-2xl text-red-400 text-sm">
+                <div className="max-w-7xl mx-auto text-center mb-6 p-4 bg-red-950/40 border border-red-500/30 rounded-xl text-red-400 text-sm">
                     {message}
                 </div>
             )}
 
-            {/* Liste Produits */}
+            {/* Liste Produits en Grille 2 à 3 colonnes (fini le défilement vertical simple) */}
             {produits.length === 0 && !message ? (
-                <div className="max-w-7xl mx-auto text-center py-20 bg-[#12161c] rounded-3xl border border-slate-800/80 shadow-xl">
+                <div className="max-w-7xl mx-auto text-center py-20 bg-[#12161c] rounded-3xl border border-slate-800/80">
                     <span className="text-4xl mb-3 block">📦</span>
-                    <p className="text-slate-400 text-base font-medium">Aucun produit disponible pour le moment.</p>
+                    <p className="text-slate-400 text-sm font-medium">Aucun produit disponible pour le moment.</p>
                 </div>
             ) : (
-                <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                     {produits.map(produit => (
                         <div
                             key={produit.id}
-                            className="group bg-[#12161c] border border-slate-800/80 rounded-3xl p-4 flex flex-col justify-between hover:border-emerald-500/40 hover:shadow-2xl hover:shadow-emerald-950/20 transition-all duration-300"
+                            className="group bg-[#12161c] border border-slate-800/80 rounded-2xl p-3 md:p-4 flex flex-col justify-between hover:border-emerald-500/40 hover:shadow-xl transition-all duration-300"
                         >
                             <div>
-                                {/* Conteneur d'image robuste contre les photos mal cadrées */}
-                                <div className="aspect-square w-full overflow-hidden rounded-2xl mb-4 bg-[#090b0e] relative flex items-center justify-center border border-slate-800/50">
+                                {/* Conteneur image carré et propre */}
+                                <div className="aspect-square w-full overflow-hidden rounded-xl mb-3 bg-[#090b0e] relative flex items-center justify-center border border-slate-800/50">
                                     {produit.image ? (
                                         <img
                                             src={`${import.meta.env.VITE_API_URL}/uploads/${produit.image}`}
                                             alt={produit.nom}
                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                            onError={(e) => {
-                                                e.target.style.display = 'none';
-                                            }}
+                                            onError={(e) => { e.target.style.display = 'none'; }}
                                         />
                                     ) : (
-                                        <span className="text-3xl opacity-40">📷</span>
+                                        <span className="text-2xl opacity-40">📷</span>
                                     )}
-                                    {produit.categorie && (
-                                        <span className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-slate-300 text-[10px] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider border border-white/10">
-                                            {produit.categorie}
-                                        </span>
-                                    )}
+
+                                    {/* Badge Fournisseur sur l'image ou en haut */}
+                                    <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-emerald-300 text-[10px] font-bold px-2 py-1 rounded-md border border-white/10 truncate max-w-[80%]">
+                                        🏢 {produit.fournisseur?.nomEntreprise || 'Partenaire Kanari'}
+                                    </div>
                                 </div>
 
-                                <h2 className="text-lg font-bold mb-1 text-slate-100 group-hover:text-white line-clamp-1">{produit.nom}</h2>
-                                <p className="text-xs text-slate-400 mb-4 line-clamp-2 leading-relaxed">{produit.description || "Aucune description fournie pour cet article."}</p>
+                                <h2 className="text-sm md:text-base font-bold mb-1 text-slate-100 group-hover:text-white line-clamp-1">{produit.nom}</h2>
+                                <p className="text-[11px] md:text-xs text-slate-400 mb-3 line-clamp-2 leading-relaxed">{produit.description || "Aucune description fournie."}</p>
                             </div>
 
-                            <div className="pt-3 border-t border-slate-800/60 flex items-center justify-between gap-3">
+                            <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between gap-2">
                                 <div>
-                                    <span className="text-[10px] text-slate-500 uppercase block font-semibold tracking-wider">Prix unitaire</span>
-                                    <span className="text-base font-black text-emerald-400">{Number(produit.prix || 0).toLocaleString()} FCFA</span>
+                                    <span className="text-[9px] text-slate-500 uppercase block font-semibold">Prix</span>
+                                    <span className="text-sm md:text-base font-black text-emerald-400">{Number(produit.prix || 0).toLocaleString()} FCFA</span>
                                 </div>
 
                                 <button
                                     onClick={() => handleAjouter(produit)}
-                                    className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all tracking-wide shadow-md ${
+                                    className={`px-3 py-2 rounded-xl font-bold text-xs transition-all shadow-md ${
                                         ajouteId === produit.id
                                             ? 'bg-emerald-600 text-white cursor-default scale-95'
                                             : 'bg-white text-[#0f1111] hover:bg-slate-200 active:scale-95'
