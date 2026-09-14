@@ -2,9 +2,9 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
-const path = require('path');         
+const path = require('path'); 
 
-// Importation de la connexion Sequelize***********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************
+// Importation de la connexion Sequelize
 const { sequelize } = require('./models');
 
 // Job planifié : validation automatique des bons d'intervention après 24h
@@ -43,7 +43,6 @@ if (!fs.existsSync(uploadDir)) {
 // ==========================================
 // 1. MIDDLEWARES DE SÉCURITÉ & PARSING
 // ==========================================
-
 app.use(cors({
     origin: process.env.CLIENT_URL || '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
@@ -59,7 +58,6 @@ app.use('/uploads', express.static(uploadDir));
 // ==========================================
 // 2. ROUTES DE DIAGNOSTIC (Health Check)
 // ==========================================
-
 app.get('/api/health', (req, res) => {
     res.status(200).json({
         status: 'OK',
@@ -71,7 +69,6 @@ app.get('/api/health', (req, res) => {
 // ==========================================
 // 4. ENREGISTREMENT DES ROUTES API
 // ==========================================
-
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/reservations', require('./routes/reservations'));
@@ -95,7 +92,6 @@ app.use('/api/settings', require('./routes/settings'));
 // ==========================================
 // 5. GESTION DES ROUTES INEXISTANTES (404)
 // ==========================================
-
 app.use((req, res, next) => {
     res.status(404).json({
         error: `La route demandée ${req.originalUrl} n'existe pas sur ce serveur.`
@@ -105,7 +101,6 @@ app.use((req, res, next) => {
 // ==========================================
 // 6. MIDDLEWARE GLOBAL DE GESTION D'ERREURS
 // ==========================================
-
 app.use((err, req, res, next) => {
     console.error('❌ ERREUR SERVEUR :', err);
 
@@ -133,7 +128,7 @@ app.use((err, req, res, next) => {
 });
 
 // ==========================================
-// 🛠️ RÉPARATION AUTOMATIQUE DE COLONNES
+// 🛠️ RÉPARATION AUTOMATIQUE DE COLONNES (À retirer ultérieurement)
 // ==========================================
 const repairDatabase = async () => {
     const queries = [
@@ -202,7 +197,6 @@ const demarrerJobAutoValidation = () => {
 // ==========================================
 // 7. INITIALISATION ET DÉMARRAGE
 // ==========================================
-
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
