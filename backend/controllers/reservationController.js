@@ -114,7 +114,6 @@ exports.createGlobalReservation = async (req, res) => {
 // ── GET /api/reservations/mes-reservations — Espace Client ─────
 exports.getMesReservations = async (req, res) => {
     try {
-        // Recherche large et robuste par ID client ET/OU par numéro de téléphone
         const conditions = [{ clientId: req.user.id }];
         if (req.user.telephone) {
             conditions.push({ telephone: req.user.telephone });
@@ -124,7 +123,8 @@ exports.getMesReservations = async (req, res) => {
             where: { [Op.or]: conditions },
             include: [
                 { model: Fournisseur, as: 'fournisseur', attributes: ['id', 'nomEntreprise', 'telephone', 'note'] },
-                { model: BonIntervention, as: 'BonIntervention' }
+                { model: BonIntervention, as: 'BonIntervention' },
+                { model: BonIntervention, as: 'bonIntervention' } // Double sécurité pour éviter les erreurs de casse
             ],
             order: [['createdAt', 'DESC']]
         });

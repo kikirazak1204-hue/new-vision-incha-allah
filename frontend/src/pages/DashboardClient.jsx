@@ -541,17 +541,17 @@ function OngletRecus({ missions, token }) {
     );
 }
 
-// ════════════════════════════════════════════════════════════════
+/// ════════════════════════════════════════════════════════════════
 // ONGLET : MON PROFIL — réellement modifiable, branché sur
 // PUT /api/users/:id (backend/routes/users.js).
 // ════════════════════════════════════════════════════════════════
-function OngletProfilClient({ currentUser, onProfilMisAJour }) {
+function OngletProfilClient({ currentUser = {}, onProfilMisAJour }) {
     const [form, setForm] = useState({
-        nom: currentUser.nom || '',
-        prenom: currentUser.prenom || '',
-        email: currentUser.email || '',
-        telephone: currentUser.telephone || '',
-        ville: currentUser.ville || '',
+        nom: currentUser?.nom || '',
+        prenom: currentUser?.prenom || '',
+        email: currentUser?.email || '',
+        telephone: currentUser?.telephone || '',
+        ville: currentUser?.ville || '',
     });
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState({ text: '', type: '' });
@@ -574,14 +574,14 @@ function OngletProfilClient({ currentUser, onProfilMisAJour }) {
                 telephone: form.telephone.trim(),
                 ville: form.ville.trim() || null,
             });
-            if (d.success) {
+            if (d?.success) {
                 onProfilMisAJour(d.data);
                 setMessage({ text: 'Profil mis à jour avec succès.', type: 'success' });
             } else {
-                setMessage({ text: d.message || 'Erreur lors de la mise à jour.', type: 'error' });
+                setMessage({ text: d?.message || 'Erreur lors de la mise à jour.', type: 'error' });
             }
         } catch (err) {
-            setMessage({ text: err.message || 'Erreur de connexion au serveur.', type: 'error' });
+            setMessage({ text: err?.message || 'Erreur de connexion au serveur.', type: 'error' });
         } finally {
             setLoading(false);
         }
@@ -681,7 +681,7 @@ export default function DashboardClient() {
                 if (!isMounted) return;
 
                 if (res?.success) {
-                    setMissions(res.data.missions || []);
+                    setMissions(res.data?.missions || []);
                     setError(null);
                     setLoading(false);
                 } else {
@@ -735,14 +735,15 @@ export default function DashboardClient() {
         </div>
     );
 
-    const missionsActives = missions.filter(m => STATUTS_ACTIFS.includes(m.statut));
-    const missionsAValider = missions.filter(m => m.statut === 'TERMINEE');
-    const missionsTerminees = missions.filter(m => m.statut === 'VALIDEE');
-    const missionsEnAttenteOffres = missions.filter(m => m.statut === 'EN_ATTENTE');
-    // ✅ CORRIGÉ : Reservation n'a pas de champ `montant` ni `acompte` — le
-    // vrai champ est `montantTotal` (voir backend/models/Reservation.js).
-    const toutesTransactions = missions.filter(m => Number(m.montantTotal || 0) > 0);
-    const totalDepense = toutesTransactions.reduce((acc, m) => acc + Number(m.montantTotal || 0), 0);
+    const missionsList = Array.isArray(missions) ? missions : [];
+    const missionsActives = missionsList.filter(m => STATUTS_ACTIFS?.includes(m?.statut));
+    const missionsAValider = missionsList.filter(m => m?.statut === 'TERMINEE');
+    const missionsTerminees = missionsList.filter(m => m?.statut === 'VALIDEE');
+    const missionsEnAttenteOffres = missionsList.filter(m => m?.statut === 'EN_ATTENTE');
+    
+    // ✅ Utilisation cohérente de montantTotal pour les réservations
+    const toutesTransactions = missionsList.filter(m => Number(m?.montantTotal || m?.montant || 0) > 0);
+    const totalDepense = toutesTransactions.reduce((acc, m) => acc + Number(m?.montantTotal || m?.montant || 0), 0);
 
     const tabs = [
         { id: 'overview', label: 'Vue d\'ensemble', icon: '' },
@@ -808,7 +809,7 @@ export default function DashboardClient() {
                         </button>
                     ))}
                     <button onClick={() => { navigate('/historique-paiements'); setMenuOuvert(false); }} className="w-full text-left px-4 py-3.5 rounded-2xl text-sm font-bold flex items-center gap-3 text-slate-300 bg-white/[0.02]">
-                        <span className="text-lg"></span><span>Historique Paiements</span>
+                        <span>Historique Paiements</span>
                     </button>
                 </div>
             )}
@@ -835,18 +836,20 @@ export default function DashboardClient() {
                     </div>
                 )}
 
-                <div className={`bg-gradient-to-r ${pubAleatoire.gradient} border ${pubAleatoire.border} rounded-3xl p-5 md:p-6 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-left`}>
-                    <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                            <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-white font-bold text-[10px] tracking-wider uppercase">{pubAleatoire.badge}</span>
-                            <h4 className="font-extrabold text-white text-base">{pubAleatoire.titre}</h4>
+                {pubAleatoire && (
+                    <div className={`bg-gradient-to-r ${pubAleatoire.gradient} border ${pubAleatoire.border} rounded-3xl p-5 md:p-6 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-left`}>
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                                <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-white font-bold text-[10px] tracking-wider uppercase">{pubAleatoire.badge}</span>
+                                <h4 className="font-extrabold text-white text-base">{pubAleatoire.titre}</h4>
+                            </div>
+                            <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">{pubAleatoire.texte}</p>
                         </div>
-                        <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">{pubAleatoire.texte}</p>
+                        <button onClick={() => navigate('/historique-paiements')} className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/10 shrink-0">
+                            Voir mes paiements 
+                        </button>
                     </div>
-                    <button onClick={() => navigate('/historique-paiements')} className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/10 shrink-0">
-                        Voir mes paiements 
-                    </button>
-                </div>
+                )}
 
                 {activeTab === 'overview' && (
                     <div className="space-y-8 text-left">
@@ -859,7 +862,7 @@ export default function DashboardClient() {
                         <div className="space-y-4">
                             <div className="flex justify-between items-center">
                                 <h3 className="font-extrabold text-lg text-white">Dernières missions en cours</h3>
-                                <button onClick={() => setActiveTab('missions')} className="text-xs text-purple-400 hover:underline font-bold">Voir tout ({missions.length})</button>
+                                <button onClick={() => setActiveTab('missions')} className="text-xs text-purple-400 hover:underline font-bold">Voir tout ({missionsList.length})</button>
                             </div>
                             {missionsActives.length === 0 ? (
                                 <div className="bg-white/[0.02] border border-white/[0.07] rounded-3xl p-10 text-center space-y-3">
@@ -869,17 +872,17 @@ export default function DashboardClient() {
                             ) : (
                                 <div className="space-y-4">
                                     {missionsActives.slice(0, 2).map(m => (
-                                        <div key={m.id} className="bg-white/[0.02] border border-white/[0.07] rounded-3xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                        <div key={m?.id} className="bg-white/[0.02] border border-white/[0.07] rounded-3xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                             <div>
                                                 <div className="flex items-center gap-2 mb-1">
-                                                    <span className="text-xs font-bold text-purple-400">Mission #{m.id}</span>
+                                                    <span className="text-xs font-bold text-purple-400">Mission #{m?.id}</span>
                                                     <span>•</span>
-                                                    <span className="text-xs text-slate-400">{m.service?.nom || m.serviceNom || 'Service'}</span>
+                                                    <span className="text-xs text-slate-400">{m?.service?.nom || m?.serviceNom || 'Service'}</span>
                                                 </div>
-                                                <h4 className="font-extrabold text-white text-lg">{m.prestataire?.nomEntreprise || 'Recherche de prestataire...'}</h4>
+                                                <h4 className="font-extrabold text-white text-lg">{m?.prestataire?.nomEntreprise || 'Recherche de prestataire...'}</h4>
                                             </div>
                                             <div className="flex items-center gap-3">
-                                                <StatutBadge statut={m.statut} />
+                                                <StatutBadge statut={m?.statut} />
                                                 <button onClick={() => setChatMission(m)} className="px-4 py-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-bold text-xs rounded-xl border border-purple-500/20">Chat</button>
                                             </div>
                                         </div>
@@ -896,35 +899,35 @@ export default function DashboardClient() {
                             <h3 className="font-extrabold text-xl text-white">Toutes mes réservations</h3>
                             <button onClick={() => navigate('/')} className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-xs font-bold">+ Nouvelle demande</button>
                         </div>
-                        {missions.length === 0 ? (
+                        {missionsList.length === 0 ? (
                             <div className="bg-white/[0.02] border border-white/[0.07] rounded-3xl p-12 text-center space-y-3">
                                 <p className="text-slate-400 text-sm">Vous n'avez pas encore effectué de réservation.</p>
                             </div>
                         ) : (
                             <div className="space-y-4">
-                                {missions.map(m => (
-                                    <div key={m.id} className="bg-white/[0.02] border border-white/[0.07] rounded-3xl p-6 space-y-4">
+                                {missionsList.map(m => (
+                                    <div key={m?.id} className="bg-white/[0.02] border border-white/[0.07] rounded-3xl p-6 space-y-4">
                                         <div className="flex justify-between items-start">
                                             <div>
-                                                <span className="text-xs font-bold text-purple-400">#{m.id} - {m.service?.nom || m.serviceNom}</span>
-                                                <h4 className="font-extrabold text-white text-lg mt-0.5">{m.prestataire?.nomEntreprise || 'Prestataire en attente'}</h4>
+                                                <span className="text-xs font-bold text-purple-400">#{m?.id} - {m?.service?.nom || m?.serviceNom || 'Service'}</span>
+                                                <h4 className="font-extrabold text-white text-lg mt-0.5">{m?.prestataire?.nomEntreprise || 'Prestataire en attente'}</h4>
                                             </div>
-                                            <StatutBadge statut={m.statut} />
+                                            <StatutBadge statut={m?.statut} />
                                         </div>
 
-                                        {m.statut === 'TERMINEE' && (
+                                        {m?.statut === 'TERMINEE' && (
                                             <button onClick={() => setBonMission(m)} className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-black rounded-xl text-xs shadow-lg transition-all">
                                                 Voir le bon d'intervention & valider
                                             </button>
                                         )}
 
                                         <div className="flex justify-between items-center text-xs text-slate-400 pt-2 border-t border-white/[0.05]">
-                                            <span>Montant : <strong className="text-white">{Number(m.montant || m.montantMainOeuvre || 0).toLocaleString()} FCFA</strong></span>
+                                            <span>Montant : <strong className="text-white">{Number(m?.montantTotal || m?.montant || m?.montantMainOeuvre || 0).toLocaleString()} FCFA</strong></span>
                                             <div className="flex items-center gap-4">
-                                                {m.statut === 'VALIDEE' && (
+                                                {m?.statut === 'VALIDEE' && (
                                                     <button onClick={() => setRemarqueMission(m)} className="text-amber-400 font-bold hover:underline">Laisser un avis</button>
                                                 )}
-                                                {!['EN_ATTENTE', 'ANNULEE'].includes(m.statut) && (
+                                                {m?.statut && !['EN_ATTENTE', 'ANNULEE'].includes(m?.statut) && (
                                                     <button onClick={() => setChatMission(m)} className="text-purple-400 font-bold hover:underline">Ouvrir le chat</button>
                                                 )}
                                             </div>
@@ -938,14 +941,14 @@ export default function DashboardClient() {
 
                 {activeTab === 'offres' && (
                     <OngletOffresRecues
-                        missions={missions}
+                        missions={missionsList}
                         token={token}
                         onDevisAccepte={(missionId) => setMissions(prev => prev.map(m => m.id === missionId ? { ...m, statut: 'ACCEPTEE' } : m))}
                     />
                 )}
 
                 {activeTab === 'recus' && (
-                    <OngletRecus missions={missions} token={token} />
+                    <OngletRecus missions={missionsList} token={token} />
                 )}
 
                 {activeTab === 'paiements' && (
@@ -967,13 +970,13 @@ export default function DashboardClient() {
                         ) : (
                             <div className="space-y-3">
                                 {toutesTransactions.map(t => (
-                                    <div key={t.id} className="bg-white/[0.02] border border-white/[0.07] rounded-2xl p-5 flex justify-between items-center">
+                                    <div key={t?.id} className="bg-white/[0.02] border border-white/[0.07] rounded-2xl p-5 flex justify-between items-center">
                                         <div>
-                                            <span className="text-xs font-bold text-indigo-400">Transaction liée à la réservation #{t.id}</span>
-                                            <p className="text-white font-bold text-sm mt-0.5">{t.service?.nom || t.serviceNom || 'Prestation'}</p>
+                                            <span className="text-xs font-bold text-indigo-400">Transaction liée à la réservation #{t?.id}</span>
+                                            <p className="text-white font-bold text-sm mt-0.5">{t?.service?.nom || t?.serviceNom || 'Prestation'}</p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-white font-mono font-extrabold">{Number(t.montant || t.montantMainOeuvre || t.acompte || 0).toLocaleString()} FCFA</p>
+                                            <p className="text-white font-mono font-extrabold">{Number(t?.montantTotal || t?.montant || t?.montantMainOeuvre || 0).toLocaleString()} FCFA</p>
                                             <span className="text-[10px] text-emerald-400 font-bold uppercase">Réglé</span>
                                         </div>
                                     </div>
@@ -988,7 +991,7 @@ export default function DashboardClient() {
                 )}
             </main>
 
-            {chatMission && <ChatModal mission={chatMission} userId={currentUser.id} token={token} onClose={() => setChatMission(null)} />}
+            {chatMission && <ChatModal mission={chatMission} userId={currentUser?.id} token={token} onClose={() => setChatMission(null)} />}
             {remarqueMission && <RemarqueModal mission={remarqueMission} token={token} onClose={() => setRemarqueMission(null)} onSaved={handleRemarqueSaved} />}
             {bonMission && <BonAValiderModal mission={bonMission} token={token} onClose={() => setBonMission(null)} onValide={handleBonValide} />}
         </div>
