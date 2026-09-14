@@ -2,9 +2,9 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
-const path = require('path');
+const path = require('path');         
 
-// Importation de la connexion Sequelize
+// Importation de la connexion Sequelize***********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************
 const { sequelize } = require('./models');
 
 // Job planifié : validation automatique des bons d'intervention après 24h
