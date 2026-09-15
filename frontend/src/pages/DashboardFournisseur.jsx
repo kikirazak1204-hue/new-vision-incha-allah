@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { getDashboardFournisseur, getProduitsFournisseur, deleteProduit, addProduit, getBonInterventionParReservation } from '../util/api';
+import { getDashboardFournisseur, getProduitsFournisseur, deleteProduit, addProduit } from '../util/api';
 import { useNotification } from '../context/NotificationContext.jsx';
 import SoldeRetrait from '../components/SoldeRetrait';
 import { STATUT, STATUT_FALLBACK, BADGE_PROFIL, STATUTS_TELEPHONE_VISIBLE } from '../constants/statuts';
@@ -19,10 +19,10 @@ function StatutBadge({ statut }) {
 
 function StatCard({ label, value, gradient }) {
     return (
-        <div className="relative overflow-hidden bg-white/[0.02] hover:bg-white/[0.04] p-6 rounded-2xl border border-white/[0.07] hover:border-white/[0.15] transition-all duration-300 group shadow-xl">
+        <div className="relative overflow-hidden bg-white hover:bg-slate-50 p-6 rounded-2xl border border-slate-200 hover:border-slate-200 transition-all duration-300 group shadow-xl">
             <div className={`absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r ${gradient} opacity-60 group-hover:opacity-100 transition-opacity`} />
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-400 group-hover:text-slate-300 transition-colors block mb-2">{label}</span>
-            <p className="text-3xl font-extrabold tracking-tight text-white">{value ?? '—'}</p>
+            <span className="text-xs font-medium uppercase tracking-wider text-slate-500 group-hover:text-slate-600 transition-colors block mb-2">{label}</span>
+            <p className="text-3xl font-extrabold tracking-tight text-[#061a3a]">{value ?? '—'}</p>
         </div>
     );
 }
@@ -96,14 +96,14 @@ function BonInterventionModal({ mission, onClose, token, onSuccess }) {
     if (bonEnvoye) {
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md print:bg-white">
-                <div className="w-full max-w-lg bg-[#0E1320] border border-emerald-500/30 rounded-3xl shadow-2xl p-6 space-y-5 text-center print:hidden">
-                    <div className="w-14 h-14 mx-auto rounded-full bg-emerald-500/10 border-2 border-emerald-500/30" />
+                <div className="w-full max-w-lg bg-white border border-emerald-500/30 rounded-3xl shadow-2xl p-6 space-y-5 text-center print:hidden">
+                    <div className="w-14 h-14 mx-auto rounded-full bg-emerald-50 border-2 border-emerald-500/30" />
                     <div>
-                        <h3 className="text-lg font-black text-white">Bon transmis avec succès</h3>
-                        <p className="text-sm text-slate-400 mt-1">Le client va recevoir une notification pour valider la prestation.</p>
+                        <h3 className="text-lg font-black text-[#061a3a]">Bon transmis avec succès</h3>
+                        <p className="text-sm text-slate-500 mt-1">Le client va recevoir une notification pour valider la prestation.</p>
                     </div>
                     <div className="flex gap-3 pt-2">
-                        <button onClick={imprimer} className="flex-1 py-3 bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 font-bold rounded-xl text-xs transition-all">
+                        <button onClick={imprimer} className="flex-1 py-3 bg-slate-50 hover:bg-slate-100 text-[#061a3a] font-bold rounded-xl text-xs transition-all">
                             Imprimer le bon
                         </button>
                         <button onClick={onClose} className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-black rounded-xl text-xs shadow-lg transition-all">
@@ -132,69 +132,69 @@ function BonInterventionModal({ mission, onClose, token, onSuccess }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-            <div className="w-full max-w-lg bg-[#0E1320] border border-purple-500/30 rounded-3xl shadow-2xl overflow-hidden flex flex-col p-6 space-y-4 text-slate-100">
-                <div className="flex items-center justify-between border-b border-white/[0.07] pb-3">
-                    <h3 className="text-lg font-black text-white flex items-center gap-2">Rapport & Bon d'Intervention</h3>
-                    <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors text-lg font-bold">×</button>
+            <div className="w-full max-w-lg bg-white border border-amber-200 rounded-3xl shadow-2xl overflow-hidden flex flex-col p-6 space-y-4 text-[#061a3a]">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                    <h3 className="text-lg font-black text-[#061a3a] flex items-center gap-2">Rapport & Bon d'Intervention</h3>
+                    <button onClick={onClose} className="text-slate-500 hover:text-[#061a3a] transition-colors text-lg font-bold">×</button>
                 </div>
 
                 {erreur && (
-                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-3 text-rose-300 text-xs font-semibold text-center">
+                    <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-red-700 text-xs font-semibold text-center">
                         {erreur}
                     </div>
                 )}
 
                 <form onSubmit={soumettreBon} className="space-y-4 text-left">
                     <div>
-                        <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">Description des travaux effectués *</label>
+                        <label className="block text-xs font-bold text-amber-600 uppercase tracking-wider mb-1.5">Description des travaux effectués *</label>
                         <textarea
                             value={description}
                             onChange={e => setDescription(e.target.value)}
                             placeholder="Détaillez précisément ce que vous avez réparé ou accompli..."
                             rows="4"
-                            className="w-full bg-[#090D16] border border-white/[0.08] focus:border-purple-500 text-slate-200 placeholder-slate-600 rounded-xl px-4 py-3 text-sm outline-none resize-none transition-all shadow-inner"
+                            className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] w-full bg-white border border-slate-200 focus:border-amber-400 rounded-xl px-4 py-3 text-sm outline-none resize-none transition-all shadow-inner"
                             required
                         />
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">Matériaux / Pièces utilisés (Optionnel)</label>
+                        <label className="block text-xs font-bold text-amber-600 uppercase tracking-wider mb-1.5">Matériaux / Pièces utilisés (Optionnel)</label>
                         <input
                             type="text"
                             value={piecesOutils}
                             onChange={e => setPiecesOutils(e.target.value)}
                             placeholder="Ex: Joint silicone, Câble 2m, Robinetterie"
-                            className="w-full bg-[#090D16] border border-white/[0.08] focus:border-purple-500 text-slate-200 placeholder-slate-600 rounded-xl px-4 py-3 text-sm outline-none transition-all shadow-inner"
+                            className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] w-full bg-white border border-slate-200 focus:border-amber-400 rounded-xl px-4 py-3 text-sm outline-none transition-all shadow-inner"
                         />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">Coût Main d'œuvre (FCFA) *</label>
+                            <label className="block text-xs font-bold text-amber-600 uppercase tracking-wider mb-1.5">Coût Main d'œuvre (FCFA) *</label>
                             <input
                                 type="number"
                                 value={montantMainOeuvre}
                                 onChange={e => setMontantMainOeuvre(e.target.value)}
                                 placeholder="Ex: 15000"
-                                className="w-full bg-[#090D16] border border-white/[0.08] focus:border-purple-500 text-slate-200 placeholder-slate-600 rounded-xl px-4 py-3 text-sm font-bold outline-none transition-all shadow-inner"
+                                className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] w-full bg-white border border-slate-200 focus:border-amber-400 rounded-xl px-4 py-3 text-sm font-bold outline-none transition-all shadow-inner"
                                 required
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-1.5">Coût des Pièces (FCFA)</label>
+                            <label className="block text-xs font-bold text-amber-600 uppercase tracking-wider mb-1.5">Coût des Pièces (FCFA)</label>
                             <input
                                 type="number"
                                 value={montantPiecesOutils}
                                 onChange={e => setMontantPiecesOutils(e.target.value)}
                                 placeholder="Ex: 5000 (Laisser vide si 0)"
-                                className="w-full bg-[#090D16] border border-white/[0.08] focus:border-purple-500 text-slate-200 placeholder-slate-600 rounded-xl px-4 py-3 text-sm font-bold outline-none transition-all shadow-inner"
+                                className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] w-full bg-white border border-slate-200 focus:border-amber-400 rounded-xl px-4 py-3 text-sm font-bold outline-none transition-all shadow-inner"
                             />
                         </div>
                     </div>
 
-                    <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex justify-between items-center text-sm">
-                        <span className="font-bold text-emerald-400">Total Facturé au Client :</span>
-                        <span className="font-black text-emerald-400 text-base">{totalFinal.toLocaleString('fr-FR')} FCFA</span>
+                    <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex justify-between items-center text-sm">
+                        <span className="font-bold text-emerald-700">Total Facturé au Client :</span>
+                        <span className="font-black text-emerald-700 text-base">{totalFinal.toLocaleString('fr-FR')} FCFA</span>
                     </div>
 
                     <p className="text-xs text-slate-500 leading-relaxed">
@@ -202,7 +202,7 @@ function BonInterventionModal({ mission, onClose, token, onSuccess }) {
                     </p>
 
                     <div className="pt-2 flex gap-3">
-                        <button type="button" onClick={onClose} className="flex-1 py-3 bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 font-bold rounded-xl text-sm transition-all">Annuler</button>
+                        <button type="button" onClick={onClose} className="flex-1 py-3 bg-slate-50 hover:bg-slate-100 text-[#061a3a] font-bold rounded-xl text-sm transition-all">Annuler</button>
                         <button type="submit" disabled={loading} className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black rounded-xl text-sm shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.99] disabled:opacity-50">
                             {loading ? 'Transmission...' : 'Envoyer le Bon'}
                         </button>
@@ -259,29 +259,29 @@ function AjouterProduitModal({ onClose, onSuccess }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-            <div className="w-full max-w-lg bg-[#0E1320] border border-purple-500/30 rounded-3xl p-6 shadow-2xl">
+            <div className="w-full max-w-lg bg-white border border-amber-200 rounded-3xl p-6 shadow-2xl">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-black text-white"> Ajouter un produit</h3>
-                    <button onClick={onClose} className="text-slate-400 hover:text-white text-sm font-bold">×</button>
+                    <h3 className="text-lg font-black text-[#061a3a]"> Ajouter un produit</h3>
+                    <button onClick={onClose} className="text-slate-500 hover:text-[#061a3a] text-sm font-bold">×</button>
                 </div>
 
                 {error && (
-                    <div className="mb-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl p-3 text-rose-300 text-xs font-semibold text-center">{error}</div>
+                    <div className="mb-4 bg-red-50 border border-red-200 rounded-2xl p-3 text-red-700 text-xs font-semibold text-center">{error}</div>
                 )}
 
                 <form onSubmit={soumettre} className="space-y-4">
-                    <input type="text" placeholder="Nom du produit *" value={nom} onChange={(e) => setNom(e.target.value)} className="w-full bg-[#161c2e] text-white p-3 rounded-xl border border-white/10 outline-none focus:border-purple-500" />
-                    <input type="number" placeholder="Prix (FCFA) *" value={prix} onChange={(e) => setPrix(e.target.value)} className="w-full bg-[#161c2e] text-white p-3 rounded-xl border border-white/10 outline-none focus:border-purple-500" />
+                    <input type="text" placeholder="Nom du produit *" value={nom} onChange={(e) => setNom(e.target.value)} className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] w-full bg-white text-[#061a3a] p-3 rounded-xl border border-white/10 outline-none focus:border-amber-400" />
+                    <input type="number" placeholder="Prix (FCFA) *" value={prix} onChange={(e) => setPrix(e.target.value)} className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] w-full bg-white text-[#061a3a] p-3 rounded-xl border border-white/10 outline-none focus:border-amber-400" />
                     <div className="flex gap-2">
-                        <input type="text" placeholder="Catégorie" value={categorie} onChange={(e) => setCategorie(e.target.value)} className="flex-1 bg-[#161c2e] text-white p-3 rounded-xl border border-white/10 outline-none focus:border-purple-500" />
-                        <input type="number" placeholder="Qté" min="0" value={quantite} onChange={(e) => setQuantite(e.target.value)} className="w-24 bg-[#161c2e] text-white p-3 rounded-xl border border-white/10 outline-none focus:border-purple-500" />
+                        <input type="text" placeholder="Catégorie" value={categorie} onChange={(e) => setCategorie(e.target.value)} className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] flex-1 bg-white text-[#061a3a] p-3 rounded-xl border border-white/10 outline-none focus:border-amber-400" />
+                        <input type="number" placeholder="Qté" min="0" value={quantite} onChange={(e) => setQuantite(e.target.value)} className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] w-24 bg-white text-[#061a3a] p-3 rounded-xl border border-white/10 outline-none focus:border-amber-400" />
                     </div>
-                    <textarea placeholder="Description..." rows="3" value={description} onChange={(e) => setDescription(e.target.value)} className="w-full bg-[#161c2e] text-white p-3 rounded-xl border border-white/10 outline-none focus:border-purple-500" />
+                    <textarea placeholder="Description..." rows="3" value={description} onChange={(e) => setDescription(e.target.value)} className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] w-full bg-white text-[#061a3a] p-3 rounded-xl border border-white/10 outline-none focus:border-amber-400" />
                     <div>
-                        <label className="block text-[10px] text-purple-400 font-bold uppercase mb-1">Photo / fichier (optionnel)</label>
-                        <input type="file" onChange={(e) => setFichier(e.target.files?.[0] || null)} className="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:bg-purple-600 file:text-white file:rounded-xl file:border-0 cursor-pointer" />
+                        <label className="block text-[10px] text-amber-600 font-bold uppercase mb-1">Photo / fichier (optionnel)</label>
+                        <input type="file" onChange={(e) => setFichier(e.target.files?.[0] || null)} className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:bg-[#061a3a] file:text-white file:rounded-xl file:border-0 cursor-pointer" />
                     </div>
-                    <button type="submit" disabled={loading} className="w-full py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-all disabled:opacity-50">
+                    <button type="submit" disabled={loading} className="w-full py-3 bg-[#061a3a] text-white rounded-xl font-bold hover:bg-[#0b2a57] transition-all disabled:opacity-50">
                         {loading ? 'Traitement...' : 'Ajouter au catalogue'}
                     </button>
                 </form>
@@ -328,18 +328,18 @@ function ChatModal({ mission, userId, onClose }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-            <div className="w-full max-w-lg bg-[#0E1320] border border-purple-500/20 rounded-3xl shadow-2xl flex flex-col overflow-hidden h-[550px]">
-                <div className="flex items-center justify-between px-6 py-4 bg-white/[0.02] border-b border-white/[0.07]">
+            <div className="w-full max-w-lg bg-white border border-amber-200 rounded-3xl shadow-2xl flex flex-col overflow-hidden h-[550px]">
+                <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center font-bold text-white shadow-md shadow-purple-500/20">
+                        <div className="w-10 h-10 rounded-2xl bg-amber-400 flex items-center justify-center font-bold text-[#061a3a] shadow-md shadow-amber-400/20">
                             {mission.client?.nom?.[0]?.toUpperCase() || 'C'}
                         </div>
                         <div>
-                            <p className="font-bold text-slate-100 text-sm">{mission.client?.nom || mission.clientNom || 'Client'}</p>
-                            <p className="text-purple-400/80 text-xs font-medium">Mission #{mission.id}</p>
+                            <p className="font-bold text-[#061a3a] text-sm">{mission.client?.nom || mission.clientNom || 'Client'}</p>
+                            <p className="text-amber-600/80 text-xs font-medium">Mission #{mission.id}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.1] flex items-center justify-center text-slate-400 hover:text-white transition-colors text-sm">×</button>
+                    <button onClick={onClose} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-white/[0.1] flex items-center justify-center text-slate-500 hover:text-[#061a3a] transition-colors text-sm">×</button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
@@ -352,9 +352,9 @@ function ChatModal({ mission, userId, onClose }) {
                             const moi = msg.senderId === userId;
                             return (
                                 <div key={msg.id} className={`flex ${moi ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm ${moi ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-br-xs font-medium' : 'bg-white/[0.05] border border-white/[0.05] text-slate-200 rounded-bl-xs'}`}>
+                                    <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm ${moi ? 'bg-[#061a3a] text-white rounded-br-xs font-medium' : 'bg-slate-100 border border-slate-200 text-[#334155] rounded-bl-xs'}`}>
                                         <p>{msg.contenu}</p>
-                                        <p className={`text-[10px] mt-1 text-right ${moi ? 'text-purple-200/70' : 'text-slate-400'}`}>
+                                        <p className={`text-[10px] mt-1 text-right ${moi ? 'text-amber-600/70' : 'text-slate-500'}`}>
                                             {new Date(msg.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                                         </p>
                                     </div>
@@ -365,18 +365,18 @@ function ChatModal({ mission, userId, onClose }) {
                     <div ref={bottomRef} />
                 </div>
 
-                <div className="p-4 bg-white/[0.02] border-t border-white/[0.07] flex gap-2.5">
+                <div className="p-4 bg-white border-t border-slate-200 flex gap-2.5">
                     <input
                         value={texte}
                         onChange={e => setTexte(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && envoyer()}
                         placeholder="Écrivez votre message ici..."
-                        className="flex-1 bg-[#090D16] border border-white/[0.08] focus:border-purple-500 text-slate-200 placeholder-slate-500 rounded-2xl px-4 py-3 text-sm outline-none transition-all shadow-inner"
+                        className="flex-1 bg-white border border-slate-200 focus:border-amber-400 rounded-2xl px-4 py-3 text-sm outline-none transition-all shadow-inner"
                     />
                     <button
                         onClick={envoyer}
                         disabled={!texte.trim() || sending}
-                        className={`px-5 rounded-2xl text-sm font-bold flex items-center justify-center transition-all ${texte.trim() ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white shadow-lg shadow-purple-500/25 active:scale-95' : 'bg-white/[0.04] text-slate-600 cursor-not-allowed'}`}>
+                        className={`px-5 rounded-2xl text-sm font-bold flex items-center justify-center transition-all ${texte.trim() ? 'bg-[#061a3a] hover:bg-[#0b2a57] text-white shadow-lg shadow-purple-500/25 active:scale-95' : 'bg-slate-50 text-slate-600 cursor-not-allowed'}`}>
                         {sending ? '...' : 'Envoyer'}
                     </button>
                 </div>
@@ -454,17 +454,17 @@ function OngletDevis({ token }) {
 
     if (loading) return (
         <div className="flex flex-col items-center justify-center py-20 space-y-3">
-            <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
             <p className="text-slate-500 text-sm animate-pulse">Recherche des opportunités...</p>
         </div>
     );
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/[0.01] p-2 rounded-2xl border border-white/[0.05] print:hidden">
-                <div className="flex gap-1 p-1 bg-[#070A12] rounded-xl border border-white/[0.05]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-2 rounded-2xl border border-slate-200 print:hidden">
+                <div className="flex gap-1 p-1 bg-slate-50 rounded-xl border border-slate-200">
                     {[['disponibles', 'Demandes disponibles'], ['mesdevis', 'Mes devis envoyés']].map(([id, label]) => (
-                        <button key={id} onClick={() => setActiveSubTab(id)} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeSubTab === id ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-white/[0.02]'}`}>
+                        <button key={id} onClick={() => setActiveSubTab(id)} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeSubTab === id ? 'bg-[#061a3a] text-white shadow-md' : 'text-slate-500 hover:text-[#061a3a] hover:bg-white'}`}>
                             {label}
                         </button>
                     ))}
@@ -474,22 +474,22 @@ function OngletDevis({ token }) {
             {activeSubTab === 'disponibles' && (
                 <div className="space-y-4 print:hidden">
                     {reservations.length === 0 ? (
-                        <div className="text-center py-16 bg-white/[0.01] border border-white/[0.05] rounded-3xl text-slate-500 space-y-3">
+                        <div className="text-center py-16 bg-white border border-slate-200 rounded-3xl text-slate-500 space-y-3">
                             <p className="text-sm font-medium">Aucune nouvelle demande d'intervention dans votre secteur.</p>
                         </div>
                     ) : reservations.map(res => {
                         const dejaEnvoye = mesDevis.some(d => d.reservationDevis?.id === res.id);
                         return (
-                            <div key={res.id} className="bg-white/[0.02] hover:bg-white/[0.03] border border-white/[0.07] hover:border-purple-500/30 rounded-3xl p-6 space-y-5 transition-all shadow-xl relative overflow-hidden group text-left">
+                            <div key={res.id} className="bg-white hover:bg-slate-50 border border-slate-200 hover:border-amber-200 rounded-3xl p-6 space-y-5 transition-all shadow-xl relative overflow-hidden group text-left">
                                 <div className="absolute top-0 left-0 bottom-0 w-1 bg-purple-500 opacity-50 group-hover:opacity-100 transition-opacity" />
                                 <div className="flex justify-between items-start flex-wrap gap-3 pl-2">
                                     <div>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-xs font-bold uppercase tracking-wider text-purple-400">Demande #{res.id}</span>
+                                            <span className="text-xs font-bold uppercase tracking-wider text-amber-600">Demande #{res.id}</span>
                                             <span className="text-slate-600">•</span>
-                                            <span className="text-xs text-slate-400">{res.serviceNom}</span>
+                                            <span className="text-xs text-slate-500">{res.serviceNom}</span>
                                         </div>
-                                        <h3 className="font-extrabold text-xl text-white mt-1">{res.clientNom || 'Client anonyme'}</h3>
+                                        <h3 className="font-extrabold text-xl text-[#061a3a] mt-1">{res.clientNom || 'Client anonyme'}</h3>
                                     </div>
                                     <StatutBadge statut={res.statut} />
                                 </div>
@@ -500,47 +500,47 @@ function OngletDevis({ token }) {
                                         ['Date ciblée', res.dateSouhaitee ? new Date(res.dateSouhaitee).toLocaleDateString('fr-FR') : 'Dès que possible'],
                                         ['Contact', 'Numéro masqué'],
                                     ].map(([label, val]) => val ? (
-                                        <div key={label} className="bg-[#070A12]/60 rounded-2xl p-3.5 border border-white/[0.04]">
+                                        <div key={label} className="bg-slate-50/60 rounded-2xl p-3.5 border border-slate-200">
                                             <p className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">{label}</p>
-                                            <p className="text-slate-200 text-sm font-semibold truncate">{val}</p>
+                                            <p className="text-[#334155] text-sm font-semibold truncate">{val}</p>
                                         </div>
                                     ) : null)}
                                 </div>
 
                                 {(res.description || res.besoin) && (
-                                    <div className="bg-purple-950/10 rounded-2xl p-4 border border-purple-500/15">
-                                        <span className="text-purple-400 text-xs font-bold uppercase tracking-wider">Détail du besoin</span>
-                                        <p className="text-sm text-slate-300 mt-1.5 leading-relaxed">{res.description || res.besoin}</p>
+                                    <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200">
+                                        <span className="text-amber-600 text-xs font-bold uppercase tracking-wider">Détail du besoin</span>
+                                        <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">{res.description || res.besoin}</p>
                                     </div>
                                 )}
 
                                 {dejaEnvoye ? (
-                                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex items-center gap-3">
+                                    <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3">
                                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                                        <p className="text-emerald-300 font-bold text-xs tracking-wide uppercase">Devis transmis avec succès</p>
+                                        <p className="text-emerald-700 font-bold text-xs tracking-wide uppercase">Devis transmis avec succès</p>
                                     </div>
                                 ) : (
-                                    <div className="bg-[#070A12]/80 rounded-2xl p-5 border border-white/[0.05] space-y-4">
-                                        <span className="text-slate-300 text-xs font-bold uppercase tracking-wider">Formuler une offre</span>
+                                    <div className="bg-slate-50/80 rounded-2xl p-5 border border-slate-200 space-y-4">
+                                        <span className="text-slate-600 text-xs font-bold uppercase tracking-wider">Formuler une offre</span>
                                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                             <input
                                                 type="number"
                                                 placeholder="Prix proposé (FCFA) *"
                                                 value={montant[res.id] || ''}
                                                 onChange={e => setMontant(p => ({ ...p, [res.id]: e.target.value }))}
-                                                className="bg-white/[0.03] border border-white/[0.08] focus:border-purple-500 text-white placeholder-slate-600 rounded-xl px-4 py-3 text-sm outline-none font-bold"
+                                                className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] bg-slate-50 border border-slate-200 focus:border-amber-400 text-[#061a3a] placeholder-slate-600 rounded-xl px-4 py-3 text-sm outline-none font-bold"
                                             />
                                             <textarea
                                                 placeholder="Précisions sur l'intervention..."
                                                 value={description[res.id] || ''}
                                                 onChange={e => setDescription(p => ({ ...p, [res.id]: e.target.value }))}
-                                                className="sm:col-span-2 bg-white/[0.03] border border-white/[0.08] focus:border-purple-500 text-white placeholder-slate-600 rounded-xl px-4 py-3 text-sm outline-none resize-none h-11"
+                                                className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] sm:col-span-2 bg-slate-50 border border-slate-200 focus:border-amber-400 text-[#061a3a] placeholder-slate-600 rounded-xl px-4 py-3 text-sm outline-none resize-none h-11"
                                             />
                                         </div>
                                         <button
                                             onClick={() => envoyerDevis(res.id)}
                                             disabled={sending === res.id}
-                                            className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-purple-500/20 transition-all active:scale-[0.99] disabled:opacity-50">
+                                            className="w-full py-3 bg-[#061a3a] hover:bg-[#0b2a57] text-white rounded-xl font-bold text-sm shadow-lg shadow-amber-400/20 transition-all active:scale-[0.99] disabled:opacity-50">
                                             {sending === res.id ? 'Transmission en cours...' : 'Envoyer ma proposition commerciale'}
                                         </button>
                                     </div>
@@ -554,58 +554,58 @@ function OngletDevis({ token }) {
             {activeSubTab === 'mesdevis' && (
                 <div className="space-y-4 print:hidden">
                     {mesDevis.length === 0 ? (
-                        <div className="text-center py-16 bg-white/[0.01] border border-white/[0.05] rounded-3xl text-slate-500 space-y-2 text-left">
+                        <div className="text-center py-16 bg-white border border-slate-200 rounded-3xl text-slate-500 space-y-2 text-left">
                             <p className="text-sm font-medium">Aucun devis émis pour le moment.</p>
                         </div>
                     ) : mesDevis.map(devis => {
                         const res = devis.reservationDevis;
                         const statutDevis = {
-                            EN_ATTENTE: { label: 'En attente de réponse', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
-                            ACCEPTE: { label: 'Devis Accepté !', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20 shadow-[0_0_15px_rgba(52,211,153,0.1)]' },
-                            REFUSE: { label: 'Décliné', color: 'text-rose-400 bg-rose-500/10 border-rose-500/20' },
-                        }[devis.statut] || { label: devis.statut, color: 'text-slate-400 bg-white/[0.05] border-white/[0.1]' };
+                            EN_ATTENTE: { label: 'En attente de réponse', color: 'text-amber-700 bg-amber-50 border-amber-200' },
+                            ACCEPTE: { label: 'Devis Accepté !', color: 'text-emerald-700 bg-emerald-50 border-emerald-200 shadow-[0_0_15px_rgba(52,211,153,0.1)]' },
+                            REFUSE: { label: 'Décliné', color: 'text-red-600 bg-red-50 border-red-200' },
+                        }[devis.statut] || { label: devis.statut, color: 'text-slate-500 bg-slate-100 border-slate-200' };
 
                         return (
-                            <div key={devis.id} className="bg-white/[0.02] border border-white/[0.07] rounded-3xl p-6 space-y-4 shadow-xl text-left">
+                            <div key={devis.id} className="bg-white border border-slate-200 rounded-3xl p-6 space-y-4 shadow-xl text-left">
                                 <div className="flex justify-between items-start flex-wrap gap-3">
                                     <div>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-xs font-bold text-slate-400 uppercase">Devis #{devis.id}</span>
+                                            <span className="text-xs font-bold text-slate-500 uppercase">Devis #{devis.id}</span>
                                             <span className="text-slate-600">/</span>
-                                            <span className="text-xs text-purple-400 font-semibold">Demande #{res?.id}</span>
+                                            <span className="text-xs text-amber-600 font-semibold">Demande #{res?.id}</span>
                                         </div>
-                                        <h4 className="text-lg font-bold text-white mt-0.5">{res?.clientNom || 'Client'}</h4>
+                                        <h4 className="text-lg font-bold text-[#061a3a] mt-0.5">{res?.clientNom || 'Client'}</h4>
                                     </div>
                                     <span className={`px-3.5 py-1 rounded-full text-xs font-bold border ${statutDevis.color}`}>{statutDevis.label}</span>
                                 </div>
 
-                                <div className="flex justify-between items-center bg-[#070A12]/80 rounded-2xl px-5 py-3.5 border border-white/[0.04]">
-                                    <span className="text-slate-400 text-xs uppercase font-bold tracking-wider">Montant convenu</span>
-                                    <span className="font-black text-lg text-amber-400">{Number(devis.montant).toLocaleString()} FCFA</span>
+                                <div className="flex justify-between items-center bg-slate-50/80 rounded-2xl px-5 py-3.5 border border-slate-200">
+                                    <span className="text-slate-500 text-xs uppercase font-bold tracking-wider">Montant convenu</span>
+                                    <span className="font-black text-lg text-amber-700">{Number(devis.montant).toLocaleString()} FCFA</span>
                                 </div>
 
                                 {devis.description && (
-                                    <p className="text-sm text-slate-400 bg-white/[0.01] rounded-2xl p-4 border border-white/[0.03] italic">« {devis.description} »</p>
+                                    <p className="text-sm text-slate-500 bg-white rounded-2xl p-4 border border-slate-200 italic">« {devis.description} »</p>
                                 )}
 
                                 {devis.statut === 'ACCEPTE' && (
-                                    <div className="bg-purple-950/10 border border-purple-500/20 rounded-2xl p-4 space-y-3">
+                                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-xs font-bold text-purple-300 uppercase tracking-wider">Justificatifs d'intervention requis</span>
-                                            <button onClick={() => setDevisAImprimer(devis)} className="text-xs font-bold text-purple-300 hover:text-white underline">Imprimer le devis</button>
+                                            <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">Justificatifs d'intervention requis</span>
+                                            <button onClick={() => setDevisAImprimer(devis)} className="text-xs font-bold text-amber-700 hover:text-[#061a3a] underline">Imprimer le devis</button>
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             {['photoAvant', 'photoApres'].map(type => (
-                                                <div key={type} className="flex items-center gap-2 bg-[#070A12] p-2 rounded-xl border border-white/[0.05]">
+                                                <div key={type} className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
                                                     <label className="flex-1 flex items-center gap-2 px-3 py-1.5 cursor-pointer truncate">
-                                                        <span className="text-xs font-medium text-slate-300">{type === 'photoAvant' ? 'État initial' : 'Résultat final'}</span>
-                                                        <input type="file" accept="image/*" className="hidden" onChange={e => setPhotos(p => ({ ...p, [`${res?.id}_${type}`]: e.target.files[0] }))} />
-                                                        {photos[`${res?.id}_${type}`] && <span className="text-[10px] text-emerald-400 font-bold ml-auto bg-emerald-500/10 px-2 py-0.5 rounded">Prêt</span>}
+                                                        <span className="text-xs font-medium text-slate-600">{type === 'photoAvant' ? 'État initial' : 'Résultat final'}</span>
+                                                        <input type="file" accept="image/*" className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] hidden" onChange={e => setPhotos(p => ({ ...p, [`${res?.id}_${type}`]: e.target.files[0] }))} />
+                                                        {photos[`${res?.id}_${type}`] && <span className="text-[10px] text-emerald-700 font-bold ml-auto bg-emerald-50 px-2 py-0.5 rounded">Prêt</span>}
                                                     </label>
                                                     <button
                                                         onClick={() => envoyerPhotos(res?.id, type)}
                                                         disabled={uploadLoading === `${res?.id}_${type}` || !photos[`${res?.id}_${type}`]}
-                                                        className="px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-white/[0.03] disabled:text-slate-600 text-white rounded-lg text-xs font-bold transition-all">
+                                                        className="px-3 py-2 bg-[#061a3a] hover:bg-[#0b2a57] disabled:bg-slate-50 disabled:text-slate-600 text-white rounded-lg text-xs font-bold transition-all">
                                                         {uploadLoading === `${res?.id}_${type}` ? '...' : 'Upload'}
                                                     </button>
                                                 </div>
@@ -636,88 +636,6 @@ function OngletDevis({ token }) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// ONGLET : MES REÇUS — même document imprimable que le bon
-// d'intervention transmis, pour chaque mission clôturée.
-// ════════════════════════════════════════════════════════════════
-function CarteRecuFournisseur({ mission, token }) {
-    const [bon, setBon] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const printRef = useRef(null);
-
-    const chargerEtImprimer = async () => {
-        setLoading(true);
-        try {
-            const d = await getBonInterventionParReservation(mission.id);
-            if (d.success) {
-                setBon(d.data);
-                setTimeout(() => window.print(), 150);
-            } else {
-                alert(d.message || 'Reçu introuvable pour cette mission.');
-            }
-        } catch (err) {
-            alert(err.message || 'Erreur de connexion au serveur.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="bg-white/[0.02] border border-white/[0.07] rounded-2xl p-5 flex flex-col sm:flex-row justify-between sm:items-center gap-3 text-left">
-            <div>
-                <span className="text-xs font-bold text-purple-400">Mission #{mission.id}</span>
-                <p className="text-white font-bold text-sm mt-0.5">{mission.serviceNom || mission.service?.nom || 'Service'}</p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                    {mission.client?.nom || mission.clientNom || 'Client'} · {Number(mission.montantTotal || 0).toLocaleString()} FCFA
-                </p>
-            </div>
-            <button
-                onClick={chargerEtImprimer}
-                disabled={loading}
-                className="px-4 py-2.5 bg-white/[0.04] hover:bg-white/[0.08] text-slate-200 rounded-xl text-xs font-bold border border-white/[0.08] transition-all disabled:opacity-50 shrink-0"
-            >
-                {loading ? 'Chargement...' : 'Voir / Imprimer le reçu'}
-            </button>
-
-            {bon && (
-                <BonInterventionPrint
-                    ref={printRef}
-                    type="bon"
-                    numero={`BI-${mission.id}`}
-                    mission={mission}
-                    client={mission.client}
-                    prestataire={{ nomEntreprise: bon.fournisseurBon?.nomEntreprise, telephone: bon.fournisseurBon?.telephone }}
-                    description={bon.descriptionTravail}
-                    dateDocument={bon.valideLe || bon.createdAt}
-                    lignes={[
-                        { label: "Main d'œuvre", montant: bon.montantMainOeuvre },
-                        { label: bon.piecesOutils || 'Pièces / matériel', montant: bon.montantPiecesOutils },
-                    ]}
-                />
-            )}
-        </div>
-    );
-}
-
-function OngletRecusFournisseur({ missions, token }) {
-    const missionsValidees = missions.filter(m => m.statut === 'VALIDEE');
-
-    if (missionsValidees.length === 0) {
-        return (
-            <div className="bg-white/[0.02] border border-white/[0.07] rounded-3xl p-12 text-center space-y-2">
-                <p className="text-slate-400 text-sm">Aucun reçu disponible pour le moment.</p>
-                <p className="text-slate-600 text-xs">Le reçu d'une mission apparaît ici une fois la prestation validée par le client.</p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="space-y-3 text-left">
-            {missionsValidees.map(m => <CarteRecuFournisseur key={m.id} mission={m} token={token} />)}
-        </div>
-    );
-}
-
-// ════════════════════════════════════════════════════════════════
 // COMPOSANT PRINCIPAL
 // ════════════════════════════════════════════════════════════════
 export default function DashboardFournisseur({ setCurrentView }) {
@@ -732,6 +650,8 @@ export default function DashboardFournisseur({ setCurrentView }) {
     const [chatMission, setChatMission] = useState(null);
     const [bonMission, setBonMission] = useState(null);
     const [ajoutProduitOuvert, setAjoutProduitOuvert] = useState(false);
+    const [lastSync, setLastSync] = useState(null);
+    const [refreshing, setRefreshing] = useState(false);
     const token = localStorage.getItem('token');
 
     let currentUser = {};
@@ -745,6 +665,7 @@ export default function DashboardFournisseur({ setCurrentView }) {
             setData(dash.data);
             setMissions(dash.data.missions || []);
             setProduits(prods.data || []);
+            setLastSync(new Date());
         } catch (e) {
             console.error(e);
             setError('Impossible de charger le dashboard.');
@@ -753,7 +674,17 @@ export default function DashboardFournisseur({ setCurrentView }) {
         }
     };
 
-    useEffect(() => { chargerDonnees(); }, [token]);
+    useEffect(() => {
+        chargerDonnees();
+        const interval = setInterval(() => chargerDonnees(), 30000);
+        return () => clearInterval(interval);
+    }, [token]);
+
+    const actualiser = async () => {
+        if (refreshing) return;
+        setRefreshing(true);
+        try { await chargerDonnees(); } finally { setRefreshing(false); }
+    };
 
     const callAction = async (id, endpoint, nextStatut, body = {}) => {
         setActionLoad(`${id}_${endpoint}`);
@@ -790,22 +721,22 @@ export default function DashboardFournisseur({ setCurrentView }) {
     if (!token) { setCurrentView && setCurrentView('login'); return null; }
 
     if (loading) return (
-        <div className="flex items-center justify-center h-screen bg-[#0B0F19] text-white">
+        <div className="flex items-center justify-center h-screen bg-slate-50 text-[#061a3a]">
             <div className="text-center space-y-4">
                 <div className="relative w-16 h-16 mx-auto">
-                    <div className="absolute inset-0 rounded-full border-2 border-purple-500/20 animate-ping" />
-                    <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto shadow-[0_0_15px_#a855f7]" />
+                    <div className="absolute inset-0 rounded-full border-2 border-amber-200 animate-ping" />
+                    <div className="w-16 h-16 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto shadow-[0_0_15px_#a855f7]" />
                 </div>
-                <p className="text-slate-400 font-medium tracking-wide text-sm animate-pulse">Synchronisation sécurisée...</p>
+                <p className="text-slate-500 font-medium tracking-wide text-sm animate-pulse">Synchronisation sécurisée...</p>
             </div>
         </div>
     );
 
     if (error) return (
-        <div className="flex items-center justify-center h-screen bg-[#0B0F19] p-4">
-            <div className="bg-rose-500/10 border border-rose-500/20 rounded-3xl p-8 max-w-md text-center space-y-4">
-                <p className="text-rose-200 font-bold text-lg">{error}</p>
-                <button onClick={() => window.location.reload()} className="px-6 py-2.5 bg-rose-500 hover:bg-rose-400 text-white rounded-xl text-xs font-bold transition-all">Réessayer</button>
+        <div className="flex items-center justify-center h-screen bg-slate-50 p-4">
+            <div className="bg-red-50 border border-red-200 rounded-3xl p-8 max-w-md text-center space-y-4">
+                <p className="text-red-700 font-bold text-lg">{error}</p>
+                <button onClick={() => window.location.reload()} className="px-6 py-2.5 bg-rose-500 hover:bg-rose-400 text-[#061a3a] rounded-xl text-xs font-bold transition-all">Réessayer</button>
             </div>
         </div>
     );
@@ -816,13 +747,10 @@ export default function DashboardFournisseur({ setCurrentView }) {
     const missionsActives = missions.filter(m => !['TERMINEE', 'VALIDEE', 'ANNULEE'].includes(m.statut));
     const badgeProfil = BADGE_PROFIL[profil?.statutKanari] || BADGE_PROFIL.EN_ATTENTE;
 
-    const missionsValideesFournisseur = missions.filter(m => m.statut === 'VALIDEE');
-
     const tabs = [
         { id: 'overview', label: 'Vue d\'ensemble', icon: '' },
         { id: 'devis', label: 'AO & Devis', icon: '' },
         { id: 'missions', label: 'Interventions', icon: '', badge: missionsActives.length },
-        { id: 'recus', label: 'Mes Reçus', icon: '', badge: missionsValideesFournisseur.length },
         { id: 'commandes', label: 'Commandes Shop', icon: '' },
         { id: 'produits', label: 'Catalogue', icon: '' },
         { id: 'solde', label: 'Portefeuille', icon: '' },
@@ -830,18 +758,18 @@ export default function DashboardFournisseur({ setCurrentView }) {
     ];
 
     return (
-        <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex relative overflow-hidden font-sans selection:bg-purple-500 selection:text-white print:bg-white">
-            <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[140px] pointer-events-none print:hidden" />
+        <div className="min-h-screen bg-slate-50 text-[#061a3a] flex relative overflow-hidden font-sans selection:bg-amber-200 selection:text-[#061a3a] print:bg-white">
+            <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-[#061a3a]/10 rounded-full blur-[140px] pointer-events-none print:hidden" />
             <div className="absolute bottom-0 right-10 w-[400px] h-[400px] bg-blue-600/10 rounded-full blur-[120px] pointer-events-none print:hidden" />
 
-            <aside className="hidden md:flex w-72 bg-[#0E1320]/80 backdrop-blur-2xl p-6 flex-col gap-4 border-r border-white/[0.05] z-20 shadow-2xl text-left print:hidden">
+            <aside className="hidden md:flex w-72 bg-white/80 backdrop-blur-xl p-6 flex-col gap-4 border-r border-slate-200 z-20 shadow-2xl text-left print:hidden">
                 <div className="flex items-center gap-3 px-2 pt-2">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
-                        <span className="font-black text-white text-base">K</span>
+                    <div className="w-9 h-9 rounded-xl bg-amber-400 flex items-center justify-center shadow-lg shadow-amber-400/30">
+                        <span className="font-black text-[#061a3a] text-base">K</span>
                     </div>
                     <div>
-                        <h2 className="font-extrabold text-base tracking-tight text-white leading-none">Kanari Service</h2>
-                        <span className="text-[10px] uppercase font-bold tracking-widest text-purple-400">Partner Portal</span>
+                        <h2 className="font-extrabold text-base tracking-tight text-[#061a3a] leading-none">Kanari Service</h2>
+                        <span className="text-[10px] uppercase font-bold tracking-widest text-amber-600">Partner Portal</span>
                     </div>
                 </div>
                 <div className={`mt-2 rounded-2xl p-3 border ${badgeProfil.bg} ${badgeProfil.border} flex items-center gap-2`}>
@@ -850,96 +778,105 @@ export default function DashboardFournisseur({ setCurrentView }) {
                 <nav className="flex flex-col gap-1.5 flex-1 mt-2">
                     <span className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Navigation</span>
                     {tabs.map(t => (
-                        <button key={t.id} onClick={() => setActiveTab(t.id)} className={`text-left px-3.5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center justify-between group ${activeTab === t.id ? 'bg-gradient-to-r from-purple-600/20 to-indigo-600/10 border border-purple-500/30 text-white shadow-lg' : 'hover:bg-white/[0.03] text-slate-400 hover:text-slate-200 border border-transparent'}`}>
+                        <button key={t.id} onClick={() => setActiveTab(t.id)} className={`text-left px-3.5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center justify-between group ${activeTab === t.id ? 'bg-amber-50 border border-amber-200 text-[#061a3a] shadow-lg' : 'hover:bg-slate-50 text-slate-500 hover:text-[#334155] border border-transparent'}`}>
                             <div className="flex items-center gap-3 text-left">
                                 <span>{t.label}</span>
                             </div>
-                            {t.badge > 0 && <span className="bg-purple-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black">{t.badge}</span>}
+                            {t.badge > 0 && <span className="bg-amber-400 text-[#061a3a] text-[10px] px-2 py-0.5 rounded-full font-black">{t.badge}</span>}
                         </button>
                     ))}
                 </nav>
             </aside>
 
-            <div className="md:hidden fixed top-0 inset-x-0 h-14 bg-[#0E1320]/90 backdrop-blur-lg border-b border-white/[0.05] z-30 px-4 flex justify-between items-center print:hidden">
+            <div className="md:hidden fixed top-0 inset-x-0 h-14 bg-white/90 backdrop-blur-md border-b border-slate-200 z-30 px-4 flex justify-between items-center print:hidden">
                 <div className="flex items-center gap-2">
-                    <button onClick={() => window.history.back()} className="text-slate-400 hover:text-white text-lg mr-1">‹</button>
-                    <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center font-black text-white text-xs">K</div>
-                    <span className="font-extrabold text-sm tracking-tight text-white">Kanari Portal</span>
+                    <button onClick={() => window.history.back()} className="text-slate-500 hover:text-[#061a3a] text-lg mr-1">‹</button>
+                    <div className="w-7 h-7 rounded-lg bg-amber-400 flex items-center justify-center font-black text-[#061a3a] text-xs">K</div>
+                    <span className="font-extrabold text-sm tracking-tight text-[#061a3a]">Kanari Portal</span>
                 </div>
-                <button onClick={() => setMenuOuvert(!menuOuvert)} className="px-3 py-1.5 rounded-xl bg-white/[0.05] text-slate-300 font-bold text-xs">{menuOuvert ? 'Fermer' : 'Menu'}</button>
+                <button onClick={() => setMenuOuvert(!menuOuvert)} className="px-3 py-1.5 rounded-xl bg-slate-100 text-[#061a3a] font-bold text-xs">{menuOuvert ? 'Fermer' : 'Menu'}</button>
             </div>
 
             {menuOuvert && (
-                <div className="md:hidden fixed inset-x-0 top-14 bottom-0 z-40 bg-[#0B0F19]/95 backdrop-blur-2xl border-b border-white/[0.05] p-6 space-y-2 overflow-y-auto print:hidden">
-                    <p className="text-xs font-bold text-purple-400 uppercase tracking-wider mb-3 text-left">Menu Principal</p>
+                <div className="md:hidden fixed inset-x-0 top-14 bottom-0 z-40 bg-slate-50/95 backdrop-blur-xl border-b border-slate-200 p-6 space-y-2 overflow-y-auto print:hidden">
+                    <p className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-3 text-left">Menu Principal</p>
                     {tabs.map(t => (
-                        <button key={t.id} onClick={() => { setActiveTab(t.id); setMenuOuvert(false); }} className={`w-full text-left px-4 py-3.5 rounded-2xl text-sm font-bold flex items-center justify-between ${activeTab === t.id ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg' : 'text-slate-300 bg-white/[0.02]'}`}>
+                        <button key={t.id} onClick={() => { setActiveTab(t.id); setMenuOuvert(false); }} className={`w-full text-left px-4 py-3.5 rounded-2xl text-sm font-bold flex items-center justify-between ${activeTab === t.id ? 'bg-[#061a3a] text-white shadow-lg' : 'text-slate-600 bg-white'}`}>
                             <div className="flex items-center gap-3"><span>{t.label}</span></div>
-                            {t.badge > 0 && <span className="bg-rose-500 text-white text-xs px-2.5 py-0.5 rounded-full font-black">{t.badge}</span>}
+                            {t.badge > 0 && <span className="bg-rose-500 text-[#061a3a] text-xs px-2.5 py-0.5 rounded-full font-black">{t.badge}</span>}
                         </button>
                     ))}
                 </div>
             )}
 
             <main className="flex-1 p-6 md:p-10 overflow-y-auto mt-14 md:mt-0 max-w-7xl mx-auto z-10 space-y-8 print:hidden">
-                <header className="hidden md:flex items-center justify-between pb-4 border-b border-white/[0.05]">
+                <header className="hidden md:flex items-center justify-between pb-4 border-b border-slate-200">
                     <div className="text-left">
-                        <span className="text-xs font-bold uppercase tracking-widest text-purple-400">Espace de gestion</span>
-                        <h1 className="text-2xl font-black text-white mt-0.5">{tabs.find(t => t.id === activeTab)?.label}</h1>
+                        <span className="text-xs font-bold uppercase tracking-widest text-amber-600">Espace de gestion</span>
+                        <h1 className="text-2xl font-black text-[#061a3a] mt-0.5">{tabs.find(t => t.id === activeTab)?.label}</h1>
                     </div>
-                    <button onClick={() => window.history.back()} className="px-4 py-2 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 font-bold text-xs flex items-center gap-2 transition-all">Retour</button>
+                    <div className="flex items-center gap-2">
+                        <span className="hidden lg:inline text-[10px] font-semibold text-slate-500">{lastSync ? `Synchronisé à ${lastSync.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : 'Synchronisation...'}</span>
+                        <button onClick={actualiser} disabled={refreshing} className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-amber-50 text-[#061a3a] font-bold text-xs flex items-center gap-2 transition-all disabled:opacity-60">{refreshing ? 'Actualisation...' : 'Actualiser'}</button>
+                        <button onClick={() => window.history.back()} className="px-4 py-2 rounded-xl bg-[#061a3a] hover:bg-[#0b2a57] text-white font-bold text-xs flex items-center gap-2 transition-all">Retour</button>
+                    </div>
                 </header>
 
                 {activeTab === 'overview' && (
                     <section className="space-y-6">
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                            <StatCard label="Missions actives" value={missionsActives.length} gradient="from-purple-600 to-blue-500" />
-                            <StatCard label="Missions traitées" value={stats?.totalMissions ?? 0} gradient="from-purple-500 to-pink-500" />
-                            <StatCard label="Ventes directes" value={stats?.totalCommandes ?? 0} gradient="from-blue-500 to-cyan-500" />
-                            <StatCard label="Net à recevoir (mois)" value={`${stats?.totalRevenus?.toLocaleString() ?? 0} F`} gradient="from-emerald-400 to-teal-500" />
+                            <StatCard label="Missions actives" value={missionsActives.length} gradient="from-[#061a3a] to-amber-400" />
+                            <StatCard label="Missions traitées" value={stats?.totalMissions ?? 0} gradient="from-[#061a3a] to-amber-400" />
+                            <StatCard label="Ventes directes" value={stats?.totalCommandes ?? 0} gradient="from-[#061a3a] to-blue-400" />
+                            <StatCard label="Chiffre d'affaires" value={`${stats?.totalRevenus?.toLocaleString() ?? 0} F`} gradient="from-emerald-500 to-teal-500" />
                         </div>
 
-                        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-5 backdrop-blur-md">
-                            <h2 className="mb-4 text-sm font-semibold text-slate-100">Résumé financier du mois</h2>
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                                    <p className="text-xs text-slate-500">Chiffre d'affaires brut</p>
-                                    <p className="mt-1 text-lg font-semibold text-slate-100">{Number(stats?.brutMois || 0).toLocaleString()} FCFA</p>
+                        <div className="rounded-3xl border border-amber-200 bg-white p-6 md:p-7 shadow-sm text-left">
+                            <div className="flex items-start justify-between gap-4 flex-wrap">
+                                <div>
+                                    <div className="text-xs font-black uppercase tracking-[.18em] text-amber-600">Récapitulatif de collaboration</div>
+                                    <h3 className="mt-1 text-lg font-black text-[#061a3a]">Vos conditions Kanari</h3>
+                                    <p className="mt-1 text-xs leading-5 text-slate-500">Les conditions détaillées restent celles de votre contrat accepté et des conditions particulières de chaque mission.</p>
                                 </div>
-                                <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                                    <p className="text-xs text-slate-500">Commission Kanari</p>
-                                    <p className="mt-1 text-lg font-semibold text-rose-400">- {Number(stats?.commissionMois || 0).toLocaleString()} FCFA</p>
-                                </div>
-                                <div className="rounded-xl border border-violet-500/20 bg-gradient-to-br from-violet-600/10 to-indigo-600/10 p-4">
-                                    <p className="text-xs text-slate-400">Net à recevoir</p>
-                                    <p className="mt-1 text-lg font-semibold text-slate-50">{Number(stats?.netMois || 0).toLocaleString()} FCFA</p>
-                                </div>
+                                <span className="rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700">Traçabilité active</span>
                             </div>
-                            <p className="mt-3 text-[11px] text-slate-600">
-                                Cumul total depuis le début : {Number(stats?.totalBrut || 0).toLocaleString()} FCFA brut, {Number(stats?.totalCommission || 0).toLocaleString()} FCFA de commission, {Number(stats?.totalNet || 0).toLocaleString()} FCFA net.
-                            </p>
+                            <div className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                                {[
+                                    ['Profil vérifié', 'Les informations et documents peuvent être contrôlés ou complétés par Kanari.'],
+                                    ['Missions', 'Aucun volume minimum n’est garanti sauf accord écrit spécifique.'],
+                                    ['Exécution', 'Le professionnel reste responsable de la qualité et de l’exécution technique.'],
+                                    ['Paiements', 'Les paiements, commissions, annulations et litiges sont rattachés à une référence de mission.'],
+                                    ['Respect client', 'Rendez-vous, consignes de sécurité et documents Kanari doivent être respectés.'],
+                                    ['Transparence', 'Toute condition commerciale particulière doit être définie avant l’opération.'],
+                                ].map(([t, d]) => (
+                                    <div key={t} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                        <p className="text-xs font-black text-[#061a3a]">{t}</p>
+                                        <p className="mt-1 text-xs leading-5 text-slate-500">{d}</p>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
 
                         {missionsActives.length > 0 && (
-                            <div className="bg-gradient-to-br from-purple-500/5 to-transparent border border-purple-500/10 rounded-3xl p-6 md:p-8 shadow-2xl space-y-4 text-left">
+                            <div className="bg-gradient-to-br from-purple-500/5 to-transparent border border-amber-200 rounded-3xl p-6 md:p-8 shadow-2xl space-y-4 text-left">
                                 <div className="flex items-center justify-between flex-wrap gap-2">
                                     <div>
-                                        <h3 className="font-extrabold text-purple-300 text-base">Missions nécessitant votre attention</h3>
-                                        <span className="text-xs text-slate-400">{missionsActives.length} dossier{missionsActives.length > 1 ? 's' : ''} en attente ou en cours</span>
+                                        <h3 className="font-extrabold text-amber-700 text-base">Missions nécessitant votre attention</h3>
+                                        <span className="text-xs text-slate-500">{missionsActives.length} dossier{missionsActives.length > 1 ? 's' : ''} en attente ou en cours</span>
                                     </div>
-                                    <button onClick={() => setActiveTab('missions')} className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white rounded-xl text-xs font-black transition-all shadow-md">Ouvrir l'onglet</button>
+                                    <button onClick={() => setActiveTab('missions')} className="px-4 py-2 bg-[#061a3a] hover:bg-[#0b2a57] text-white rounded-xl text-xs font-black transition-all shadow-md">Ouvrir l'onglet</button>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
                                     {missionsActives.slice(0, 3).map(m => (
-                                        <div key={m.id} className="bg-[#070A12]/80 border border-white/[0.05] rounded-2xl p-4 flex flex-col justify-between space-y-3 hover:border-purple-500/40 transition-all text-left">
+                                        <div key={m.id} className="bg-slate-50/80 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between space-y-3 hover:border-amber-400/40 transition-all text-left">
                                             <div className="flex justify-between items-start">
                                                 <div>
                                                     <span className="text-[10px] uppercase font-extrabold text-slate-500">Réf #{m.id}</span>
-                                                    <p className="font-extrabold text-white text-sm truncate max-w-[140px] mt-0.5">{m.client?.nom || m.clientNom || 'Client'}</p>
+                                                    <p className="font-extrabold text-[#061a3a] text-sm truncate max-w-[140px] mt-0.5">{m.client?.nom || m.clientNom || 'Client'}</p>
                                                 </div>
                                                 <StatutBadge statut={m.statut} />
                                             </div>
-                                            <button onClick={() => setActiveTab('missions')} className="w-full py-2 bg-white/[0.03] hover:bg-purple-500/20 hover:text-purple-300 text-slate-400 rounded-xl text-xs font-bold transition-all text-center">Gérer l'intervention</button>
+                                            <button onClick={() => setActiveTab('missions')} className="w-full py-2 bg-slate-50 hover:bg-amber-50 hover:text-amber-700 text-slate-500 rounded-xl text-xs font-bold transition-all text-center">Gérer l'intervention</button>
                                         </div>
                                     ))}
                                 </div>
@@ -952,35 +889,35 @@ export default function DashboardFournisseur({ setCurrentView }) {
 
                 {activeTab === 'missions' && (
                     <section className="space-y-6 text-left">
-                        <div className="flex items-center justify-between pb-2 border-b border-white/[0.05]">
-                            <h2 className="text-xl font-black text-white">Suivi de vos Interventions</h2>
-                            <span className="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold">
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                            <h2 className="text-xl font-black text-[#061a3a]">Suivi de vos Interventions</h2>
+                            <span className="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 text-xs font-bold">
                                 {missions.length} mission{missions.length > 1 ? 's' : ''} au total
                             </span>
                         </div>
 
                         {missions.length === 0 ? (
-                            <div className="text-center py-20 bg-white/[0.01] border border-white/[0.05] rounded-3xl text-slate-500">
+                            <div className="text-center py-20 bg-white border border-slate-200 rounded-3xl text-slate-500">
                                 <p className="text-sm font-medium">Aucune mission ne vous est affectée pour le moment.</p>
                                 <p className="text-xs text-slate-600 mt-2">Vos missions apparaîtront ici dès qu'un Admin vous assignera une réservation.</p>
                             </div>
                         ) : (
                             <div className="space-y-5">
                                 {missions.map(mission => (
-                                    <div key={mission.id} className="bg-white/[0.02] border border-white/[0.07] hover:border-purple-500/20 rounded-3xl p-6 space-y-5 shadow-xl transition-all relative overflow-hidden group">
-                                        <div className="absolute top-0 left-0 bottom-0 w-1 bg-purple-600 opacity-40 group-hover:opacity-100 transition-opacity" />
+                                    <div key={mission.id} className="bg-white border border-slate-200 hover:border-amber-200 rounded-3xl p-6 space-y-5 shadow-xl transition-all relative overflow-hidden group">
+                                        <div className="absolute top-0 left-0 bottom-0 w-1 bg-[#061a3a] opacity-40 group-hover:opacity-100 transition-opacity" />
 
                                         <div className="flex justify-between items-start flex-wrap gap-4 pl-2">
                                             <div>
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Mission ID #{mission.id}</span>
+                                                    <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">Mission ID #{mission.id}</span>
                                                     <span className="text-slate-600">•</span>
-                                                    <span className="text-xs font-medium text-slate-400">{mission.serviceNom || mission.service?.nom || 'Prestation de service'}</span>
+                                                    <span className="text-xs font-medium text-slate-500">{mission.serviceNom || mission.service?.nom || 'Prestation de service'}</span>
                                                 </div>
-                                                <h3 className="font-extrabold text-2xl text-white mt-1">{mission.client?.nom || mission.clientNom || 'Client'}</h3>
-                                                <p className="text-xs text-slate-400 font-medium mt-1">
+                                                <h3 className="font-extrabold text-2xl text-[#061a3a] mt-1">{mission.client?.nom || mission.clientNom || 'Client'}</h3>
+                                                <p className="text-xs text-slate-500 font-medium mt-1">
                                                     Téléphone :{' '}
-                                                    <span className={`font-bold ${STATUTS_TELEPHONE_VISIBLE.includes(mission.statut) ? 'text-amber-400' : 'text-slate-500'}`}>
+                                                    <span className={`font-bold ${STATUTS_TELEPHONE_VISIBLE.includes(mission.statut) ? 'text-amber-700' : 'text-slate-500'}`}>
                                                         {STATUTS_TELEPHONE_VISIBLE.includes(mission.statut)
                                                             ? (mission.client?.telephone || mission.telephone || 'Non spécifié')
                                                             : "Numéro masqué (Disponible après validation par l'Admin)"}
@@ -989,7 +926,7 @@ export default function DashboardFournisseur({ setCurrentView }) {
                                             </div>
 
                                             <div className="flex items-center gap-3">
-                                                <button onClick={() => setChatMission(mission)} className="px-4 py-2 rounded-2xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 font-bold text-xs flex items-center gap-2 transition-all">Messagerie Client</button>
+                                                <button onClick={() => setChatMission(mission)} className="px-4 py-2 rounded-2xl bg-amber-50 hover:bg-amber-50 border border-amber-200 text-amber-700 font-bold text-xs flex items-center gap-2 transition-all">Messagerie Client</button>
                                                 <StatutBadge statut={mission.statut} />
                                             </div>
                                         </div>
@@ -1000,17 +937,17 @@ export default function DashboardFournisseur({ setCurrentView }) {
                                                 ['Horaires convenus', mission.dateSouhaitee ? new Date(mission.dateSouhaitee).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Non spécifié'],
                                                 ['Acompte versé', mission.acompte ? `${Number(mission.acompte).toLocaleString()} FCFA` : 'Aucun acompte'],
                                             ].map(([label, val]) => val && (
-                                                <div key={label} className="bg-[#070A12]/80 rounded-2xl p-4 border border-white/[0.04]">
+                                                <div key={label} className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200">
                                                     <p className="text-slate-500 text-[10px] uppercase font-black tracking-wider mb-1">{label}</p>
-                                                    <p className="text-slate-200 text-sm font-bold truncate">{val}</p>
+                                                    <p className="text-[#334155] text-sm font-bold truncate">{val}</p>
                                                 </div>
                                             ))}
                                         </div>
 
                                         {(mission.description || mission.besoin) && (
-                                            <div className="bg-white/[0.01] rounded-2xl p-4 border border-white/[0.04]">
-                                                <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Cahier des charges client</span>
-                                                <p className="text-sm text-slate-300 mt-1.5 leading-relaxed">{mission.description || mission.besoin}</p>
+                                            <div className="bg-white rounded-2xl p-4 border border-slate-200">
+                                                <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Cahier des charges client</span>
+                                                <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">{mission.description || mission.besoin}</p>
                                             </div>
                                         )}
 
@@ -1020,21 +957,21 @@ export default function DashboardFournisseur({ setCurrentView }) {
                                                     <button onClick={() => callAction(mission.id, 'accepter', 'EN_VALIDATION_ADMIN')} disabled={actionLoad === `${mission.id}_accepter`} className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black rounded-xl text-xs shadow-lg transition-all active:scale-95 disabled:opacity-50">
                                                         {actionLoad === `${mission.id}_accepter` ? 'Traitement...' : "Je suis partant — Envoyer à l'Admin"}
                                                     </button>
-                                                    <button onClick={() => callAction(mission.id, 'refuser', 'ANNULEE')} disabled={actionLoad === `${mission.id}_refuser`} className="px-6 py-3 bg-white/[0.04] hover:bg-rose-500/20 text-rose-400 border border-transparent hover:border-rose-500/30 font-bold rounded-xl text-xs transition-all active:scale-95 disabled:opacity-50">
+                                                    <button onClick={() => callAction(mission.id, 'refuser', 'ANNULEE')} disabled={actionLoad === `${mission.id}_refuser`} className="px-6 py-3 bg-slate-50 hover:bg-rose-500/20 text-red-600 border border-transparent hover:border-rose-500/30 font-bold rounded-xl text-xs transition-all active:scale-95 disabled:opacity-50">
                                                         {actionLoad === `${mission.id}_refuser` ? 'Refus...' : 'Je ne suis pas disponible'}
                                                     </button>
                                                 </>
                                             )}
 
                                             {mission.statut === 'EN_VALIDATION_ADMIN' && (
-                                                <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex items-center gap-3 w-full">
+                                                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-center gap-3 w-full">
                                                     <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-                                                    <p className="text-blue-300 font-bold text-xs tracking-wide uppercase">Transmission effectuée — En attente d'approbation de l'administration</p>
+                                                    <p className="text-blue-700 font-bold text-xs tracking-wide uppercase">Transmission effectuée — En attente d'approbation de l'administration</p>
                                                 </div>
                                             )}
 
                                             {mission.statut === 'ACCEPTEE' && (
-                                                <button onClick={() => callAction(mission.id, 'demarrer', 'EN_COURS')} disabled={actionLoad === `${mission.id}_demarrer`} className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold rounded-xl text-xs shadow-lg transition-all active:scale-95 disabled:opacity-50">
+                                                <button onClick={() => callAction(mission.id, 'demarrer', 'EN_COURS')} disabled={actionLoad === `${mission.id}_demarrer`} className="px-6 py-3 bg-[#061a3a] hover:bg-[#0b2a57] text-white font-extrabold rounded-xl text-xs shadow-lg transition-all active:scale-95 disabled:opacity-50">
                                                     {actionLoad === `${mission.id}_demarrer` ? 'Démarrage...' : "Démarrer l'intervention"}
                                                 </button>
                                             )}
@@ -1044,21 +981,21 @@ export default function DashboardFournisseur({ setCurrentView }) {
                                                     <button onClick={() => setBonMission(mission)} className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black rounded-xl text-xs shadow-lg transition-all active:scale-95">
                                                         Remplir le Bon d'intervention & Terminer
                                                     </button>
-                                                    <button onClick={() => signalerMateriel(mission.id)} className="px-4 py-3 bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 font-bold rounded-xl text-xs transition-all">Signaler matériel manquant</button>
+                                                    <button onClick={() => signalerMateriel(mission.id)} className="px-4 py-3 bg-slate-50 hover:bg-slate-100 text-[#061a3a] font-bold rounded-xl text-xs transition-all">Signaler matériel manquant</button>
                                                 </>
                                             )}
 
                                             {mission.statut === 'EN_PREPARATION' && (
-                                                <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-4 flex items-center gap-3 w-full">
+                                                <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex items-center gap-3 w-full">
                                                     <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
-                                                    <p className="text-orange-300 font-bold text-xs tracking-wide uppercase">Matériel manquant signalé — Reprise dès réception</p>
+                                                    <p className="text-orange-700 font-bold text-xs tracking-wide uppercase">Matériel manquant signalé — Reprise dès réception</p>
                                                 </div>
                                             )}
 
                                             {mission.statut === 'TERMINEE' && (
-                                                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex items-center gap-3 w-full">
+                                                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3 w-full">
                                                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                                                    <p className="text-emerald-300 font-bold text-xs tracking-wide uppercase">Bon envoyé — En attente de validation du client</p>
+                                                    <p className="text-emerald-700 font-bold text-xs tracking-wide uppercase">Bon envoyé — En attente de validation du client</p>
                                                 </div>
                                             )}
                                         </div>
@@ -1069,34 +1006,30 @@ export default function DashboardFournisseur({ setCurrentView }) {
                     </section>
                 )}
 
-                {activeTab === 'recus' && (
-                    <OngletRecusFournisseur missions={missions} token={token} />
-                )}
-
                 {activeTab === 'commandes' && (
                     <section className="space-y-6 text-left">
-                        <div className="bg-white/[0.01] p-6 rounded-3xl border border-white/[0.05]">
-                            <h2 className="text-2xl font-black text-white">Commandes de la Boutique</h2>
-                            <p className="text-slate-400 text-xs mt-1">Achats directs passés sur votre vitrine Kanari</p>
+                        <div className="bg-white p-6 rounded-3xl border border-slate-200">
+                            <h2 className="text-2xl font-black text-[#061a3a]">Commandes de la Boutique</h2>
+                            <p className="text-slate-500 text-xs mt-1">Achats directs passés sur votre vitrine Kanari</p>
                         </div>
                         {commandesRecentes.length === 0 ? (
-                            <div className="text-center py-20 bg-white/[0.01] border border-white/[0.05] rounded-3xl text-slate-500">
+                            <div className="text-center py-20 bg-white border border-slate-200 rounded-3xl text-slate-500">
                                 <p className="text-sm font-medium">Aucune commande récente.</p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">
                                 {commandesRecentes.map(cmd => (
-                                    <div key={cmd.id} className="bg-white/[0.02] border border-white/[0.07] rounded-3xl p-6 space-y-4 shadow-xl">
-                                        <div className="flex justify-between items-center pb-3 border-b border-white/[0.05]">
-                                            <span className="font-extrabold text-white text-base">Commande #{cmd.id}</span>
-                                            <span className="text-xs font-bold text-purple-400 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20">{new Date(cmd.createdAt).toLocaleDateString('fr-FR')}</span>
+                                    <div key={cmd.id} className="bg-white border border-slate-200 rounded-3xl p-6 space-y-4 shadow-xl">
+                                        <div className="flex justify-between items-center pb-3 border-b border-slate-200">
+                                            <span className="font-extrabold text-[#061a3a] text-base">Commande #{cmd.id}</span>
+                                            <span className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">{new Date(cmd.createdAt).toLocaleDateString('fr-FR')}</span>
                                         </div>
-                                        <p className="text-xs text-slate-400 font-medium">Destinataire : <span className="text-white font-bold">{cmd.clientCommande?.nom || 'Non spécifié'}</span></p>
+                                        <p className="text-xs text-slate-500 font-medium">Destinataire : <span className="text-[#061a3a] font-bold">{cmd.clientCommande?.nom || 'Non spécifié'}</span></p>
                                         <div className="space-y-2 pt-1">
                                             {cmd.itemsCommande?.map(item => (
-                                                <div key={item.id} className="flex justify-between items-center text-xs bg-[#070A12] rounded-xl px-3.5 py-2.5 border border-white/[0.04]">
-                                                    <span className="text-slate-200 font-semibold">{item.produitCommandeProduit?.nom}</span>
-                                                    <span className="text-purple-300 font-extrabold bg-white/[0.05] px-2 py-0.5 rounded">x{item.quantite}</span>
+                                                <div key={item.id} className="flex justify-between items-center text-xs bg-slate-50 rounded-xl px-3.5 py-2.5 border border-slate-200">
+                                                    <span className="text-[#334155] font-semibold">{item.produitCommandeProduit?.nom}</span>
+                                                    <span className="text-amber-700 font-extrabold bg-slate-100 px-2 py-0.5 rounded">x{item.quantite}</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -1109,24 +1042,24 @@ export default function DashboardFournisseur({ setCurrentView }) {
 
                 {activeTab === 'produits' && (
                     <section className="space-y-6 text-left">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/[0.01] p-6 rounded-3xl border border-white/[0.05]">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200">
                             <div>
-                                <h2 className="text-2xl font-black text-white">Gestion du Catalogue</h2>
-                                <p className="text-slate-400 text-xs mt-1">Gérez vos produits en vente directe</p>
+                                <h2 className="text-2xl font-black text-[#061a3a]">Gestion du Catalogue</h2>
+                                <p className="text-slate-500 text-xs mt-1">Gérez vos produits en vente directe</p>
                             </div>
-                            <button onClick={() => setAjoutProduitOuvert(true)} className="px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-2xl text-xs font-black shadow-lg shadow-purple-500/20 transition-all active:scale-95">
+                            <button onClick={() => setAjoutProduitOuvert(true)} className="px-5 py-3 bg-[#061a3a] hover:bg-[#0b2a57] text-white rounded-2xl text-xs font-black shadow-lg shadow-amber-400/20 transition-all active:scale-95">
                                 + Ajouter un produit
                             </button>
                         </div>
                         {produits.length === 0 ? (
-                            <div className="text-center py-20 bg-white/[0.01] border border-white/[0.05] rounded-3xl text-slate-500">
+                            <div className="text-center py-20 bg-white border border-slate-200 rounded-3xl text-slate-500">
                                 <p className="text-sm font-medium">Aucun produit dans votre vitrine.</p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 text-left">
                                 {produits.map(p => (
-                                    <div key={p.id} className="bg-white/[0.02] border border-white/[0.07] rounded-3xl overflow-hidden flex flex-col justify-between shadow-xl">
-                                        <div className="w-full h-36 bg-[#070A12] flex items-center justify-center overflow-hidden">
+                                    <div key={p.id} className="bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col justify-between shadow-xl">
+                                        <div className="w-full h-36 bg-slate-50 flex items-center justify-center overflow-hidden">
                                             {p.image ? (
                                                 <img
                                                     src={`${API}/uploads/${p.image}`}
@@ -1140,12 +1073,12 @@ export default function DashboardFournisseur({ setCurrentView }) {
                                         </div>
                                         <div className="p-5 flex flex-col justify-between space-y-4 flex-1">
                                             <div>
-                                                <h4 className="font-extrabold text-base text-white">{p.nom}</h4>
-                                                <p className="text-xs text-purple-400 font-black mt-1">{Number(p.prix).toLocaleString()} FCFA</p>
+                                                <h4 className="font-extrabold text-base text-[#061a3a]">{p.nom}</h4>
+                                                <p className="text-xs text-amber-600 font-black mt-1">{Number(p.prix).toLocaleString()} FCFA</p>
                                                 {p.categorie && <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mt-1">{p.categorie}</p>}
                                             </div>
                                             <div className="flex gap-2">
-                                                <button onClick={() => { if (window.confirm('Supprimer cet article ?')) deleteProduit(p.id).then(() => setProduits(prev => prev.filter(x => x.id !== p.id))); }} className="w-full py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-bold transition-all">Supprimer l'article</button>
+                                                <button onClick={() => { if (window.confirm('Supprimer cet article ?')) deleteProduit(p.id).then(() => setProduits(prev => prev.filter(x => x.id !== p.id))); }} className="w-full py-2 bg-red-50 hover:bg-rose-500/20 text-red-600 rounded-xl text-xs font-bold transition-all">Supprimer l'article</button>
                                             </div>
                                         </div>
                                     </div>
@@ -1157,11 +1090,11 @@ export default function DashboardFournisseur({ setCurrentView }) {
 
                 {activeTab === 'solde' && (
                     <section className="space-y-6 text-left">
-                        <div className="bg-white/[0.01] p-6 rounded-3xl border border-white/[0.05]">
-                            <h2 className="text-2xl font-black text-white">Flux Financiers</h2>
-                            <p className="text-slate-400 text-xs mt-1">Gérez vos encaissements et demandez vos virements</p>
+                        <div className="bg-white p-6 rounded-3xl border border-slate-200">
+                            <h2 className="text-2xl font-black text-[#061a3a]">Flux Financiers</h2>
+                            <p className="text-slate-500 text-xs mt-1">Gérez vos encaissements et demandez vos virements</p>
                         </div>
-                        <div className="bg-white/[0.02] border border-white/[0.07] rounded-3xl p-6 md:p-8 shadow-2xl">
+                        <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-2xl">
                             <SoldeRetrait />
                         </div>
                     </section>
@@ -1169,8 +1102,8 @@ export default function DashboardFournisseur({ setCurrentView }) {
 
                 {activeTab === 'profil' && (
                     <section className="space-y-6 text-left">
-                        <div className="bg-white/[0.02] border border-white/[0.07] rounded-3xl p-6 md:p-8 shadow-2xl max-w-2xl">
-                            <h2 className="text-xl font-black text-white border-b border-white/[0.05] pb-3">Informations de l'Établissement</h2>
+                        <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-2xl max-w-2xl">
+                            <h2 className="text-xl font-black text-[#061a3a] border-b border-slate-200 pb-3">Informations de l'Établissement</h2>
                             <div className="divide-y divide-white/[0.05] pt-2">
                                 {[
                                     ['Responsable légal', profil?.nom || currentUser.nom || '—'],
@@ -1183,8 +1116,8 @@ export default function DashboardFournisseur({ setCurrentView }) {
                                     ['Indice de satisfaction', profil?.note > 0 ? `${profil.note.toFixed(1)} / 5` : 'Nouveau partenaire (Non noté)'],
                                 ].map(([label, val]) => (
                                     <div key={label} className="flex justify-between items-center py-3.5">
-                                        <span className="text-slate-400 text-sm">{label}</span>
-                                        <span className="font-extrabold text-white text-right text-sm">{val}</span>
+                                        <span className="text-slate-500 text-sm">{label}</span>
+                                        <span className="font-extrabold text-[#061a3a] text-right text-sm">{val}</span>
                                     </div>
                                 ))}
                             </div>
