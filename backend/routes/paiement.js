@@ -38,3 +38,7 @@ router.get('/admin/liste', protect, adminOnly, getAllPaiements);
 router.put('/admin/:id/statut', protect, adminOnly, updateStatutPaiement);
 
 module.exports = router;
+
+
+
+

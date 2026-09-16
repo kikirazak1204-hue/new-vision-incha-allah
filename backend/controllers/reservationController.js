@@ -112,6 +112,17 @@ exports.createGlobalReservation = async (req, res) => {
 };
 
 // ── GET /api/reservations/mes-reservations — Espace Client ─────
+//
+// ✅ CORRIGÉ : deux alias inventés faisaient planter cette route à CHAQUE
+// appel :
+//   - { model: Fournisseur, as: 'fournisseur' } → l'alias réel défini
+//     dans models/index.js est 'prestataire', pas 'fournisseur'.
+//   - { model: BonIntervention, as: 'BonIntervention' } → cet alias
+//     n'existe pas du tout (seul 'bonIntervention', minuscule, existe).
+//     Le "double include" pensé comme protection contre une erreur de
+//     casse causait en réalité une EagerLoadingError garantie.
+// Conservé : la recherche par téléphone en plus de clientId, utile si
+// une réservation a été créée sans utilisateur connecté au départ.
 exports.getMesReservations = async (req, res) => {
     try {
         const conditions = [{ clientId: req.user.id }];
@@ -122,9 +133,8 @@ exports.getMesReservations = async (req, res) => {
         const reservations = await Reservation.findAll({
             where: { [Op.or]: conditions },
             include: [
-                { model: Fournisseur, as: 'fournisseur', attributes: ['id', 'nomEntreprise', 'telephone', 'note'] },
-                { model: BonIntervention, as: 'BonIntervention' },
-                { model: BonIntervention, as: 'bonIntervention' } // Double sécurité pour éviter les erreurs de casse
+                { model: Fournisseur, as: 'prestataire', attributes: ['id', 'nomEntreprise', 'telephone', 'note'] },
+                { model: BonIntervention, as: 'bonIntervention' }
             ],
             order: [['createdAt', 'DESC']]
         });

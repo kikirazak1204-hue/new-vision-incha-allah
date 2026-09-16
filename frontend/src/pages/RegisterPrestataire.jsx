@@ -10,6 +10,12 @@ import { getServices, registerUser, registerFournisseur } from '../util/api';
     Livraison / Transport (ou un service dont le nom contient ces mots).
   - Les informations manquantes peuvent être complétées plus tard par Kanari.
   - Le contrat dépend du type de profil et sa version est envoyée au backend.
+
+  ✅ CORRIGÉ : le textarea de description et trois labels de cases à
+  cocher n'avaient aucune couleur de texte explicite. Le reste de
+  l'application étant en thème sombre, ces éléments héritaient d'une
+  couleur de texte claire par défaut — invisible sur ce formulaire à
+  fond blanc. Chaque élément texte a maintenant une couleur explicite.
 */
 
 const TYPES = {
@@ -99,13 +105,27 @@ const Select = ({ label, name, value, onChange, required = false, children }) =>
   </label>
 );
 
+const Textarea = ({ label, name, value, onChange, placeholder = '', rows = 4 }) => (
+  <label className="block">
+    {label && <span className="mb-1.5 block text-sm font-semibold text-slate-700">{label}</span>}
+    <textarea
+      name={name}
+      value={value}
+      onChange={onChange}
+      rows={rows}
+      placeholder={placeholder}
+      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm !text-[#061a3a] placeholder:!text-slate-400 outline-none focus:border-amber-400"
+    />
+  </label>
+);
+
 const FileBox = ({ label, file, onChange, required = false, hint = 'JPG, PNG ou PDF' }) => (
   <label className="block cursor-pointer rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 hover:border-amber-400">
     <span className="block text-sm font-semibold text-slate-700">
       {label}{required && <b className="text-amber-500"> *</b>}
     </span>
     <span className="mt-1 block text-xs text-slate-500">{file ? file.name : hint}</span>
-    <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={onChange} className="mt-3 w-full text-xs" />
+    <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={onChange} className="mt-3 w-full text-xs text-slate-600" />
   </label>
 );
 
@@ -140,9 +160,20 @@ function Title({ n, title, desc }) {
   );
 }
 
-
-const FORM_CONTROL_STYLE =
-  "bg-white !text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] selection:bg-amber-200 selection:text-[#061a3a]";
+// Case à cocher réutilisable — texte toujours explicitement coloré,
+// jamais dépendant d'un thème hérité.
+const CheckboxLine = ({ checked, onChange, name, children }) => (
+  <label className="flex gap-3 text-sm leading-6 text-slate-700">
+    <input
+      type="checkbox"
+      name={name}
+      checked={checked}
+      onChange={onChange}
+      className="mt-1 h-5 w-5 shrink-0 accent-amber-400"
+    />
+    <span className="text-slate-700">{children}</span>
+  </label>
+);
 
 export default function RegisterPartenaireKanari({ setCurrentView }) {
   const [step, setStep] = useState(1);
@@ -203,7 +234,6 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
   const contract = CONTRACTS[form.typeProfil];
   const international = form.pays !== 'Niger';
 
-  // Le véhicule n'est demandé que si l'un des services sélectionnés est lié au transport/livraison.
   const transportRequired = useMemo(() => {
     const text = selectedServiceNames.join(' ').toLowerCase();
     return /transport|livraison|chauffeur|taxi|moto|coursier|logistique/.test(text);
@@ -240,7 +270,6 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
   const file = (key) => (e) => setFiles((p) => ({ ...p, [key]: e.target.files?.[0] || null }));
 
   const validate = () => {
-    // Seulement les informations vraiment nécessaires au premier passage sont obligatoires.
     if (step === 1 && (!form.nom || !form.telephone || !form.password)) {
       return 'Nom, téléphone et mot de passe sont obligatoires.';
     }
@@ -283,7 +312,6 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
     setMessage({});
 
     try {
-      // Conserver la compatibilité avec l'API actuelle.
       const auth = await registerUser({
         nom: form.nom,
         email: form.email || undefined,
@@ -305,7 +333,6 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
         if (value !== '' && value != null) data.append(key, String(value));
       });
 
-      // Plusieurs services : envoyer le tableau sous forme répétée et JSON pour faciliter le backend.
       form.serviceIds.forEach((id) => data.append('serviceIds[]', String(id)));
       data.append('serviceIds', JSON.stringify(form.serviceIds));
       data.append('serviceNames', JSON.stringify(selectedServiceNames));
@@ -347,7 +374,7 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-xs font-black uppercase tracking-[.25em] text-amber-400">KANARI SERVICE</div>
-              <h1 className="mt-1 text-2xl font-black md:text-3xl">Créer votre profil professionnel</h1>
+              <h1 className="mt-1 text-2xl font-black text-white md:text-3xl">Créer votre profil professionnel</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
                 Inscription rapide. Les informations secondaires peuvent être complétées après l’inscription.
               </p>
@@ -442,11 +469,19 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
                 </Select>
                 <Input label="NIF" name="nif" value={form.nif} onChange={change} placeholder="Optionnel au départ" />
                 <Input label="RCCM" name="rccm" value={form.rccm} onChange={change} placeholder="Optionnel au départ" />
-                <label className="flex items-center rounded-xl border border-slate-200 p-4 text-sm font-semibold">
+                {/* ✅ CORRIGÉ : label sans couleur de texte explicite ajoutée */}
+                <label className="flex items-center rounded-xl border border-slate-200 p-4 text-sm font-semibold text-slate-700">
                   <input type="checkbox" name="hasMateriel" checked={form.hasMateriel} onChange={change} className="mr-3 h-5 w-5 accent-amber-400" /> Matériel disponible
                 </label>
                 <div className="md:col-span-2">
-                  <textarea name="description" value={form.description} onChange={change} rows="4" placeholder="Spécialités, zones couvertes, produits ou précisions... (optionnel)" className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-amber-400" />
+                  {/* ✅ CORRIGÉ : textarea remplacé par le composant Textarea avec couleur explicite */}
+                  <Textarea
+                    name="description"
+                    value={form.description}
+                    onChange={change}
+                    rows={4}
+                    placeholder="Spécialités, zones couvertes, produits ou précisions... (optionnel)"
+                  />
                 </div>
               </div>
             </>
@@ -530,7 +565,7 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
               <div className="overflow-hidden rounded-2xl border border-amber-200">
                 <div className="bg-[#061a3a] p-5 text-white">
                   <div className="mb-2 text-xs font-bold uppercase tracking-widest text-amber-400">Document contractuel</div>
-                  <h3 className="text-lg font-black">{contract.title}</h3>
+                  <h3 className="text-lg font-black text-white">{contract.title}</h3>
                   <p className="mt-2 text-sm text-slate-300">{contract.text}</p>
                 </div>
                 <div className="max-h-72 overflow-y-auto p-5">
@@ -538,21 +573,31 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
                     {contract.clauses.map((c, i) => <li key={i}><b className="mr-2 text-amber-500">{i + 1}.</b>{c}</li>)}
                   </ol>
                 </div>
-                <label className="flex gap-3 border-t bg-slate-50 p-5 text-sm leading-6">
-                  <input type="checkbox" checked={form.accepteContrat} onChange={(e) => setForm((p) => ({ ...p, accepteContrat: e.target.checked }))} className="mt-1 h-5 w-5 accent-amber-400" />
-                  <span>Je confirme avoir lu le document correspondant à mon profil et j’accepte les conditions présentées par Kanari.<b className="text-amber-500"> *</b></span>
-                </label>
+                {/* ✅ CORRIGÉ : CheckboxLine garantit un texte toujours visible */}
+                <div className="border-t bg-slate-50 p-5">
+                  <CheckboxLine
+                    checked={form.accepteContrat}
+                    onChange={(e) => setForm((p) => ({ ...p, accepteContrat: e.target.checked }))}
+                  >
+                    Je confirme avoir lu le document correspondant à mon profil et j’accepte les conditions présentées par Kanari.<b className="text-amber-500"> *</b>
+                  </CheckboxLine>
+                </div>
               </div>
-              <label className="mt-5 flex gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm leading-6">
-                <input type="checkbox" name="accepteConditions" checked={form.accepteConditions} onChange={change} className="mt-1 h-5 w-5 accent-amber-400" />
-                <span>Je confirme que les informations fournies sont exactes et j’accepte les règles générales de vérification, suivi, paiement, commission et gestion des incidents Kanari.<b className="text-amber-500"> *</b></span>
-              </label>
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                <CheckboxLine
+                  checked={form.accepteConditions}
+                  onChange={change}
+                  name="accepteConditions"
+                >
+                  Je confirme que les informations fournies sont exactes et j’accepte les règles générales de vérification, suivi, paiement, commission et gestion des incidents Kanari.<b className="text-amber-500"> *</b>
+                </CheckboxLine>
+              </div>
             </>
           )}
 
           <div className="mt-8 flex justify-between border-t border-slate-200 pt-6">
             {step > 1 ? (
-              <button type="button" onClick={prev} className="rounded-xl border px-6 py-3 text-sm font-bold">Retour</button>
+              <button type="button" onClick={prev} className="rounded-xl border px-6 py-3 text-sm font-bold text-slate-700">Retour</button>
             ) : (
               <button type="button" onClick={() => setCurrentView?.('login')} className="text-sm font-semibold text-slate-500">J’ai déjà un compte</button>
             )}

@@ -1,25 +1,103 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Search, ImageOff, Check, ShoppingBag } from 'lucide-react';
 import { usePanier } from '../../context/PanierContext';
+
+const API = import.meta.env.VITE_API_URL;
+
+function CarteProduit({ produit, ajoute, onAjouter }) {
+    const [imageEnErreur, setImageEnErreur] = useState(!produit.image);
+
+    return (
+        <div className="group bg-white/[0.02] border border-white/[0.07] hover:border-purple-500/40 rounded-3xl overflow-hidden flex flex-col transition-all duration-300 hover:shadow-2xl hover:shadow-purple-950/20">
+            <div className="relative aspect-square w-full overflow-hidden bg-[#0B0F19]">
+                {!imageEnErreur ? (
+                    <img
+                        src={`${API}/uploads/${produit.image}`}
+                        alt={produit.nom}
+                        onError={() => setImageEnErreur(true)}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        loading="lazy"
+                    />
+                ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-white/[0.03] to-transparent">
+                        <ImageOff className="text-slate-700" size={28} strokeWidth={1.5} />
+                        <span className="text-[10px] text-slate-600 uppercase tracking-wider font-semibold">Photo indisponible</span>
+                    </div>
+                )}
+                <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
+                {produit.categorie && (
+                    <span className="absolute top-3 left-3 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-slate-200 border border-white/10">
+                        {produit.categorie}
+                    </span>
+                )}
+            </div>
+
+            <div className="p-5 flex flex-col flex-1">
+                <h2 className="text-base font-bold text-white leading-snug line-clamp-1">{produit.nom}</h2>
+                {produit.description && (
+                    <p className="text-xs text-slate-400 mt-1.5 line-clamp-2 flex-1">{produit.description}</p>
+                )}
+
+                <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t border-white/[0.05]">
+                    <span className="text-lg font-black text-emerald-400">
+                        {Number(produit.prix || 0).toLocaleString('fr-FR')} FCFA
+                    </span>
+                    <button
+                        onClick={() => onAjouter(produit)}
+                        disabled={ajoute === produit.id}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                            ajoute === produit.id
+                                ? 'bg-emerald-500 text-slate-950 cursor-default'
+                                : 'bg-white text-slate-950 hover:bg-purple-100'
+                        }`}
+                    >
+                        {ajoute === produit.id ? (
+                            <>
+                                <Check size={14} /> Ajouté
+                            </>
+                        ) : (
+                            'Ajouter'
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function CarteChargement() {
+    return (
+        <div className="rounded-3xl overflow-hidden border border-white/[0.05] bg-white/[0.02]">
+            <div className="aspect-square w-full bg-white/[0.03] animate-pulse" />
+            <div className="p-5 space-y-3">
+                <div className="h-4 w-3/4 bg-white/[0.05] rounded animate-pulse" />
+                <div className="h-3 w-full bg-white/[0.03] rounded animate-pulse" />
+                <div className="h-8 w-full bg-white/[0.03] rounded-xl animate-pulse mt-2" />
+            </div>
+        </div>
+    );
+}
 
 export default function VoirProduits() {
     const navigate = useNavigate();
     const [produits, setProduits] = useState([]);
-    const [recherche, setRecherche] = useState('');
-    const [message, setMessage] = useState('');
+    const [erreur, setErreur] = useState('');
     const [loading, setLoading] = useState(true);
     const [ajouteId, setAjouteId] = useState(null);
+    const [recherche, setRecherche] = useState('');
+    const [categorieActive, setCategorieActive] = useState('toutes');
     const { ajouterAuPanier } = usePanier();
 
     useEffect(() => {
         const fetchProduits = async () => {
             try {
-                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/produits`);
+                const res = await fetch(`${API}/api/produits`);
                 const data = await res.json();
                 setProduits(data.data || []);
             } catch (err) {
                 console.error("Erreur chargement produits:", err);
-                setMessage("❌ Impossible de charger les produits.");
+                setErreur("Impossible de charger le catalogue pour le moment.");
             } finally {
                 setLoading(false);
             }
@@ -27,187 +105,104 @@ export default function VoirProduits() {
         fetchProduits();
     }, []);
 
+    const categories = useMemo(() => {
+        const set = new Set(produits.map(p => p.categorie).filter(Boolean));
+        return ['toutes', ...Array.from(set)];
+    }, [produits]);
+
+    const produitsFiltres = useMemo(() => {
+        return produits.filter(p => {
+            const matchCategorie = categorieActive === 'toutes' || p.categorie === categorieActive;
+            const matchRecherche = (p.nom || '').toLowerCase().includes(recherche.toLowerCase());
+            return matchCategorie && matchRecherche;
+        });
+    }, [produits, categorieActive, recherche]);
+
     const handleAjouter = (produit) => {
         ajouterAuPanier(produit);
         setAjouteId(produit.id);
         setTimeout(() => setAjouteId(null), 1500);
     };
 
-    const produitsFiltres = produits.filter(produit =>
-        produit.nom?.toLowerCase().includes(recherche.toLowerCase())
-    );
-
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-500 p-4">
-                <div className="flex flex-col items-center gap-3">
-                    <div className="w-12 h-12 border-4 border-[#061a3a] border-t-amber-400 rounded-full animate-spin"></div>
-                    <p className="animate-pulse font-bold text-sm tracking-wide text-[#061a3a]">
-                        Chargement du catalogue Kanari...
-                    </p>
-                </div>
-            </div>
-        );
-    }
-
     return (
-        <div className="min-h-screen bg-slate-50 px-4 py-8 text-[#061a3a]">
-            <div className="mx-auto max-w-6xl overflow-hidden rounded-3xl bg-white shadow-xl">
-                
-                {/* Header Style Kanari (Bleu Nuit #061a3a & Ambre) */}
-                <header className="bg-[#061a3a] px-6 py-7 text-white md:px-10">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                        <div>
-                            <button
-                                onClick={() => navigate('/')}
-                                className="mb-3 inline-flex items-center gap-2 rounded-xl bg-white/10 px-3.5 py-1.5 text-xs font-bold text-amber-400 transition hover:bg-white/20"
-                            >
-                                ← Retour à l'accueil
-                            </button>
-                            <div className="text-xs font-black uppercase tracking-[.25em] text-amber-400">
-                                KANARI SERVICE
-                            </div>
-                            <h1 className="mt-1 text-2xl font-black md:text-3xl">
-                                Catalogue Produits & Équipements
-                            </h1>
-                            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-                                Matériaux et articles de qualité proposés par nos partenaires et fournisseurs certifiés.
-                            </p>
-                        </div>
+        <div className="min-h-screen bg-[#0B0F19] text-slate-100 font-sans">
+            <div className="max-w-6xl mx-auto px-6 py-10 md:py-12">
 
-                        <div className="flex items-center gap-4">
-                            <div className="hidden h-14 w-14 shrink-0 place-items-center rounded-2xl bg-amber-400 text-3xl font-black text-[#061a3a] md:grid">
-                                K
-                            </div>
-                        </div>
-                    </div>
-                </header>
-
-                {/* Section Principale */}
-                <div className="p-6 md:p-10">
-                    
-                    {/* Barre de Recherche (Identique au style des inputs du Register) */}
-                    <div className="mb-8 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:p-6">
-                        <label className="block">
-                            <span className="mb-2 block text-xs font-black uppercase tracking-wider text-amber-500">
-                                🔍 Rechercher dans le catalogue
-                            </span>
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    placeholder="Tapez le nom d'un produit ou équipement..."
-                                    value={recherche}
-                                    onChange={(e) => setRecherche(e.target.value)}
-                                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium !text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] selection:bg-amber-200 selection:text-[#061a3a] outline-none shadow-sm transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20"
-                                />
-                                {recherche && (
-                                    <button
-                                        onClick={() => setRecherche('')}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-[#061a3a]"
-                                    >
-                                        Effacer
-                                    </button>
-                                )}
-                            </div>
-                        </label>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+                    <div>
+                        <button
+                            onClick={() => navigate('/')}
+                            className="text-slate-400 hover:text-white flex items-center gap-2 transition-colors mb-4 text-sm"
+                        >
+                            <ArrowLeft size={16} /> Retour à l'accueil
+                        </button>
+                        <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white flex items-center gap-3">
+                            <ShoppingBag className="text-purple-400" size={30} />
+                            Catalogue Produits
+                        </h1>
                     </div>
 
-                    {/* Affichage des Messages d'erreur */}
-                    {message && (
-                        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
-                            {message}
-                        </div>
-                    )}
-
-                    {/* Liste des Produits */}
-                    {produitsFiltres.length === 0 && !message ? (
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 py-16 text-center">
-                            <span className="text-4xl block mb-2">📦</span>
-                            <h3 className="text-base font-black text-[#061a3a]">Aucun produit trouvé</h3>
-                            <p className="mt-1 text-sm text-slate-500">
-                                {recherche ? "Ajustez vos mots clés de recherche." : "Aucun article n'est disponible pour le moment."}
-                            </p>
-                            {recherche && (
-                                <button
-                                    onClick={() => setRecherche('')}
-                                    className="mt-4 rounded-xl bg-[#061a3a] px-4 py-2 text-xs font-bold text-amber-400 hover:bg-[#0a2550]"
-                                >
-                                    Réinitialiser la recherche
-                                </button>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                            {produitsFiltres.map((produit) => (
-                                <div
-                                    key={produit.id}
-                                    className="group flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:border-amber-400 hover:shadow-md"
-                                >
-                                    <div>
-                                        {/* Image du produit */}
-                                        <div className="relative mb-3 aspect-square w-full overflow-hidden rounded-xl bg-slate-100 border border-slate-100 flex items-center justify-center">
-                                            {produit.image ? (
-                                                <img
-                                                    src={`${import.meta.env.VITE_API_URL}/uploads/${produit.image}`}
-                                                    alt={produit.nom}
-                                                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                                    onError={(e) => {
-                                                        e.target.style.display = 'none';
-                                                    }}
-                                                />
-                                            ) : (
-                                                <span className="text-3xl opacity-30">📷</span>
-                                            )}
-
-                                            {/* Badge Fournisseur (Style Bleu Nuit / Ambre) */}
-                                            <div className="absolute top-2 left-2 rounded-lg bg-[#061a3a] px-2.5 py-1 text-[10px] font-bold text-amber-400 shadow-sm max-w-[85%] truncate">
-                                                {produit.fournisseur?.nomEntreprise || 'Fournisseur Kanari'}
-                                            </div>
-                                        </div>
-
-                                        {/* Titre & Description */}
-                                        <h2 className="text-sm font-black text-[#061a3a] line-clamp-1 group-hover:text-amber-500 transition-colors">
-                                            {produit.nom}
-                                        </h2>
-                                        <p className="mt-1 text-xs leading-relaxed text-slate-500 line-clamp-2">
-                                            {produit.description || 'Aucune description fournie.'}
-                                        </p>
-                                    </div>
-
-                                    {/* Bas de Carte : Prix & Action */}
-                                    <div className="mt-4 border-t border-slate-100 pt-3 flex items-center justify-between gap-2">
-                                        <div>
-                                            <span className="block text-[9px] font-black uppercase tracking-wider text-slate-400">
-                                                Prix
-                                            </span>
-                                            <span className="text-base font-black text-[#061a3a]">
-                                                {Number(produit.prix || 0).toLocaleString('fr-FR')} 
-                                                <span className="ml-1 text-xs font-bold text-amber-500">FCFA</span>
-                                            </span>
-                                        </div>
-
-                                        <button
-                                            onClick={() => handleAjouter(produit)}
-                                            disabled={ajouteId === produit.id}
-                                            className={`rounded-xl px-3.5 py-2 text-xs font-black transition-all ${
-                                                ajouteId === produit.id
-                                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
-                                                    : 'bg-amber-400 text-[#061a3a] hover:bg-amber-500 shadow-sm active:scale-95'
-                                            }`}
-                                        >
-                                            {ajouteId === produit.id ? '✓ Ajouté' : '+ Ajouter'}
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                    <div className="relative w-full md:w-72 shrink-0">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                        <input
+                            type="text"
+                            placeholder="Rechercher un produit..."
+                            value={recherche}
+                            onChange={(e) => setRecherche(e.target.value)}
+                            className="w-full bg-white/[0.03] border border-white/[0.08] focus:border-purple-500 rounded-2xl pl-11 pr-4 py-3 text-sm text-white placeholder-slate-600 outline-none transition-all"
+                        />
+                    </div>
                 </div>
 
-                {/* Footer Style Register */}
-                <footer className="border-t border-slate-100 bg-slate-50 py-6 text-center text-xs font-semibold text-slate-400">
-                    KANARI SERVICE — Un réseau pour tous
-                </footer>
+                {categories.length > 1 && (
+                    <div className="flex gap-2 overflow-x-auto pb-2 mb-8">
+                        {categories.map(cat => (
+                            <button
+                                key={cat}
+                                onClick={() => setCategorieActive(cat)}
+                                className={`shrink-0 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wide transition-all border ${
+                                    categorieActive === cat
+                                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 border-transparent text-white shadow-lg'
+                                        : 'bg-white/[0.02] border-white/[0.08] text-slate-400 hover:text-white hover:border-white/20'
+                                }`}
+                            >
+                                {cat === 'toutes' ? 'Toutes' : cat}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {erreur && (
+                    <div className="mb-8 p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-300 text-sm text-center">
+                        {erreur}
+                    </div>
+                )}
+
+                {loading ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
+                        {Array.from({ length: 8 }).map((_, i) => <CarteChargement key={i} />)}
+                    </div>
+                ) : produitsFiltres.length === 0 ? (
+                    <div className="text-center py-24 bg-white/[0.02] rounded-3xl border border-white/[0.05]">
+                        <ShoppingBag className="mx-auto text-slate-700 mb-3" size={32} strokeWidth={1.5} />
+                        <p className="text-slate-400 text-sm">
+                            {recherche || categorieActive !== 'toutes'
+                                ? 'Aucun produit ne correspond à votre recherche.'
+                                : 'Aucun produit disponible pour le moment.'}
+                        </p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
+                        {produitsFiltres.map(produit => (
+                            <CarteProduit
+                                key={produit.id}
+                                produit={produit}
+                                ajoute={ajouteId}
+                                onAjouter={handleAjouter}
+                            />
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );

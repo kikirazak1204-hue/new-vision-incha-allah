@@ -2,9 +2,15 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
+// Rôles qu'un utilisateur peut légitimement choisir lui-même à
+// l'inscription. 'admin' est volontairement ABSENT de cette liste — un
+// compte admin ne doit jamais pouvoir être créé via ce formulaire public.
+// Il doit être créé manuellement (script, accès direct base de données,
+// ou un futur écran "promouvoir un utilisateur" réservé aux SUPER_ADMIN).
+const ROLES_AUTORISES_A_LINSCRIPTION = ['utilisateur', 'fournisseur'];
+
 // 🔧 Génère un token JWT avec protection
 const generateToken = (user) => {
-    // Vérification de sécurité pour le secret
     if (!process.env.JWT_SECRET) {
         console.error("❌ CRITIQUE : JWT_SECRET est manquant dans le fichier .env");
         throw new Error("Configuration serveur incomplète");
@@ -27,6 +33,13 @@ exports.register = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email déjà utilisé' });
         }
 
+        // ✅ CORRIGÉ : le rôle demandé n'est accepté QUE s'il fait partie de
+        // la liste blanche. Avant, n'importe quelle valeur (y compris
+        // 'admin') envoyée dans le corps de la requête était acceptée
+        // telle quelle — n'importe qui pouvait s'inscrire directement en
+        // tant qu'administrateur.
+        const roleDemande = ROLES_AUTORISES_A_LINSCRIPTION.includes(role) ? role : 'utilisateur';
+
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const user = await User.create({
@@ -35,7 +48,7 @@ exports.register = async (req, res) => {
             password: hashedPassword,
             telephone,
             ville,
-            role: role || 'utilisateur'
+            role: roleDemande
         });
 
         const token = generateToken(user);
@@ -44,7 +57,7 @@ exports.register = async (req, res) => {
             success: true,
             message: 'Inscription réussie - Incha Allah',
             token,
-            user: { id: user.id, nom: user.nom, email: user.email, role: user.role }
+            user: { id: user.id, nom: user.nom, email: user.email, role: user.role, telephone: user.telephone, ville: user.ville }
         });
     } catch (error) {
         console.error("DEBUG REGISTER ERROR:", error);
@@ -76,10 +89,9 @@ exports.login = async (req, res) => {
             success: true,
             message: 'Connexion réussie - Incha Allah',
             token,
-            user: { id: user.id, nom: user.nom, email: user.email, role: user.role }
+            user: { id: user.id, nom: user.nom, email: user.email, role: user.role, telephone: user.telephone, ville: user.ville }
         });
     } catch (error) {
-        // CE LOG APPARAÎTRA DANS VOTRE TERMINAL BACKEND
         console.error("--- ERREUR CRITIQUE LOGIN ---");
         console.error(error);
 
