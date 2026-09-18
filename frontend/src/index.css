@@ -1,3 +1,6 @@
+/* 1. Les @import doivent TOUJOURS être tout en haut du fichier */
+@import 'leaflet/dist/leaflet.css';
+
 /* ✅ Activation des couches Tailwind */
 @tailwind base;
 @tailwind components;
@@ -6,15 +9,13 @@
 /* ✅ Style global - Design Clair (Blanc & Bleu) */
 body {
     font-family: 'Inter', sans-serif;
-    background-color: #f8fafc; /* Fond très léger et propre (Slate 50) */
-    color: #334155;            /* Texte sombre, lisible et reposant (Slate 700) */
+    background-color: #f8fafc;
+    color: #334155;
     min-height: 100vh;
-    
-    /* Indispensable pour empêcher Google Translate de décaler la page vers le bas */
     top: 0px !important; 
 }
 
-/* ✅ Sélection immersive (Bleu professionnel) */
+/* ✅ Sélection immersive */
 ::selection {
     background-color: #2563eb;
     color: #ffffff;
@@ -36,15 +37,15 @@ body {
     animation: fadeIn 0.4s ease-out;
 }
 
-/* ✅ Titres renforcés (Sombres, élégants et lisibles sur fond clair) */
-h1,
-h2,
-h3 {
+/* ✅ Titres renforcés (S'appliquent uniquement s'il n'y a pas de classe de couleur explicite comme text-white) */
+h1:not([class*="text-"]),
+h2:not([class*="text-"]),
+h3:not([class*="text-"]) {
     font-weight: bold;
-    color: #0f172a; /* Slate 900 - Très sombre et pro */
+    color: #0f172a;
 }
 
-/* ✅ Classes utilitaires personnalisées adaptées au Blanc & Bleu */
+/* ✅ Classes utilitaires personnalisées */
 .bg-tonBleu {
     background-color: #2563eb;
 }
@@ -58,18 +59,15 @@ h3 {
 }
 
 /* ====================================================== */
-/* ✅ MODIFICATIONS POUR LE TRADUCTEUR GOOGLE AUTOMATIQUE */
+/* ✅ GOOGLE TRANSLATE CUSTOMIZATION */
 /* ====================================================== */
-
-/* 1. Cacher l'énorme barre blanche en haut de page */
 .goog-te-banner-frame.skiptranslate {
     display: none !important;
 }
 
-/* 2. Styliser le bouton Google pour qu'il matche ton thème clair */
 .goog-te-gadget-simple {
-    background-color: #ffffff !important; /* Fond blanc */
-    border: 1px solid #cbd5e1 !important; /* Bordure grise subtile */
+    background-color: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
     border-radius: 8px !important;
     padding: 6px 12px !important;
     font-size: 14px !important;
@@ -77,15 +75,13 @@ h3 {
     display: flex !important;
     align-items: center !important;
     cursor: pointer !important;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* Ombre légère */
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
-/* 3. Mettre le texte du bouton en couleur sombre lisible */
 .goog-te-gadget-simple span {
     color: #1e293b !important; 
 }
 
-/* 4. Cacher le vieux logo Google à côté du bouton pour faire plus "Pro" */
 .goog-te-gadget-icon {
     display: none !important;
 }
