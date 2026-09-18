@@ -12,6 +12,7 @@ import { NavigationProvider } from './context/NavigationContext';
 // Composants de protection et globaux
 import ProtectedRoute from './components/ProtectedRoute';
 import GlobalLocationBar from './components/GlobalLocationBar';
+import AutoTranslator from './components/AutoTranslator'; // 🌐 NOUVEAU : Traducteur automatique global
 
 // Importations des pages
 import Accueil from './pages/Accueil';
@@ -83,9 +84,21 @@ export default function App() {
             <NavigationProvider>
                 <div className="min-h-screen bg-slate-950 font-sans text-slate-100 relative">
 
+                    {/* 🌐 BARRE D'EN-TÊTE GLOBALE (TRADUCTION ET EN-TÊTE) */}
+                    <div className="bg-[#430fd1]/90 backdrop-blur-md border-b border-white/10 px-4 py-2 flex items-center justify-between sticky top-0 z-40">
+                        <div className="flex items-center gap-2">
+                            <span className="font-black tracking-wider text-[#13d484] text-sm">
+                                KANARI
+                            </span>
+                        </div>
+                        {/* Composant de traduction Google automatique */}
+                        <AutoTranslator />
+                    </div>
+
                     {/* 📍 BARRE DE GÉOLOCALISATION GLOBALE */}
                     <GlobalLocationBar />
 
+                    {/* BOUTON D'INSTALLATION PWA */}
                     {showInstallBtn && (
                         <div className="fixed bottom-4 left-4 right-4 z-50 bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-2xl flex items-center justify-between max-w-md mx-auto animate-bounce">
                             <div>
@@ -94,7 +107,7 @@ export default function App() {
                             </div>
                             <button
                                 onClick={handleInstallApp}
-                                className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs px-4 py-2 rounded-lg transition-all"
+                                className="bg-[#13d484] hover:bg-emerald-400 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition-all"
                             >
                                 Installer
                             </button>
@@ -120,7 +133,7 @@ export default function App() {
                         {/* Page Paiement (publique pour test) */}
                         <Route path="/paiement" element={<PaiementPage />} />
 
-                        {/* 🟢 PAGE RÉSERVATION (Devenue publique pour tous les utilisateurs / prestataires / inconnus) */}
+                        {/* 🟢 PAGE RÉSERVATION */}
                         <Route path="/reservation" element={<ReservationPage />} />
 
                         {/* 🟠 PAGES SÉCURISÉES - CLIENTS */}
@@ -138,7 +151,6 @@ export default function App() {
                         } />
                         <Route path="/dashboard/client" element={<Navigate to="/dashboard-client" replace />} />
 
-
                         {/* 🔵 PAGES SÉCURISÉES - FOURNISSEURS */}
                         <Route path="/dashboard-fournisseur" element={
                             <ProtectedRoute role="fournisseur">
@@ -146,7 +158,6 @@ export default function App() {
                             </ProtectedRoute>
                         } />
                         <Route path="/dashboard/fournisseur" element={<Navigate to="/dashboard-fournisseur" replace />} />
-
 
                         {/* 🔴 PAGES SÉCURISÉES - ADMIN */}
                         <Route path="/admin" element={

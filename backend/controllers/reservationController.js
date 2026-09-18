@@ -13,6 +13,20 @@ function formaterBesoin(detailsParticuliers = {}) {
 exports.createGlobalReservation = async (req, res) => {
     const transaction = await sequelize.transaction();
     try {
+        // Analyse du FormData : si req.body.donneesReservation existe, on le parse, sinon on prend req.body directement
+        let donneesVoyageantes = req.body;
+        if (req.body && req.body.donneesReservation) {
+            try {
+                donneesVoyageantes = JSON.parse(req.body.donneesReservation);
+            } catch (e) {
+                await transaction.rollback();
+                return res.status(400).json({
+                    success: false,
+                    message: 'Format de données JSON invalide dans donneesReservation.'
+                });
+            }
+        }
+
         const {
             clientNom,
             telephone,
@@ -21,7 +35,7 @@ exports.createGlobalReservation = async (req, res) => {
             modePaiement,
             fournisseurId,
             services
-        } = req.body;
+        } = donneesVoyageantes;
 
         if (!clientNom || !telephone || !adresse || !services || !Array.isArray(services) || services.length === 0) {
             await transaction.rollback();
@@ -33,6 +47,9 @@ exports.createGlobalReservation = async (req, res) => {
 
         const parsedFournisseurId = fournisseurId ? parseInt(fournisseurId, 10) : null;
         const reservationsCreees = [];
+
+        // Les fichiers reçus via le middleware Multer (photos et documents)
+        const fichiersRecus = req.files || [];
 
         for (const srv of services) {
             const typeFormulaire = srv.typeFormulaire === 'candidature' ? 'candidature' : 'classique';
@@ -102,7 +119,9 @@ exports.createGlobalReservation = async (req, res) => {
         });
 
     } catch (error) {
-        await transaction.rollback();
+        if (transaction && !transaction.finished) {
+            await transaction.rollback();
+        }
         console.error('Erreur critique createGlobalReservation :', error);
         return res.status(500).json({
             success: false,
@@ -112,17 +131,6 @@ exports.createGlobalReservation = async (req, res) => {
 };
 
 // ── GET /api/reservations/mes-reservations — Espace Client ─────
-//
-// ✅ CORRIGÉ : deux alias inventés faisaient planter cette route à CHAQUE
-// appel :
-//   - { model: Fournisseur, as: 'fournisseur' } → l'alias réel défini
-//     dans models/index.js est 'prestataire', pas 'fournisseur'.
-//   - { model: BonIntervention, as: 'BonIntervention' } → cet alias
-//     n'existe pas du tout (seul 'bonIntervention', minuscule, existe).
-//     Le "double include" pensé comme protection contre une erreur de
-//     casse causait en réalité une EagerLoadingError garantie.
-// Conservé : la recherche par téléphone en plus de clientId, utile si
-// une réservation a été créée sans utilisateur connecté au départ.
 exports.getMesReservations = async (req, res) => {
     try {
         const conditions = [{ clientId: req.user.id }];

@@ -11,6 +11,9 @@ body {
     color: rgb(19, 212, 132);
     /* ton vert signature */
     min-height: 100vh;
+    
+    /* Indispensable pour empêcher Google Translate de décaler la page vers le bas */
+    top: 0px !important; 
 }
 
 /* ✅ Sélection immersive */
@@ -25,7 +28,6 @@ body {
         opacity: 0;
         transform: translateY(10px);
     }
-
     to {
         opacity: 1;
         transform: translateY(0);
@@ -55,4 +57,36 @@ h3 {
 
 .bg-fondTransparent {
     background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ====================================================== */
+/* ✅ MODIFICATIONS POUR LE TRADUCTEUR GOOGLE AUTOMATIQUE */
+/* ====================================================== */
+
+/* 1. Cacher l'énorme barre blanche en haut de page */
+.goog-te-banner-frame.skiptranslate {
+    display: none !important;
+}
+
+/* 2. Styliser le bouton Google pour qu'il matche ton thème */
+.goog-te-gadget-simple {
+    background-color: rgba(255, 255, 255, 0.1) !important; /* Fond transparent comme ta classe */
+    border: 1px solid rgb(19, 212, 132) !important; /* Bordure avec ton vert signature */
+    border-radius: 8px !important;
+    padding: 6px 12px !important;
+    font-size: 14px !important;
+    font-weight: bold !important;
+    display: flex !important;
+    align-items: center !important;
+    cursor: pointer !important;
+}
+
+/* 3. Mettre le texte du bouton en blanc/vert */
+.goog-te-gadget-simple span {
+    color: #ffffff !important; 
+}
+
+/* 4. Cacher le vieux logo Google à côté du bouton pour faire plus "Pro" */
+.goog-te-gadget-icon {
+    display: none !important;
 }

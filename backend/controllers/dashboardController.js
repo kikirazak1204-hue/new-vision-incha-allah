@@ -1,6 +1,6 @@
 const {
     Produit, Commande,
-    CommandeProduit, Fournisseur, User, Reservation, BonIntervention
+    CommandeProduit, Fournisseur, User, Reservation, BonIntervention, Devis // 👈 Ajout de Devis ici
 } = require('../models');
 
 exports.getDashboardFournisseur = async (req, res) => {
@@ -37,10 +37,6 @@ exports.getDashboardFournisseur = async (req, res) => {
                 limit: 5,
                 order: [['createdAt', 'DESC']]
             }),
-            // ── Vrais montants de commission : plus de "10%" codé en dur.
-            // On lit directement les bons validés de ce fournisseur, dont
-            // le taux/montant de commission a été figé au moment de la
-            // validation (voir bonInterventionController.js).
             BonIntervention.findAll({
                 where: { fournisseurId: fId, valide: true }
             })
@@ -101,8 +97,25 @@ exports.getDashboardClient = async (req, res) => {
             Reservation.findAll({
                 where: { clientId },
                 include: [
-                    { model: Fournisseur, as: 'prestataire', attributes: ['id', 'nomEntreprise', 'telephone'] },
-                    { model: BonIntervention, as: 'bonIntervention' }
+                    { 
+                        model: Fournisseur, 
+                        as: 'prestataire', // ATTENTION: Vérifie que l'alias dans tes models est bien 'prestataire' et non 'fournisseur'
+                        attributes: ['id', 'nomEntreprise', 'telephone'] 
+                    },
+                    { 
+                        model: BonIntervention, 
+                        as: 'bonIntervention' 
+                    },
+                    // 👇 AJOUT CRITIQUE POUR L'ONGLET "OFFRES REÇUES" DU FRONTEND 👇
+                    {
+                        model: Devis,
+                        as: 'devis', // L'alias défini dans tes relations Sequelize
+                        include: [{
+                            model: Fournisseur,
+                            as: 'fournisseur',
+                            attributes: ['id', 'nomEntreprise', 'telephone']
+                        }]
+                    }
                 ],
                 limit: 20,
                 order: [['createdAt', 'DESC']]

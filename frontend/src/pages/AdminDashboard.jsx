@@ -5,10 +5,11 @@ import UtilisateursAdmin from '../components/admin/UtilisateursAdmin';
 import ProduitsAdmin from '../components/admin/ProduitsAdmin';
 import ReservationsAdmin from '../components/admin/ReservationsAdmin';
 import ParametresAdmin from '../components/admin/ParametresAdmin';
+// NOUVEAU : Import de la Tour de Contrôle (vérifie le chemin selon ton dossier)
+import AdminLiveDispatch from './AdminLiveDispatch'; 
 
-// Vérifie que ce fichier existe bien.
-// Si le nom ou le chemin est différent, adapte uniquement cette ligne.
-
+// Note : J'ai laissé ton import de PaiementAdmin tel qu'il devait être dans ton projet
+import PaiementAdmin from '../components/admin/PaiementAdmin'; 
 
 export default function AdminDashboard() {
   const [tab, setTab] = useState('reservations');
@@ -19,6 +20,13 @@ export default function AdminDashboard() {
       label: 'Missions',
       color: 'from-pink-600 to-rose-500',
     },
+    // ---- NOUVEL ONGLET GPS ----
+    {
+      id: 'live-gps',
+      label: '📍 Tour de Contrôle',
+      color: 'from-amber-400 to-orange-500', 
+    },
+    // ---------------------------
     {
       id: 'validations',
       label: 'Validations',
@@ -52,6 +60,8 @@ export default function AdminDashboard() {
     switch (tab) {
       case 'reservations':
         return 'Missions';
+      case 'live-gps':          // <-- NOUVEAU
+        return 'Tour de Contrôle GPS';
       case 'validations':
         return 'Validations';
       case 'utilisateurs':
@@ -98,6 +108,11 @@ export default function AdminDashboard() {
               }`}
             >
               {item.label}
+              
+              {/* Petite animation (point rouge) si c'est l'onglet GPS mais qu'il n'est pas actif pour attirer l'oeil */}
+              {item.id === 'live-gps' && tab !== 'live-gps' && (
+                <span className="ml-auto w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+              )}
             </button>
           ))}
         </nav>
@@ -130,7 +145,9 @@ export default function AdminDashboard() {
               </h2>
 
               <p className="text-slate-500 text-sm mt-1">
-                Gestion des données de la plateforme
+                {tab === 'live-gps' 
+                  ? 'Suivi en temps réel des prestataires et livreurs' 
+                  : 'Gestion des données de la plateforme'}
               </p>
             </div>
 
@@ -151,29 +168,20 @@ export default function AdminDashboard() {
         {/* CONTENU */}
         <div className="bg-white border border-slate-200 rounded-2xl p-1 shadow-sm">
 
-          {tab === 'reservations' && (
-            <ReservationsAdmin />
-          )}
+          {tab === 'reservations' && <ReservationsAdmin />}
+          
+          {/* NOUVEAU : Affichage de la Tour de contrôle */}
+          {tab === 'live-gps' && <AdminLiveDispatch />}
 
-          {tab === 'validations' && (
-            <ValidationsAdmin />
-          )}
+          {tab === 'validations' && <ValidationsAdmin />}
 
-          {tab === 'utilisateurs' && (
-            <UtilisateursAdmin />
-          )}
+          {tab === 'utilisateurs' && <UtilisateursAdmin />}
 
-          {tab === 'paiements' && (
-            <PaiementAdmin />
-          )}
+          {tab === 'paiements' && <PaiementAdmin />}
 
-          {tab === 'produits' && (
-            <ProduitsAdmin />
-          )}
+          {tab === 'produits' && <ProduitsAdmin />}
 
-          {tab === 'parametres' && (
-            <ParametresAdmin />
-          )}
+          {tab === 'parametres' && <ParametresAdmin />}
 
         </div>
       </main>

@@ -3,7 +3,9 @@
     "tailwindcss": "^4.1.16"
   },
   "dependencies": {
-    "mysql2": "^3.22.5"
+    "leaflet": "^1.9.4",
+    "mysql2": "^3.22.5",
+    "react-leaflet": "^5.0.0"
   },
   "scripts": {
     "build": "npm --prefix frontend install && npm --prefix frontend run build"
