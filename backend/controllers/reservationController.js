@@ -31,24 +31,26 @@ exports.createGlobalReservation = async (req, res) => {
             clientNom,
             telephone,
             adresse,
+            coordonneesGps,
             dateIntervention,
             modePaiement,
             fournisseurId,
             services
         } = donneesVoyageantes;
 
-        if (!clientNom || !telephone || !adresse || !services || !Array.isArray(services) || services.length === 0) {
+        // Règle de validation alignée sur le front : Seul le téléphone et les services sont obligatoires
+        if (!telephone || !services || !Array.isArray(services) || services.length === 0) {
             await transaction.rollback();
             return res.status(400).json({
                 success: false,
-                message: 'Informations obligatoires manquantes dans la requête.'
+                message: 'Le numéro de téléphone et au moins un service sont obligatoires.'
             });
         }
 
         const parsedFournisseurId = fournisseurId ? parseInt(fournisseurId, 10) : null;
         const reservationsCreees = [];
 
-        // Les fichiers reçus via le middleware Multer (photos et documents)
+        // Les fichiers reçus via le middleware Multer (photos, documents et vocaux)
         const fichiersRecus = req.files || [];
 
         for (const srv of services) {
@@ -58,10 +60,32 @@ exports.createGlobalReservation = async (req, res) => {
             const fournisseurAssigne = estCandidature ? null : parsedFournisseurId;
             const statutInitial = fournisseurAssigne ? 'ASSIGNEE' : 'EN_ATTENTE';
 
+            // Filtrer les fichiers spécifiques à ce service via son safeId
+            const photosService = fichiersRecus
+                .filter(f => f.fieldname === `photo_${srv.safeId}`)
+                .map(f => f.path || f.filename);
+
+            const documentsService = fichiersRecus
+                .filter(f => f.fieldname === `document_${srv.safeId}`)
+                .map(f => f.path || f.filename);
+
+            const vocalService = fichiersRecus.find(f => f.fieldname === `vocal_${srv.safeId}`);
+            const vocalUrl = vocalService ? (vocalService.path || vocalService.filename) : null;
+
+            // Regroupement des détails du besoin pour ce service
+            const detailsComplets = {
+                description: srv.description || '',
+                photos: photosService,
+                documents: documentsService,
+                vocal: vocalUrl,
+                ...(srv.detailsParticuliers || {})
+            };
+
             const reservation = await Reservation.create({
-                clientNom,
-                telephone,
-                adresse,
+                clientNom: clientNom || 'Client Kanari',
+                telephone: telephone.trim(),
+                adresse: adresse || 'Non renseignée',
+                coordonneesGps: coordonneesGps ? JSON.stringify(coordonneesGps) : null,
                 dateIntervention: dateIntervention ? new Date(dateIntervention) : new Date(),
                 modePaiement: estCandidature ? 'aucun' : (modePaiement || 'depot_kanari'),
                 montantTotal: estCandidature ? 0 : Number(srv.prix || srv.tarif || 0),
@@ -72,8 +96,8 @@ exports.createGlobalReservation = async (req, res) => {
                 fournisseurId: fournisseurAssigne,
                 serviceId: srv.serviceId || null,
                 serviceNom: srv.nom || 'Service',
-                besoin: formaterBesoin(srv.detailsParticuliers),
-                services: srv.detailsParticuliers || {}
+                besoin: srv.description || formaterBesoin(srv.detailsParticuliers),
+                services: detailsComplets
             }, { transaction });
 
             reservationsCreees.push(reservation);
@@ -81,6 +105,7 @@ exports.createGlobalReservation = async (req, res) => {
 
         await transaction.commit();
 
+        // Envoi des notifications de manière asynchrone
         for (const reservation of reservationsCreees) {
             try {
                 if (reservation.fournisseurId) {

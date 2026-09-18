@@ -3,22 +3,20 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ✅ Style global */
+/* ✅ Style global - Design Clair (Blanc & Bleu) */
 body {
     font-family: 'Inter', sans-serif;
-    background-color: #430fd1;
-    /* ton noir sacré */
-    color: rgb(19, 212, 132);
-    /* ton vert signature */
+    background-color: #f8fafc; /* Fond très léger et propre (Slate 50) */
+    color: #334155;            /* Texte sombre, lisible et reposant (Slate 700) */
     min-height: 100vh;
     
     /* Indispensable pour empêcher Google Translate de décaler la page vers le bas */
     top: 0px !important; 
 }
 
-/* ✅ Sélection immersive */
+/* ✅ Sélection immersive (Bleu professionnel) */
 ::selection {
-    background-color: rgb(19, 212, 132);
+    background-color: #2563eb;
     color: #ffffff;
 }
 
@@ -38,25 +36,25 @@ body {
     animation: fadeIn 0.4s ease-out;
 }
 
-/* ✅ Titres renforcés */
+/* ✅ Titres renforcés (Sombres, élégants et lisibles sur fond clair) */
 h1,
 h2,
 h3 {
     font-weight: bold;
-    color: #ffffff;
+    color: #0f172a; /* Slate 900 - Très sombre et pro */
 }
 
-/* ✅ Classes utilitaires personnalisées (optionnelles) */
-.bg-tonNoir {
-    background-color: #430fd1;
+/* ✅ Classes utilitaires personnalisées adaptées au Blanc & Bleu */
+.bg-tonBleu {
+    background-color: #2563eb;
 }
 
-.text-brandVert {
-    color: rgb(19, 212, 132);
+.text-brandBleu {
+    color: #2563eb;
 }
 
-.bg-fondTransparent {
-    background-color: rgba(255, 255, 255, 0.1);
+.bg-fondClair {
+    background-color: #ffffff;
 }
 
 /* ====================================================== */
@@ -68,22 +66,23 @@ h3 {
     display: none !important;
 }
 
-/* 2. Styliser le bouton Google pour qu'il matche ton thème */
+/* 2. Styliser le bouton Google pour qu'il matche ton thème clair */
 .goog-te-gadget-simple {
-    background-color: rgba(255, 255, 255, 0.1) !important; /* Fond transparent comme ta classe */
-    border: 1px solid rgb(19, 212, 132) !important; /* Bordure avec ton vert signature */
+    background-color: #ffffff !important; /* Fond blanc */
+    border: 1px solid #cbd5e1 !important; /* Bordure grise subtile */
     border-radius: 8px !important;
     padding: 6px 12px !important;
     font-size: 14px !important;
-    font-weight: bold !important;
+    font-weight: 500 !important;
     display: flex !important;
     align-items: center !important;
     cursor: pointer !important;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* Ombre légère */
 }
 
-/* 3. Mettre le texte du bouton en blanc/vert */
+/* 3. Mettre le texte du bouton en couleur sombre lisible */
 .goog-te-gadget-simple span {
-    color: #ffffff !important; 
+    color: #1e293b !important; 
 }
 
 /* 4. Cacher le vieux logo Google à côté du bouton pour faire plus "Pro" */

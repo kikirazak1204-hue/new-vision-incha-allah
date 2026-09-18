@@ -1,15 +1,8 @@
-// ============================================================
-//  AuthContext.jsx — Gestion globale de l'authentification
-//  À placer dans : src/context/AuthContext.jsx
-// ============================================================
-
 import React, { createContext, useContext, useState } from 'react';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-
-    // ✅ Initialisation depuis localStorage
     const [token, setToken] = useState(() => localStorage.getItem('token') || null);
     const [user, setUser] = useState(() => {
         try {
@@ -19,7 +12,6 @@ export const AuthProvider = ({ children }) => {
         }
     });
 
-    // 🔑 Connexion — appelé après loginUser()
     const login = (tokenValue, userData) => {
         localStorage.setItem('token', tokenValue);
         localStorage.setItem('user', JSON.stringify(userData));
@@ -27,7 +19,6 @@ export const AuthProvider = ({ children }) => {
         setUser(userData);
     };
 
-    // 🚪 Déconnexion — remplace tous les localStorage.removeItem éparpillés
     const logout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -35,10 +26,12 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
-    // 🔍 Helpers rôle
-    const isAdmin = user?.role === 'admin';
-    const isFournisseur = user?.role === 'fournisseur';
-    const isUtilisateur = user?.role === 'utilisateur';
+    // ✅ Normalisation des rôles pour éviter les bugs de casse ou de terminologie
+    const userRole = String(user?.role || user?.typeProfil || user?.type || '').toLowerCase();
+
+    const isAdmin = userRole.includes('admin');
+    const isFournisseur = userRole.includes('fournisseur') || userRole.includes('prestataire') || userRole.includes('partenaire');
+    const isUtilisateur = userRole.includes('client') || userRole.includes('user') || userRole.includes('utilisateur');
     const isConnecte = !!token;
 
     return (
@@ -57,7 +50,6 @@ export const AuthProvider = ({ children }) => {
     );
 };
 
-// 🪝 Hook personnalisé
 export const useAuth = () => {
     const context = useContext(AuthContext);
     if (!context) {
