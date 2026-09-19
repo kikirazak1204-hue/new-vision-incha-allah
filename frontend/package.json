@@ -10,9 +10,11 @@
   "dependencies": {
     "@vitejs/plugin-react": "^4.7.0",
     "axios": "^1.13.2",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.548.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-leaflet": "^4.2.1",
     "react-router-dom": "^7.9.5",
     "vite": "^6.4.2"
   },

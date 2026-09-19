@@ -1,87 +1,117 @@
 /* 1. Les @import doivent TOUJOURS être tout en haut du fichier */
 @import 'leaflet/dist/leaflet.css';
 
-/* ✅ Activation des couches Tailwind */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ✅ Style global - Design Clair (Blanc & Bleu) */
+:root {
+  --kanari-navy: #061a3a;
+  --kanari-navy-light: #0b2858;
+  --kanari-blue: #2563eb;
+  --kanari-blue-dark: #1d4ed8;
+  --kanari-blue-soft: #eff6ff;
+  --kanari-amber: #fbbf24;
+  --kanari-amber-dark: #f59e0b;
+  --kanari-bg: #f8fafc;
+  --kanari-white: #ffffff;
+  --kanari-text: #0f172a;
+  --kanari-muted: #64748b;
+  --kanari-border: #e2e8f0;
+  --kanari-success: #16a34a;
+  --kanari-danger: #dc2626;
+  --kanari-warning: #d97706;
+}
+
+* { box-sizing: border-box; }
+
+html { min-height: 100%; scroll-behavior: smooth; background: var(--kanari-bg); }
+
 body {
-    font-family: 'Inter', sans-serif;
-    background-color: #f8fafc;
-    color: #334155;
-    min-height: 100vh;
-    top: 0px !important; 
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  font-family: "Inter", "Segoe UI", Arial, sans-serif;
+  background: var(--kanari-bg);
+  color: var(--kanari-text);
+  -webkit-font-smoothing: antialiased;
+  top: 0 !important;
 }
 
-/* ✅ Sélection immersive */
-::selection {
-    background-color: #2563eb;
-    color: #ffffff;
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+img { max-width: 100%; height: auto; }
+
+::selection { background: var(--kanari-blue); color: #fff; }
+
+@layer components {
+  .kanari-page { min-height: 100vh; background: var(--kanari-bg); color: var(--kanari-text); }
+  .kanari-container { width: 100%; max-width: 1180px; margin: 0 auto; padding: 24px 16px; }
+  .kanari-card { background: #fff; border: 1px solid var(--kanari-border); border-radius: 18px; box-shadow: 0 4px 18px rgba(15,23,42,.06); }
+  .kanari-header { background: var(--kanari-navy); color: #fff; }
+  .kanari-title { color: var(--kanari-navy); font-weight: 800; letter-spacing: -.025em; }
+  .kanari-muted { color: var(--kanari-muted); }
+
+  .kanari-primary, .kanari-blue-button, .kanari-action, .kanari-secondary {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 42px; padding: 10px 16px; border-radius: 12px;
+    font-weight: 700; transition: .2s ease;
+  }
+  .kanari-primary { background: var(--kanari-navy); color: #fff; border: 1px solid transparent; }
+  .kanari-primary:hover { background: var(--kanari-navy-light); transform: translateY(-1px); }
+  .kanari-blue-button { background: var(--kanari-blue); color: #fff; border: 1px solid transparent; }
+  .kanari-blue-button:hover { background: var(--kanari-blue-dark); transform: translateY(-1px); }
+  .kanari-action { background: var(--kanari-amber); color: var(--kanari-navy); border: 1px solid transparent; font-weight: 800; }
+  .kanari-action:hover { background: var(--kanari-amber-dark); transform: translateY(-1px); }
+  .kanari-secondary { background: #fff; color: var(--kanari-navy); border: 1px solid var(--kanari-border); }
+  .kanari-secondary:hover { background: #f1f5f9; border-color: #cbd5e1; }
+
+  .kanari-input { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--kanari-border); border-radius: 12px; background: #fff; color: var(--kanari-text); outline: none; }
+  .kanari-input:focus { border-color: var(--kanari-blue); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+  .kanari-label { display: block; margin-bottom: 6px; color: #334155; font-size: .875rem; font-weight: 700; }
+  .kanari-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: var(--kanari-blue-soft); color: var(--kanari-blue-dark); font-size: .75rem; font-weight: 800; }
+  .kanari-badge-success { background: #f0fdf4; color: var(--kanari-success); }
+  .kanari-badge-warning { background: #fffbeb; color: var(--kanari-warning); }
+  .kanari-badge-danger { background: #fef2f2; color: var(--kanari-danger); }
+  .kanari-divider { height: 1px; background: var(--kanari-border); }
+
+  .kanari-map { width: 100%; min-height: 280px; overflow: hidden; border: 1px solid var(--kanari-border); border-radius: 18px; background: #e2e8f0; }
+  .kanari-map-panel { background: #fff; border: 1px solid var(--kanari-border); border-radius: 14px; box-shadow: 0 4px 14px rgba(15,23,42,.08); }
+  .kanari-location-marker, .kanari-provider-marker { display: flex; align-items: center; justify-content: center; border: 3px solid #fff; border-radius: 999px; box-shadow: 0 3px 12px rgba(15,23,42,.22); }
+  .kanari-location-marker { width: 34px; height: 34px; background: var(--kanari-amber); color: var(--kanari-navy); }
+  .kanari-provider-marker { width: 36px; height: 36px; background: var(--kanari-navy); color: #fff; }
+  .kanari-status-dot { display: inline-block; width: 9px; height: 9px; border-radius: 999px; background: var(--kanari-success); }
 }
 
-/* ✅ Animation fadeIn */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes kanariPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(6,26,58,.25); } 50% { box-shadow: 0 0 0 9px rgba(6,26,58,0); } }
+.animate-fadeIn { animation: fadeIn .4s ease-out; }
+.kanari-pulse { animation: kanariPulse 1.8s infinite; }
+
+h1:not([class*="text-"]), h2:not([class*="text-"]), h3:not([class*="text-"]) { font-weight: 800; color: var(--kanari-text); }
+.bg-tonBleu { background-color: var(--kanari-blue); }
+.text-brandBleu { color: var(--kanari-blue); }
+.bg-fondClair { background-color: #fff; }
+
+.goog-te-banner-frame.skiptranslate { display: none !important; }
+body > .skiptranslate { display: none !important; }
+.goog-te-gadget { font-family: "Inter", "Segoe UI", Arial, sans-serif !important; }
+.goog-te-gadget-simple { display: inline-flex !important; align-items: center !important; gap: 6px !important; min-height: 36px !important; padding: 6px 12px !important; background: #fff !important; border: 1px solid var(--kanari-border) !important; border-radius: 10px !important; font-size: 14px !important; font-weight: 600 !important; box-shadow: none !important; }
+.goog-te-gadget-simple span { color: var(--kanari-text) !important; }
+.goog-te-gadget-icon { display: none !important; }
+
+:focus-visible { outline: 3px solid rgba(37,99,235,.35); outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .kanari-container { padding: 18px 12px; }
+  .kanari-card { border-radius: 14px; }
+  .kanari-primary, .kanari-blue-button, .kanari-action, .kanari-secondary { min-height: 40px; padding: 9px 12px; font-size: .875rem; }
+  .kanari-map { min-height: 230px; }
 }
 
-.animate-fadeIn {
-    animation: fadeIn 0.4s ease-out;
-}
-
-/* ✅ Titres renforcés (S'appliquent uniquement s'il n'y a pas de classe de couleur explicite comme text-white) */
-h1:not([class*="text-"]),
-h2:not([class*="text-"]),
-h3:not([class*="text-"]) {
-    font-weight: bold;
-    color: #0f172a;
-}
-
-/* ✅ Classes utilitaires personnalisées */
-.bg-tonBleu {
-    background-color: #2563eb;
-}
-
-.text-brandBleu {
-    color: #2563eb;
-}
-
-.bg-fondClair {
-    background-color: #ffffff;
-}
-
-/* ====================================================== */
-/* ✅ GOOGLE TRANSLATE CUSTOMIZATION */
-/* ====================================================== */
-.goog-te-banner-frame.skiptranslate {
-    display: none !important;
-}
-
-.goog-te-gadget-simple {
-    background-color: #ffffff !important;
-    border: 1px solid #cbd5e1 !important;
-    border-radius: 8px !important;
-    padding: 6px 12px !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    display: flex !important;
-    align-items: center !important;
-    cursor: pointer !important;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-}
-
-.goog-te-gadget-simple span {
-    color: #1e293b !important; 
-}
-
-.goog-te-gadget-icon {
-    display: none !important;
+@media print {
+  body { background: #fff !important; }
+  .no-print { display: none !important; }
+  .kanari-card { box-shadow: none !important; border: 1px solid #cbd5e1 !important; }
 }
