@@ -93,7 +93,8 @@ Reservation.hasMany(Devis, { foreignKey: 'reservationId', as: 'devis' });
 Devis.belongsTo(Reservation, { foreignKey: 'reservationId', as: 'reservationDevis' });
 
 Fournisseur.hasMany(Devis, { foreignKey: 'fournisseurId', as: 'devisFournisseur' });
-Devis.belongsTo(Fournisseur, { foreignKey: 'fournisseurId', as: 'fournisseurDevis' });
+// ✅ CORRECTION ICI : Changement de 'fournisseurDevis' vers 'fournisseur' pour correspondre au contrôleur
+Devis.belongsTo(Fournisseur, { foreignKey: 'fournisseurId', as: 'fournisseur' });
 
 // ==========================================
 // Finances Fournisseur (Solde & Retrait)
