@@ -1,223 +1,75 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { io } from 'socket.io-client';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://newvision-backend.onrender.com';
+// Correction de l'icône par défaut de Leaflet
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 
-export default function OrderTracking({ initialMissionId = '' }) {
-  const [missionId, setMissionId] = useState(initialMissionId);
-  const [searchId, setSearchId] = useState(initialMissionId);
-  const [trackingData, setTrackingData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+// Remplace cette URL par l'URL de ton backend sur Render (ex: https://kanari-backend.onrender.com)
+const SOCKET_URL = 'http://localhost:5000'; 
 
-  const mapRef = useRef(null);
-  const leafletMap = useRef(null);
-  const providerMarkerRef = useRef(null);
+export default function OrderTracking() {
+  const { missionId } = useParams(); // Récupère le numéro de commande depuis l'URL
+  const [providerLocation, setProviderLocation] = useState(null);
+  const [socket, setSocket] = useState(null);
 
-  // 1. Chargement de la bibliothèque Leaflet
   useEffect(() => {
-    if (window.L) return;
+    // 1. Connexion au serveur
+    const newSocket = io(SOCKET_URL);
+    setSocket(newSocket);
 
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(link);
+    // 2. Rejoindre la salle spécifique à cette commande
+    newSocket.emit('joinMission', missionId);
 
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.async = true;
-    document.body.appendChild(script);
+    // 3. Écouter les mises à jour de position
+    newSocket.on('locationUpdated', (data) => {
+      console.log('📍 Nouvelle position reçue :', data);
+      setProviderLocation({ lat: data.lat, lon: data.lon });
+    });
 
+    // 4. Nettoyage lors de la fermeture de la page
     return () => {
-      if (leafletMap.current) leafletMap.current.remove();
+      newSocket.disconnect();
     };
-  }, []);
-
-  // 2. Récupération du suivi de la mission
-  const fetchTrackingInfo = async (idToFetch) => {
-    const id = idToFetch || missionId;
-    if (!id.trim()) return;
-
-    setLoading(true);
-    setError('');
-
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-
-    try {
-      const res = await fetch(`${API_BASE}/api/orders/tracking/${id.trim()}`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      });
-
-      const data = await res.json().catch(() => null);
-
-      if (res.ok && data?.success !== false) {
-        setTrackingData(data);
-        renderMap(data);
-      } else {
-        // Mode Simulation si le backend n'a pas encore la route dédiée
-        const mockTracking = {
-          missionId: id,
-          serviceName: 'Livraison Express / Intervention',
-          status: 'EN_ROUTE', // 'VALIDE', 'EN_ROUTE', 'SUR_PLACE', 'TERMINE'
-          provider: {
-            name: 'Aliou Transporter',
-            phone: '+227 90 00 00 01',
-            vehicle: 'Moto Express',
-            lat: 13.5150,
-            lon: 2.1180
-          },
-          clientLocation: {
-            lat: 13.5220,
-            lon: 2.1300,
-            address: 'Quartier Plateau, Niamey'
-          },
-          estimatedArrival: '12-15 min'
-        };
-        setTrackingData(mockTracking);
-        renderMap(mockTracking);
-      }
-    } catch (err) {
-      console.error('Erreur chargement tracking:', err);
-      setError('Impossible de récupérer le suivi. Vérifiez le numéro de mission.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Rafraîchissement automatique toutes les 10 secondes
-  useEffect(() => {
-    if (!missionId) return;
-    fetchTrackingInfo(missionId);
-
-    const interval = setInterval(() => {
-      fetchTrackingInfo(missionId);
-    }, 10000);
-
-    return () => clearInterval(interval);
   }, [missionId]);
 
-  // 3. Initialisation et mise à jour de la carte
-  const renderMap = (data) => {
-    if (!window.L || !mapRef.current || !data?.provider?.lat) return;
-
-    const providerPos = [data.provider.lat, data.provider.lon];
-    const clientPos = data.clientLocation?.lat ? [data.clientLocation.lat, data.clientLocation.lon] : null;
-
-    if (!leafletMap.current) {
-      leafletMap.current = window.L.map(mapRef.current).setView(providerPos, 14);
-
-      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© Kanari GPS'
-      }).addTo(leafletMap.current);
-    }
-
-    // Marqueur du Prestataire / Livreur
-    if (providerMarkerRef.current) {
-      providerMarkerRef.current.setLatLng(providerPos);
-    } else {
-      providerMarkerRef.current = window.L.marker(providerPos)
-        .addTo(leafletMap.current)
-        .bindPopup(`<b>${data.provider.name}</b><br/>${data.provider.vehicle || 'En déplacement'}`)
-        .openPopup();
-    }
-
-    // Marqueur du Client
-    if (clientPos) {
-      window.L.marker(clientPos).addTo(leafletMap.current).bindPopup('Votre position de livraison');
-      const bounds = window.L.latLngBounds([providerPos, clientPos]);
-      leafletMap.current.fitBounds(bounds, { padding: [50, 50] });
-    } else {
-      leafletMap.current.panTo(providerPos);
-    }
-  };
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (searchId.trim()) {
-      setMissionId(searchId.trim());
-    }
-  };
-
   return (
-    <div className="w-full max-w-4xl mx-auto p-4 font-sans text-[#061a3a]">
-      {/* Barre de recherche du numéro de mission */}
-      <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-200 mb-6">
-        <h2 className="text-xl font-black mb-2">Suivi de Mission Kanari</h2>
-        <p className="text-xs text-slate-500 mb-4">Entrez votre N° de mission pour localiser votre intervenant en direct.</p>
-        
-        <form onSubmit={handleSearchSubmit} className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Ex: CMD-890"
-            value={searchId}
-            onChange={(e) => setSearchId(e.target.value)}
-            className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-amber-400"
-          />
-          <button
-            type="submit"
-            disabled={loading}
-            className="bg-[#061a3a] text-white font-black px-6 py-3 rounded-2xl hover:bg-[#0b2855] transition shadow-lg"
-          >
-            {loading ? 'Recherche...' : 'Suivre'}
-          </button>
-        </form>
+    <div className="p-4 max-w-4xl mx-auto">
+      <h2 className="text-2xl font-bold mb-4 text-[#13d484]">
+        Suivi de la commande : {missionId}
+      </h2>
 
-        {error && <div className="mt-3 text-xs font-bold text-red-600">{error}</div>}
-      </div>
-
-      {trackingData && (
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Panneau latéral : Détails et Étapes */}
-          <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-200 flex flex-col justify-between">
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">N° {trackingData.missionId}</span>
-                  <h3 className="text-lg font-black">{trackingData.serviceName}</h3>
-                </div>
-                <span className="bg-amber-100 text-amber-800 text-xs font-black px-3 py-1 rounded-full animate-pulse">
-                  {trackingData.status === 'EN_ROUTE' ? 'En route' : 'En cours'}
-                </span>
-              </div>
-
-              {/* Estimation */}
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 mb-6 text-center">
-                <div className="text-xs text-slate-500 font-bold uppercase">Temps d'arrivée estimé</div>
-                <div className="text-2xl font-black text-amber-600 mt-1">{trackingData.estimatedArrival || 'Calcul en cours...'}</div>
-              </div>
-
-              {/* Fiche Prestataire */}
-              <div className="border-t border-slate-100 pt-4 mb-4">
-                <div className="text-xs font-bold text-slate-400 mb-2">Votre intervenant</div>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-amber-400 flex items-center justify-center font-black text-[#061a3a]">
-                    {trackingData.provider.name.charAt(0)}
-                  </div>
-                  <div>
-                    <div className="font-bold text-sm">{trackingData.provider.name}</div>
-                    <div className="text-xs text-slate-500">{trackingData.provider.vehicle}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Bouton d'action */}
-            <a
-              href={`tel:${trackingData.provider.phone}`}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3 rounded-2xl flex items-center justify-center gap-2 shadow-lg transition text-sm"
+      <div className="bg-slate-900 p-4 rounded-xl shadow-lg border border-slate-800">
+        {!providerLocation ? (
+          <div className="h-96 flex items-center justify-center text-slate-400">
+            En attente de la position du prestataire...
+          </div>
+        ) : (
+          <div className="h-96 w-full rounded-lg overflow-hidden border border-white/10">
+            <MapContainer 
+              center={[providerLocation.lat, providerLocation.lon]} 
+              zoom={15} 
+              style={{ height: '100%', width: '100%' }}
             >
-              📞 Appeler ({trackingData.provider.phone})
-            </a>
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              />
+              <Marker position={[providerLocation.lat, providerLocation.lon]}>
+                <Popup>Le prestataire est ici !</Popup>
+              </Marker>
+            </MapContainer>
           </div>
-
-          {/* Zone Carte Leaflet */}
-          <div className="lg:col-span-2 bg-slate-900 rounded-3xl shadow-xl border border-slate-200 overflow-hidden min-h-[400px] relative">
-            <div ref={mapRef} className="w-full h-full min-h-[400px] z-0" />
-            <div className="absolute bottom-4 left-4 z-[1000] bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-md text-[11px] font-bold text-slate-700">
-              📍 Position mise à jour en direct toutes les 10s
-            </div>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

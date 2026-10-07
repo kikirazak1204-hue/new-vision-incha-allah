@@ -33,6 +33,7 @@ import ProduitsParFournisseur from './pages/Produitsparfournisseur';
 import PanierPage from './pages/PanierPage';
 import ProduitsParService from './pages/ProduitsParService';
 import VoirProduits from './pages/VoirProduitsPage';
+import OrderTracking from './components/OrderTracking';
 
 export default function App() {
     const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -165,6 +166,8 @@ export default function App() {
                                 <DashboardAdmin />
                             </ProtectedRoute>
                         } />
+
+                        <Route path="/suivi-commande/:missionId" element={<OrderTracking />} />
 
                         {/* 🔀 REDIRECTION PAR DÉFAUT */}
                         <Route path="*" element={<Navigate to="/" replace />} />

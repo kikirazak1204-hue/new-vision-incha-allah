@@ -96,42 +96,55 @@ exports.getDashboardClient = async (req, res) => {
         const [missions, totalReservations] = await Promise.all([
             Reservation.findAll({
                 where: { clientId },
+
                 include: [
-                    { 
-                        model: Fournisseur, 
-                        as: 'prestataire', // ATTENTION: Vérifie que l'alias dans tes models est bien 'prestataire' et non 'fournisseur'
-                        attributes: ['id', 'nomEntreprise', 'telephone'] 
-                    },
-                    { 
-                        model: BonIntervention, 
-                        as: 'bonIntervention' 
-                    },
-                    // 👇 AJOUT CRITIQUE POUR L'ONGLET "OFFRES REÇUES" DU FRONTEND 👇
                     {
-                        model: Devis,
-                        as: 'devis', // L'alias défini dans tes relations Sequelize
-                        include: [{
-                            model: Fournisseur,
-                            as: 'fournisseur',
-                            attributes: ['id', 'nomEntreprise', 'telephone']
-                        }]
+                        model: Fournisseur,
+                        as: 'prestataire',
+                        attributes: [
+                            'id',
+                            'nomEntreprise',
+                            'telephone'
+                        ]
+                    },
+                    {
+                        model: BonIntervention,
+                        as: 'bonIntervention'
                     }
                 ],
+
                 limit: 20,
                 order: [['createdAt', 'DESC']]
             }),
-            Reservation.count({ where: { clientId } })
+
+            Reservation.count({
+                where: { clientId }
+            })
         ]);
 
-        res.json({
+        return res.json({
             success: true,
             data: {
-                stats: { totalReservations },
+                stats: {
+                    totalReservations
+                },
                 missions
             }
         });
+
     } catch (err) {
-        console.error('❌ Erreur Critique (dashboard client):', err);
-        res.status(500).json({ success: false, message: 'Erreur serveur interne' });
+        console.error(
+            '❌ ERREUR DASHBOARD CLIENT :',
+            err
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: 'Erreur serveur interne',
+            debug:
+                process.env.NODE_ENV !== 'production'
+                    ? err.message
+                    : undefined
+        });
     }
 };

@@ -3,6 +3,9 @@ import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
+// Import de ton gestionnaire d'état global
+import { getGlobalLocationState } from '../util/geolocationManager'; 
+
 // Configuration de l'icône Kanari (Ambre)
 const kanariPinIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png',
@@ -30,16 +33,18 @@ function LocationMarker({ position, setPosition, onLocationSelected }) {
 export default function KanariGeoPicker({ onLocationSelected, defaultPosition = [13.5116, 2.1254] /* Niamey par défaut */ }) {
   const [position, setPosition] = useState(null);
 
-  // Demander la géolocalisation HTML5 au chargement pour centrer sur le client
+  // Utilisation du gestionnaire global au lieu de forcer la géolocalisation
   useEffect(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        const currentLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setPosition(currentLoc);
-        if (onLocationSelected) onLocationSelected(currentLoc);
-      });
+    const globalGeo = getGlobalLocationState();
+    
+    // Si l'utilisateur a activé le GPS dans la barre globale, on utilise ces coordonnées
+    if (globalGeo && globalGeo.enabled && globalGeo.lat && globalGeo.lon) {
+      const currentLoc = { lat: globalGeo.lat, lng: globalGeo.lon };
+      setPosition(currentLoc);
+      if (onLocationSelected) onLocationSelected(currentLoc);
     }
-  }, []);
+    // Sinon, on ne force rien, la carte s'ouvrira sur defaultPosition (Niamey)
+  }, [onLocationSelected]);
 
   return (
     <div className="relative w-full overflow-hidden rounded-2xl border-2 border-slate-200 shadow-inner focus-within:border-amber-400">
