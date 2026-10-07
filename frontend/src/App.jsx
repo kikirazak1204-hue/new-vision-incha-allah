@@ -6,15 +6,16 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
 // Providers et Contexts
+import { AuthProvider } from './context/AuthContext'; // 🔐 NOUVEAU : Ajout du AuthProvider obligatoire
 import { PanierProvider } from './context/PanierContext';
 import { NavigationProvider } from './context/NavigationContext';
 
 // Composants de protection et globaux
 import ProtectedRoute from './components/ProtectedRoute';
 import GlobalLocationBar from './components/GlobalLocationBar';
-import AutoTranslator from './components/AutoTranslator'; // 🌐 NOUVEAU : Traducteur automatique global
+import AutoTranslator from './components/AutoTranslator';
 
-// Importations des pages
+// Importations des pages et composants
 import Accueil from './pages/Accueil';
 import ServiceSelectionPage from './pages/ServiceSelectionPage';
 import ServiceDetailPage from './pages/ServiceDetailPage';
@@ -81,99 +82,100 @@ export default function App() {
     };
 
     return (
-        <PanierProvider>
-            <NavigationProvider>
-                <div className="min-h-screen bg-slate-950 font-sans text-slate-100 relative">
+        <AuthProvider>
+            <PanierProvider>
+                <NavigationProvider>
+                    <div className="min-h-screen bg-slate-950 font-sans text-slate-100 relative">
 
-                    {/* 🌐 BARRE D'EN-TÊTE GLOBALE (TRADUCTION ET EN-TÊTE) */}
-                    <div className="bg-[#430fd1]/90 backdrop-blur-md border-b border-white/10 px-4 py-2 flex items-center justify-between sticky top-0 z-40">
-                        <div className="flex items-center gap-2">
-                            <span className="font-black tracking-wider text-[#13d484] text-sm">
-                                KANARI
-                            </span>
-                        </div>
-                        {/* Composant de traduction Google automatique */}
-                        <AutoTranslator />
-                    </div>
-
-                    {/* 📍 BARRE DE GÉOLOCALISATION GLOBALE */}
-                    <GlobalLocationBar />
-
-                    {/* BOUTON D'INSTALLATION PWA */}
-                    {showInstallBtn && (
-                        <div className="fixed bottom-4 left-4 right-4 z-50 bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-2xl flex items-center justify-between max-w-md mx-auto animate-bounce">
-                            <div>
-                                <p className="font-bold text-sm text-white">Installer l'application Kanari</p>
-                                <p className="text-xs text-slate-400">Pour recevoir vos notifications en temps réel.</p>
+                        {/* 🌐 BARRE D'EN-TÊTE GLOBALE */}
+                        <div className="bg-[#430fd1]/90 backdrop-blur-md border-b border-white/10 px-4 py-2 flex items-center justify-between sticky top-0 z-40">
+                            <div className="flex items-center gap-2">
+                                <span className="font-black tracking-wider text-[#13d484] text-sm">
+                                    KANARI
+                                </span>
                             </div>
-                            <button
-                                onClick={handleInstallApp}
-                                className="bg-[#13d484] hover:bg-emerald-400 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition-all"
-                            >
-                                Installer
-                            </button>
+                            <AutoTranslator />
                         </div>
-                    )}
 
-                    <Routes>
-                        {/* 🟢 PAGES PUBLIQUES */}
-                        <Route path="/" element={<Accueil />} />
-                        <Route path="/produits" element={<VoirProduits />} />
-                        <Route path="/login" element={<Login />} />
-                        <Route path="/register" element={<Register />} />
-                        <Route path="/register-utilisateur" element={<RegisterUtilisateur />} />
-                        <Route path="/register-prestataire" element={<RegisterPrestataire />} />
-                        <Route path="/selection" element={<ServiceSelectionPage />} />
+                        {/* 📍 BARRE DE GÉOLOCALISATION GLOBALE */}
+                        <GlobalLocationBar />
 
-                        <Route path="/service/:id" element={<ServiceDetailPage />} />
-                        <Route path="/produits/:fournisseurId" element={<ProduitsParFournisseur />} />
-                        <Route path="/produits/service/:serviceId" element={<ProduitsParService />} />
-                        <Route path="/fournisseur-profil/:id?" element={<FournisseurProfilePage />} />
-                        <Route path="/panier" element={<PanierPage />} />
+                        {/* BOUTON D'INSTALLATION PWA */}
+                        {showInstallBtn && (
+                            <div className="fixed bottom-4 left-4 right-4 z-50 bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-2xl flex items-center justify-between max-w-md mx-auto animate-bounce">
+                                <div>
+                                    <p className="font-bold text-sm text-white">Installer l'application Kanari</p>
+                                    <p className="text-xs text-slate-400">Pour recevoir vos notifications en temps réel.</p>
+                                </div>
+                                <button
+                                    onClick={handleInstallApp}
+                                    className="bg-[#13d484] hover:bg-emerald-400 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition-all"
+                                >
+                                    Installer
+                                </button>
+                            </div>
+                        )}
 
-                        {/* Page Paiement (publique pour test) */}
-                        <Route path="/paiement" element={<PaiementPage />} />
+                        <Routes>
+                            {/* 🟢 PAGES PUBLIQUES */}
+                            <Route path="/" element={<Accueil />} />
+                            <Route path="/produits" element={<VoirProduits />} />
+                            <Route path="/login" element={<Login />} />
+                            <Route path="/register" element={<Register />} />
+                            <Route path="/register-utilisateur" element={<RegisterUtilisateur />} />
+                            <Route path="/register-prestataire" element={<RegisterPrestataire />} />
+                            <Route path="/selection" element={<ServiceSelectionPage />} />
 
-                        {/* 🟢 PAGE RÉSERVATION */}
-                        <Route path="/reservation" element={<ReservationPage />} />
+                            <Route path="/service/:id" element={<ServiceDetailPage />} />
+                            <Route path="/produits/:fournisseurId" element={<ProduitsParFournisseur />} />
+                            <Route path="/produits/service/:serviceId" element={<ProduitsParService />} />
+                            <Route path="/fournisseur-profil/:id?" element={<FournisseurProfilePage />} />
+                            <Route path="/panier" element={<PanierPage />} />
 
-                        {/* 🟠 PAGES SÉCURISÉES - CLIENTS */}
-                        <Route path="/historique-paiements" element={
-                            <ProtectedRoute role="client">
-                                <HistoriquePaiements />
-                            </ProtectedRoute>
-                        } />
+                            {/* Page Paiement */}
+                            <Route path="/paiement" element={<PaiementPage />} />
 
-                        {/* Dashboards Client avec redirection propre */}
-                        <Route path="/dashboard-client" element={
-                            <ProtectedRoute role="client">
-                                <DashboardClient />
-                            </ProtectedRoute>
-                        } />
-                        <Route path="/dashboard/client" element={<Navigate to="/dashboard-client" replace />} />
+                            {/* 🟢 PAGE RÉSERVATION */}
+                            <Route path="/reservation" element={<ReservationPage />} />
 
-                        {/* 🔵 PAGES SÉCURISÉES - FOURNISSEURS */}
-                        <Route path="/dashboard-fournisseur" element={
-                            <ProtectedRoute role="fournisseur">
-                                <DashboardFournisseur />
-                            </ProtectedRoute>
-                        } />
-                        <Route path="/dashboard/fournisseur" element={<Navigate to="/dashboard-fournisseur" replace />} />
+                            {/* 📍 PAGE DE SUIVI DE COMMANDE */}
+                            <Route path="/suivi-commande/:missionId" element={<OrderTracking />} />
 
-                        {/* 🔴 PAGES SÉCURISÉES - ADMIN */}
-                        <Route path="/admin" element={
-                            <ProtectedRoute role="admin">
-                                <DashboardAdmin />
-                            </ProtectedRoute>
-                        } />
+                            {/* 🟠 PAGES SÉCURISÉES - CLIENTS */}
+                            <Route path="/historique-paiements" element={
+                                <ProtectedRoute role="client">
+                                    <HistoriquePaiements />
+                                </ProtectedRoute>
+                            } />
 
-                        <Route path="/suivi-commande/:missionId" element={<OrderTracking />} />
+                            <Route path="/dashboard-client" element={
+                                <ProtectedRoute role="client">
+                                    <DashboardClient />
+                                </ProtectedRoute>
+                            } />
+                            <Route path="/dashboard/client" element={<Navigate to="/dashboard-client" replace />} />
 
-                        {/* 🔀 REDIRECTION PAR DÉFAUT */}
-                        <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
-                </div>
-            </NavigationProvider>
-        </PanierProvider>
+                            {/* 🔵 PAGES SÉCURISÉES - FOURNISSEURS */}
+                            <Route path="/dashboard-fournisseur" element={
+                                <ProtectedRoute role="fournisseur">
+                                    <DashboardFournisseur />
+                                </ProtectedRoute>
+                            } />
+                            <Route path="/dashboard/fournisseur" element={<Navigate to="/dashboard-fournisseur" replace />} />
+
+                            {/* 🔴 PAGES SÉCURISÉES - ADMIN */}
+                            <Route path="/admin" element={
+                                <ProtectedRoute role="admin">
+                                    <DashboardAdmin />
+                                </ProtectedRoute>
+                            } />
+
+                            {/* 🔀 REDIRECTION PAR DÉFAUT */}
+                            <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+                    </div>
+                </NavigationProvider>
+            </PanierProvider>
+        </AuthProvider>
     );
 }
