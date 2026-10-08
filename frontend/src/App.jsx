@@ -1,12 +1,12 @@
 // ============================================================
-// Fichier : src/App.jsx
+// Fichier : frontend/src/App.jsx
 // ============================================================
 
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
 // Providers et Contexts
-import { AuthProvider } from './context/AuthContext'; // 🔐 NOUVEAU : Ajout du AuthProvider obligatoire
+import { AuthProvider } from './context/AuthContext';
 import { PanierProvider } from './context/PanierContext';
 import { NavigationProvider } from './context/NavigationContext';
 
@@ -87,13 +87,15 @@ export default function App() {
                 <NavigationProvider>
                     <div className="min-h-screen bg-slate-950 font-sans text-slate-100 relative">
 
-                        {/* 🌐 BARRE D'EN-TÊTE GLOBALE */}
-                        <div className="bg-[#430fd1]/90 backdrop-blur-md border-b border-white/10 px-4 py-2 flex items-center justify-between sticky top-0 z-40">
+                        {/* 🌐 BARRE D'EN-TÊTE GLOBALE COMPACTE */}
+                        <div className="bg-[#061a3a] border-b border-white/10 px-4 py-2 flex items-center justify-between sticky top-0 z-40">
                             <div className="flex items-center gap-2">
                                 <span className="font-black tracking-wider text-[#13d484] text-sm">
                                     KANARI
                                 </span>
                             </div>
+
+                            {/* Bouton de traduction compact à droite */}
                             <AutoTranslator />
                         </div>
 
