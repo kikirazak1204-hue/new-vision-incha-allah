@@ -5,7 +5,8 @@ const multer = require('multer');
 // Configuration de Multer pour stocker temporairement les fichiers envoyés via le formulaire
 const upload = multer({ dest: 'uploads/' });
 
-const { protect } = require('../middleware/auth');
+// ✏️ MODIFIÉ : optionalProtect ajouté à l'import
+const { protect, optionalProtect } = require('../middleware/auth');
 const resController = require('../controllers/reservationController');
 
 // ════════════════════════════════════════════════════════════════
@@ -16,8 +17,9 @@ const resController = require('../controllers/reservationController');
 // ════════════════════════════════════════════════════════════════
 
 // ── Création de réservation (public ou connecté) avec support des fichiers (upload.any()) ──
-router.post('/global', upload.any(), resController.createGlobalReservation);
-router.post('/', upload.any(), resController.createGlobalReservation);
+// ✏️ MODIFIÉ : optionalProtect ajouté AVANT upload.any() sur les deux routes
+router.post('/global', optionalProtect, upload.any(), resController.createGlobalReservation);
+router.post('/', optionalProtect, upload.any(), resController.createGlobalReservation);
 
 // ── Espace Client ────────────────────────────────────────────────
 router.get('/mes-reservations', protect, resController.getMesReservations);

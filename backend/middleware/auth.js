@@ -27,10 +27,10 @@ const protect = async (req, res, next) => {
             role: user.role,
             nom: user.nom,
             email: user.email,
-            telephone: user.telephone,   // ajouté
-            ville: user.ville,           // ajouté
-            avatar: user.avatar,         // optionnel
-            verified: user.verified      // optionnel
+            telephone: user.telephone,
+            ville: user.ville,
+            avatar: user.avatar,
+            verified: user.verified
         };
 
         next();
@@ -38,6 +38,35 @@ const protect = async (req, res, next) => {
         console.error('Erreur vérification token:', error);
         return res.status(401).json({ success: false, message: 'Token invalide', error: error.message });
     }
+};
+
+// ➕ AJOUT : authentification OPTIONNELLE.
+// Remplit req.user si un token valide est présent ; sinon la requête
+// continue comme visiteur (route publique), sans jamais renvoyer d'erreur.
+const optionalProtect = async (req, res, next) => {
+    try {
+        const header = req.headers.authorization;
+        if (header && header.startsWith('Bearer')) {
+            const token = header.split(' ')[1];
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            const user = await User.findByPk(decoded.id);
+            if (user) {
+                req.user = {
+                    id: user.id,
+                    role: user.role,
+                    nom: user.nom,
+                    email: user.email,
+                    telephone: user.telephone,
+                    ville: user.ville,
+                    avatar: user.avatar,
+                    verified: user.verified
+                };
+            }
+        }
+    } catch (err) {
+        // Token invalide ou expiré : on continue en visiteur
+    }
+    next();
 };
 
 // 🔐 Middleware pour vérifier les rôles autorisés
@@ -53,4 +82,5 @@ const authorize = (...roles) => {
 // Alias pratique pour les routes admin-only
 const adminOnly = authorize('admin');
 
-module.exports = { protect, authorize, adminOnly };
+// ✏️ MODIFIÉ : optionalProtect ajouté à l'export
+module.exports = { protect, optionalProtect, authorize, adminOnly };
