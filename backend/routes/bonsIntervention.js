@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/auth');
+const { protect, adminOnly } = require('../middleware/auth');
 const {
     creerBonIntervention,
     getBonParReservation,
     validerBon,
+    validerBonParAdmin,
     getBonsEnAttenteValidation
 } = require('../controllers/bonInterventionController');
 
@@ -17,9 +18,10 @@ router.get('/reservation/:id', protect, getBonParReservation);
 // ── Client valide le bon (+ note optionnelle) ──
 router.put('/:id/valider', protect, validerBon);
 
+// ── Admin valide pour un client sans smartphone ──
+router.put('/:id/valider-admin', protect, adminOnly, validerBonParAdmin);
+
 // ── Liste des bons en attente depuis +24h (pour job auto) ──
 router.get('/en-attente', protect, getBonsEnAttenteValidation);
-
-router.put('/:id/valider-admin', protect, adminOnly, validerBonParAdmin);
 
 module.exports = router;
