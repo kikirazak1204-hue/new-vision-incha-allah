@@ -38,14 +38,16 @@ const createFournisseur = async (req, res) => {
         const {
             serviceId, nomEntreprise, telephone, adresse, quartier, secteur,
             description, hasTransport, hasMateriel,
-            anneesExperience, saitLireEcrire, referenceClient, immatriculation
+            anneesExperience, experience, saitLireEcrire, referenceClient, immatriculation,
+            typeProfil, ville, pays, langues, methodePaiement, numeroPaiement, devisePaiement,
+            serviceNames, branches, nif, rccm
         } = req.body;
 
         if (!userId) {
             return res.status(401).json({ success: false, message: 'Utilisateur non authentifié.' });
         }
         if (!serviceId || !nomEntreprise) {
-            return res.status(400).json({ success: false, message: 'Les champs userId et serviceId sont obligatoires.' });
+            return res.status(400).json({ success: false, message: 'Le service et le nom professionnel sont obligatoires.' });
         }
 
         const exist = await Fournisseur.findOne({ where: { userId } });
@@ -53,11 +55,29 @@ const createFournisseur = async (req, res) => {
             return res.status(409).json({ success: false, message: 'Vous avez déjà un profil prestataire.' });
         }
 
+        // Informations sans colonne dédiée : regroupées dans la description (lisible par l'admin)
+        let servicesTxt = '';
+        try { servicesTxt = JSON.parse(serviceNames || '[]').join(', '); } catch { servicesTxt = ''; }
+
+        let branchesTxt = '';
+        try { branchesTxt = JSON.parse(branches || '[]').join(', '); } catch { branchesTxt = ''; }
+
+        const descriptionComplete = [
+            description || '',
+            typeProfil ? `Profil : ${typeProfil}` : '',
+            servicesTxt ? `Services : ${servicesTxt}` : '',
+            branchesTxt ? `Spécialités : ${branchesTxt}` : '',
+            (ville || pays) ? `Lieu : ${[ville, pays].filter(Boolean).join(', ')}` : '',
+            langues ? `Langues : ${langues}` : '',
+            nif ? `NIF : ${nif}` : '',
+            rccm ? `RCCM : ${rccm}` : '',
+            methodePaiement ? `Paiement : ${methodePaiement} ${numeroPaiement || ''} (${devisePaiement || 'FCFA'})` : ''
+        ].filter(Boolean).join('\n');
+
         const cniRecto = req.files?.cniRecto?.[0]?.filename || null;
         const cniVerso = req.files?.cniVerso?.[0]?.filename || null;
         const selfie = req.files?.selfie?.[0]?.filename || null;
         const diplome = req.files?.diplome?.[0]?.filename || null;
-        const photoVehicule = req.files?.photoVehicule?.[0]?.filename || null;
         const carteProf = req.files?.carteProf?.[0]?.filename || null;
 
         const fournisseur = await Fournisseur.create({
@@ -68,7 +88,7 @@ const createFournisseur = async (req, res) => {
             quartier,
             secteur,
             telephone,
-            description,
+            description: descriptionComplete,
             hasTransport: hasTransport === 'true' || hasTransport === true,
             hasMateriel: hasMateriel === 'true' || hasMateriel === true,
             statut: 'EN_ATTENTE',
@@ -77,7 +97,7 @@ const createFournisseur = async (req, res) => {
             selfie,
             diplome,
             carteProf,
-            anneesExperience: anneesExperience || null,
+            anneesExperience: anneesExperience || experience || null,
             saitLireEcrire: saitLireEcrire || null,
             referenceClient: referenceClient || null,
             immatriculation: immatriculation || null,
@@ -160,7 +180,7 @@ const getFournisseursParService = async (req, res) => {
     }
 };
 
-// ── NOUVEAU : Récupérer produits par ID fournisseur ───────
+// ── Récupérer produits par ID fournisseur ───────
 const getProduitsByFournisseurId = async (req, res) => {
     try {
         const produits = await Produit.findAll({
@@ -173,7 +193,7 @@ const getProduitsByFournisseurId = async (req, res) => {
     }
 };
 
-// ── NOUVEAU : Récupérer un fournisseur par ID (L'ERREUR VENAIT D'ICI) ──
+// ── Récupérer un fournisseur par ID ──
 const getFournisseurById = async (req, res) => {
     try {
         const fournisseur = await Fournisseur.findByPk(req.params.id, {
@@ -201,5 +221,5 @@ module.exports = {
     getAllFournisseurs,
     getFournisseursParService,
     getProduitsByFournisseurId,
-    getFournisseurById // Ajouté ici pour corriger le plantage
+    getFournisseurById
 };
