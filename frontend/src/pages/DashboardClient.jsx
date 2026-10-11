@@ -4,6 +4,7 @@ import { getDashboardClient, getBonInterventionParReservation, validerBonInterve
 import { STATUT, STATUT_FALLBACK, STATUTS_ACTIFS } from '../constants/statuts';
 import BonInterventionPrint from '../components/BonInterventionPrint';
 import KanariGeoMap from '../components/KanariGeoMap';
+import MesAbonnements from '../components/MesAbonnements'; // ➕ AJOUT
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -205,21 +206,9 @@ function RemarqueModal({ mission, token, onClose, onSaved }) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// MODAL : BON D'INTERVENTION À VALIDER (cœur de la liaison client/fournisseur)
-//
-// Branché sur les VRAIES routes déjà existantes côté backend :
-//   GET  /api/bons-intervention/reservation/:id  → getBonInterventionParReservation
-//   PUT  /api/bons-intervention/:id/valider      → validerBonIntervention(bonId, {note, commentaire})
-//
-// Important : validerBon() côté backend attend l'ID DU BON (bon.id),
-// PAS l'ID de la réservation. Une note (1 à 5) est optionnelle mais,
-// si fournie, met à jour automatiquement la moyenne du fournisseur
-// (logique déjà gérée par le contrôleur — rien à recalculer ici).
-//
-// Cycle : le prestataire transmet un bon -> statut TERMINEE.
-// Le client voit ICI le détail exact (description, montants) transmis
-// par le prestataire, peut l'imprimer, noter la prestation, et doit
-// cliquer "Valider" pour clôturer réellement la mission -> VALIDEE.
+// MODAL : BON D'INTERVENTION À VALIDER
+//   GET  /api/bons-intervention/reservation/:id
+//   PUT  /api/bons-intervention/:id/valider  (ID DU BON, pas de la réservation)
 // ════════════════════════════════════════════════════════════════
 function BonAValiderModal({ mission, token, onClose, onValide }) {
     const [bon, setBon] = useState(null);
@@ -379,9 +368,7 @@ function BonAValiderModal({ mission, token, onClose, onValide }) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// ONGLET : OFFRES REÇUES — devis de plusieurs prestataires sur une
-// même demande en attente. Backend déjà existant (routes/devis.js),
-// il ne manquait que cet écran côté client.
+// ONGLET : OFFRES REÇUES — devis de plusieurs prestataires
 // ════════════════════════════════════════════════════════════════
 function CarteDevisReservation({ mission, token, onAccepte }) {
     const [devisListe, setDevisListe] = useState([]);
@@ -457,7 +444,8 @@ function CarteDevisReservation({ mission, token, onAccepte }) {
 }
 
 function OngletOffresRecues({ missions, token, onDevisAccepte }) {
-    const missionsEnAttente = missions.filter(m => m.statut === 'EN_ATTENTE' && !m.fournisseurId);
+    // ✏️ MODIFIÉ : les visites d'abonnement n'ont pas d'offres
+    const missionsEnAttente = missions.filter(m => m.statut === 'EN_ATTENTE' && !m.fournisseurId && !m.abonnementId);
 
     if (missionsEnAttente.length === 0) {
         return (
@@ -478,10 +466,7 @@ function OngletOffresRecues({ missions, token, onDevisAccepte }) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// ONGLET : MES REÇUS — réutilise le même document imprimable que le
-// bon d'intervention (BonInterventionPrint) pour chaque mission
-// clôturée. Pas de système séparé à maintenir : le bon d'intervention
-// validé EST le reçu de la prestation.
+// ONGLET : MES REÇUS
 // ════════════════════════════════════════════════════════════════
 function CarteRecu({ mission, token }) {
     const [bon, setBon] = useState(null);
@@ -561,9 +546,8 @@ function OngletRecus({ missions, token }) {
     );
 }
 
-/// ════════════════════════════════════════════════════════════════
-// ONGLET : MON PROFIL — réellement modifiable, branché sur
-// PUT /api/users/:id (backend/routes/users.js).
+// ════════════════════════════════════════════════════════════════
+// ONGLET : MON PROFIL — PUT /api/users/:id
 // ════════════════════════════════════════════════════════════════
 function OngletProfilClient({ currentUser = {}, onProfilMisAJour }) {
     const [form, setForm] = useState({
@@ -746,9 +730,9 @@ export default function DashboardClient() {
     const missionsActives = missionsList.filter(m => STATUTS_ACTIFS?.includes(m?.statut));
     const missionsAValider = missionsList.filter(m => m?.statut === 'TERMINEE');
     const missionsTerminees = missionsList.filter(m => m?.statut === 'VALIDEE');
-    const missionsEnAttenteOffres = missionsList.filter(m => m?.statut === 'EN_ATTENTE' && !m?.fournisseurId);
-    
-    // ✅ Utilisation cohérente de montantTotal pour les réservations
+    // ✏️ MODIFIÉ : les visites d'abonnement sont exclues des offres
+    const missionsEnAttenteOffres = missionsList.filter(m => m?.statut === 'EN_ATTENTE' && !m?.fournisseurId && !m?.abonnementId);
+
     const toutesTransactions = missionsList.filter(m => Number(m?.montantTotal || m?.montant || 0) > 0);
     const totalDepense = toutesTransactions.filter(m => m?.statutPaiement === 'paye').reduce((acc, m) => acc + Number(m?.montantTotal || m?.montant || 0), 0);
 
@@ -756,6 +740,7 @@ export default function DashboardClient() {
         { id: 'overview', label: 'Vue d\'ensemble', icon: '' },
         { id: 'missions', label: 'Mes Réservations', icon: '', badge: missionsActives.length + missionsAValider.length },
         { id: 'offres', label: 'Offres reçues', icon: '', badge: missionsEnAttenteOffres.length },
+        { id: 'abonnements', label: 'Mes abonnements', icon: '' }, // ➕ AJOUT
         { id: 'recus', label: 'Mes Reçus', icon: '', badge: missionsTerminees.length },
         { id: 'paiements', label: 'Paiements & Transactions', icon: '', badge: toutesTransactions.length },
         { id: 'profil', label: 'Mon Profil', icon: '' },
@@ -927,7 +912,8 @@ export default function DashboardClient() {
                                     <div key={m?.id} className="bg-white border border-slate-200 rounded-3xl p-6 space-y-4">
                                         <div className="flex justify-between items-start">
                                             <div>
-                                                <span className="text-xs font-bold text-purple-400">#{m?.id} - {m?.service?.nom || m?.serviceNom || 'Service'}</span>
+                                                {/* ✏️ MODIFIÉ : étiquette « Abonnement » */}
+                                                <span className="text-xs font-bold text-purple-400">#{m?.id} - {m?.service?.nom || m?.serviceNom || 'Service'}{m?.abonnementId && <span className="ml-2 px-2 py-0.5 rounded-md bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200 text-[10px]">Abonnement</span>}</span>
                                                 <h4 className="font-extrabold text-[#061a3a] text-lg mt-0.5">{m?.prestataire?.nomEntreprise || 'Prestataire en attente'}</h4>
                                             </div>
                                             <StatutBadge statut={m?.statut} />
@@ -964,6 +950,9 @@ export default function DashboardClient() {
                         onDevisAccepte={() => chargerDashboard(true)}
                     />
                 )}
+
+                {/* ➕ AJOUT : onglet abonnements */}
+                {activeTab === 'abonnements' && <MesAbonnements />}
 
                 {activeTab === 'recus' && (
                     <OngletRecus missions={missionsList} token={token} />
