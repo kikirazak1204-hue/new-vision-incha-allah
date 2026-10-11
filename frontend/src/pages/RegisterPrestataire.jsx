@@ -1,21 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { getServices, registerUser, registerFournisseur } from '../util/api';
+import { branchesDuService } from '../constants/branches';
 
 /*
   KANARI — inscription simple et fiable
-  Principes :
-  - Un profil peut choisir PLUSIEURS services.
+  - Un profil peut choisir PLUSIEURS services (tous types de profil).
+  - Chaque service coché propose ses spécialités (branches).
   - Les champs secondaires restent optionnels au premier passage.
-  - Les documents de transport ne sont demandés que pour les activités
-    Livraison / Transport (ou un service dont le nom contient ces mots).
-  - Les informations manquantes peuvent être complétées plus tard par Kanari.
-  - Le contrat dépend du type de profil et sa version est envoyée au backend.
-
-  ✅ CORRIGÉ : le textarea de description et trois labels de cases à
-  cocher n'avaient aucune couleur de texte explicite. Le reste de
-  l'application étant en thème sombre, ces éléments héritaient d'une
-  couleur de texte claire par défaut — invisible sur ce formulaire à
-  fond blanc. Chaque élément texte a maintenant une couleur explicite.
+  - Documents de transport demandés seulement pour Livraison / Transport.
 */
 
 const TYPES = {
@@ -98,7 +90,7 @@ const Select = ({ label, name, value, onChange, required = false, children }) =>
       value={value}
       onChange={onChange}
       required={required}
-      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm !text-[#061a3a] placeholder:!text-slate-400 outline-none focus:border-amber-400"
+      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm !text-[#061a3a] outline-none focus:border-amber-400"
     >
       {children}
     </select>
@@ -160,8 +152,6 @@ function Title({ n, title, desc }) {
   );
 }
 
-// Case à cocher réutilisable — texte toujours explicitement coloré,
-// jamais dépendant d'un thème hérité.
 const CheckboxLine = ({ checked, onChange, name, children }) => (
   <label className="flex gap-3 text-sm leading-6 text-slate-700">
     <input
@@ -178,7 +168,6 @@ const CheckboxLine = ({ checked, onChange, name, children }) => (
 export default function RegisterPartenaireKanari({ setCurrentView }) {
   const [step, setStep] = useState(1);
   const [services, setServices] = useState([]);
-  const [selectedServiceNames, setSelectedServiceNames] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
@@ -196,6 +185,7 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
     adresse: '',
     langues: '',
     serviceIds: [],
+    branches: [],
     nomEntreprise: '',
     statutJuridique: '',
     nif: '',
@@ -234,6 +224,14 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
   const contract = CONTRACTS[form.typeProfil];
   const international = form.pays !== 'Niger';
 
+  // Les noms des services cochés sont dérivés des identifiants (toujours cohérents)
+  const selectedServiceNames = useMemo(
+    () => form.serviceIds
+      .map((id) => services.find((s) => String(s.id) === String(id))?.nom)
+      .filter(Boolean),
+    [form.serviceIds, services]
+  );
+
   const transportRequired = useMemo(() => {
     const text = selectedServiceNames.join(' ').toLowerCase();
     return /transport|livraison|chauffeur|taxi|moto|coursier|logistique/.test(text);
@@ -241,7 +239,7 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
 
   const diplomaPossible = useMemo(() => {
     const text = selectedServiceNames.join(' ').toLowerCase();
-    return /médecin|docteur|avocat|enseignant|professeur|comptable|architecte|ingénieur|pharmacien|infirmier|notaire/.test(text);
+    return /médecin|medecine|docteur|avocat|juridique|enseignant|education|professeur|comptable|architecte|ingénieur|pharmacien|infirmier|notaire/.test(text);
   }, [selectedServiceNames]);
 
   const change = (e) => {
@@ -258,13 +256,19 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
     setForm((p) => {
       const exists = p.serviceIds.some((x) => String(x) === String(id));
       const next = exists ? p.serviceIds.filter((x) => String(x) !== String(id)) : [...p.serviceIds, id];
-      return { ...p, serviceIds: next };
+      // Si on décoche un service, on retire aussi ses spécialités
+      const branches = exists && service
+        ? p.branches.filter((b) => !b.startsWith(`${service.nom} / `))
+        : p.branches;
+      return { ...p, serviceIds: next, branches };
     });
-    setSelectedServiceNames((current) => {
-      if (!service) return current;
-      const exists = form.serviceIds.some((x) => String(x) === String(id));
-      return exists ? current.filter((x) => x !== service.nom) : [...current, service.nom];
-    });
+  };
+
+  const toggleBranche = (cle) => {
+    setForm((p) => ({
+      ...p,
+      branches: p.branches.includes(cle) ? p.branches.filter((x) => x !== cle) : [...p.branches, cle],
+    }));
   };
 
   const file = (key) => (e) => setFiles((p) => ({ ...p, [key]: e.target.files?.[0] || null }));
@@ -273,7 +277,7 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
     if (step === 1 && (!form.nom || !form.telephone || !form.password)) {
       return 'Nom, téléphone et mot de passe sont obligatoires.';
     }
-    if (step === 2 && form.typeProfil === 'prestataire' && form.serviceIds.length === 0) {
+    if (step === 2 && form.serviceIds.length === 0) {
       return 'Sélectionnez au moins un service.';
     }
     if (step === 2 && !form.nomEntreprise) return 'Indiquez au moins votre nom professionnel ou votre activité.';
@@ -329,13 +333,16 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
       data.append('userId', auth.user.id);
 
       Object.entries(form).forEach(([key, value]) => {
-        if (key === 'password' || key === 'serviceIds') return;
+        if (key === 'password' || key === 'serviceIds' || key === 'branches') return;
         if (value !== '' && value != null) data.append(key, String(value));
       });
 
       form.serviceIds.forEach((id) => data.append('serviceIds[]', String(id)));
       data.append('serviceIds', JSON.stringify(form.serviceIds));
       data.append('serviceNames', JSON.stringify(selectedServiceNames));
+      data.append('branches', JSON.stringify(form.branches));
+      // ✅ Le serveur exige serviceId (singulier) : on envoie le premier service
+      if (form.serviceIds[0] != null) data.append('serviceId', String(form.serviceIds[0]));
 
       data.append('contractType', form.typeProfil);
       data.append('contractVersion', '1.1');
@@ -368,7 +375,7 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
   const steps = ['Compte', 'Services', 'Localisation', 'Vérification', 'Paiement', 'Contrat'];
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8">
+    <div className="min-h-screen bg-slate-50 px-4 py-8 text-[#061a3a]">
       <div className="mx-auto max-w-5xl overflow-hidden rounded-3xl bg-white shadow-xl">
         <header className="bg-[#061a3a] px-6 py-7 text-white md:px-10">
           <div className="flex items-center justify-between gap-4">
@@ -422,32 +429,56 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
 
           {step === 2 && (
             <>
-              <Title n="02 — SERVICES" title="Que proposez-vous ?" desc="Vous pouvez sélectionner plusieurs services. Ne remplissez pas ce qui ne vous concerne pas." />
-              {form.typeProfil === 'prestataire' && (
-                <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-slate-700">
-                  <b className="text-[#061a3a]">Plusieurs services autorisés :</b> sélectionnez tous les métiers que vous pouvez réellement assurer.
-                </div>
-              )}
+              <Title n="02 — SERVICES" title="Que proposez-vous ?" desc="Vous pouvez sélectionner plusieurs services, puis préciser vos spécialités pour chacun." />
 
-              {form.typeProfil === 'prestataire' && (
-                <div className="grid max-h-80 gap-3 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
-                  {services.length ? services.map((s) => {
-                    const active = form.serviceIds.some((id) => String(id) === String(s.id));
-                    return (
-                      <label key={s.id} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 ${active ? 'border-amber-400 bg-white' : 'border-slate-200 bg-white'}`}>
-                        <input type="checkbox" checked={active} onChange={() => toggleService(s.id)} className="h-5 w-5 accent-amber-400" />
-                        <span className="text-sm font-semibold text-slate-700">{s.nom}</span>
-                      </label>
-                    );
-                  }) : <p className="text-sm text-slate-500">Impossible de charger les services. Vérifiez l’API.</p>}
-                </div>
-              )}
+              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-slate-700">
+                <b className="text-[#061a3a]">Plusieurs services autorisés :</b> sélectionnez tous les métiers ou activités que vous pouvez réellement assurer.
+              </div>
+
+              <div className="grid max-h-80 gap-3 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
+                {services.length ? services.map((s) => {
+                  const active = form.serviceIds.some((id) => String(id) === String(s.id));
+                  return (
+                    <label key={s.id} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 ${active ? 'border-amber-400 bg-white' : 'border-slate-200 bg-white'}`}>
+                      <input type="checkbox" checked={active} onChange={() => toggleService(s.id)} className="h-5 w-5 accent-amber-400" />
+                      <span className="text-sm font-semibold text-slate-700">{s.emoji ? `${s.emoji} ` : ''}{s.nom}</span>
+                    </label>
+                  );
+                }) : <p className="text-sm text-slate-500">Impossible de charger les services. Vérifiez l’API.</p>}
+              </div>
 
               {selectedServiceNames.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-2">
                   {selectedServiceNames.map((name) => <span key={name} className="rounded-full bg-[#061a3a] px-3 py-1 text-xs font-bold text-white">{name}</span>)}
                 </div>
               )}
+
+              {/* Spécialités (branches) de chaque service coché */}
+              {selectedServiceNames.map((nom) => {
+                const liste = branchesDuService(nom);
+                if (!liste.length) return null;
+                return (
+                  <div key={nom} className="mt-4 rounded-xl border border-slate-200 p-4">
+                    <p className="mb-2 text-sm font-bold text-[#061a3a]">{nom} : vos spécialités</p>
+                    <div className="flex flex-wrap gap-2">
+                      {liste.map((b) => {
+                        const cle = `${nom} / ${b}`;
+                        const actif = form.branches.includes(cle);
+                        return (
+                          <button
+                            key={cle}
+                            type="button"
+                            onClick={() => toggleBranche(cle)}
+                            className={`rounded-full border px-3 py-1 text-xs font-bold ${actif ? 'border-amber-400 bg-amber-50 text-[#061a3a]' : 'border-slate-200 bg-white text-slate-600'}`}
+                          >
+                            {actif ? '✓ ' : ''}{b}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
 
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 <Input label="Nom professionnel / activité" name="nomEntreprise" value={form.nomEntreprise} onChange={change} required placeholder="Ex. Abdo Électricité" />
@@ -469,12 +500,10 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
                 </Select>
                 <Input label="NIF" name="nif" value={form.nif} onChange={change} placeholder="Optionnel au départ" />
                 <Input label="RCCM" name="rccm" value={form.rccm} onChange={change} placeholder="Optionnel au départ" />
-                {/* ✅ CORRIGÉ : label sans couleur de texte explicite ajoutée */}
                 <label className="flex items-center rounded-xl border border-slate-200 p-4 text-sm font-semibold text-slate-700">
                   <input type="checkbox" name="hasMateriel" checked={form.hasMateriel} onChange={change} className="mr-3 h-5 w-5 accent-amber-400" /> Matériel disponible
                 </label>
                 <div className="md:col-span-2">
-                  {/* ✅ CORRIGÉ : textarea remplacé par le composant Textarea avec couleur explicite */}
                   <Textarea
                     name="description"
                     value={form.description}
@@ -531,6 +560,9 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
                     <FileBox label="Justificatif d'entreprise / activité" file={files.justificatifEntreprise} onChange={file('justificatifEntreprise')} hint="Optionnel au premier passage" />
                     <FileBox label="Document fiscal / registre" file={files.documentFiscal} onChange={file('documentFiscal')} hint="NIF, RCCM ou équivalent — optionnel au départ" />
                     <FileBox label="Catalogue / offre commerciale" file={files.catalogue} onChange={file('catalogue')} hint="Optionnel" />
+                    {transportRequired && (
+                      <FileBox label="Photo du véhicule" file={files.vehicule} onChange={file('vehicule')} required hint="Obligatoire pour Transport / Livraison" />
+                    )}
                   </>
                 )}
               </div>
@@ -553,9 +585,6 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
                   <option>FCFA</option><option>EUR</option><option>USD</option><option>Autre</option>
                 </Select>
               </div>
-              <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-slate-700">
-                <b className="text-[#061a3a]">Important :</b> ces cartes sont des repères visuels intégrés à l’interface. Si Kanari dispose des logos officiels des opérateurs, remplacez le carré avec la lettre par leur image officielle dans <code>PaymentCard</code>.
-              </div>
             </>
           )}
 
@@ -573,7 +602,6 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
                     {contract.clauses.map((c, i) => <li key={i}><b className="mr-2 text-amber-500">{i + 1}.</b>{c}</li>)}
                   </ol>
                 </div>
-                {/* ✅ CORRIGÉ : CheckboxLine garantit un texte toujours visible */}
                 <div className="border-t bg-slate-50 p-5">
                   <CheckboxLine
                     checked={form.accepteContrat}
