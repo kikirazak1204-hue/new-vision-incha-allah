@@ -399,3 +399,109 @@ export const updateSetting = (cle, { valeur, motif }) =>
 
 export const getHistoriqueSetting = (cle) =>
   request(`/api/settings/${cle}/historique`, { headers: authHeaders() });
+
+// ============================================================
+// 🔁 ABONNEMENTS — CLIENT
+// ============================================================
+export const demanderAbonnement = (payload) =>
+  request('/api/abonnements', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+export const getMesAbonnements = () =>
+  request('/api/abonnements/mes', { headers: authHeaders() });
+
+const actionAbonnement = (id, action) =>
+  request(`/api/abonnements/${id}/${action}`, {
+    method: 'PUT',
+    headers: authHeaders(),
+  });
+
+export const accepterAbonnement = (id) => actionAbonnement(id, 'accepter');
+export const refuserAbonnement = (id) => actionAbonnement(id, 'refuser');
+export const pauseAbonnement = (id) => actionAbonnement(id, 'pause');
+export const reprendreAbonnement = (id) => actionAbonnement(id, 'reprendre');
+export const resilierAbonnement = (id) => actionAbonnement(id, 'resilier');
+
+// ============================================================
+// 🔁 ABONNEMENTS — ADMIN
+// ============================================================
+export const getAdminAbonnements = (statut = '') =>
+  request(`/api/abonnements/admin/liste${statut ? `?statut=${statut}` : ''}`, {
+    headers: authHeaders(),
+  });
+
+export const getAdminAbonnement = (id) =>
+  request(`/api/abonnements/admin/${id}`, { headers: authHeaders() });
+
+export const adminCreerAbonnement = (payload) =>
+  request('/api/abonnements/admin/creer', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+export const adminModifierAbonnement = (id, payload) =>
+  request(`/api/abonnements/admin/${id}`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+export const adminAjouterPrestataireAbonnement = (id, fournisseurId) =>
+  request(`/api/abonnements/admin/${id}/prestataires`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ fournisseurId }),
+  });
+
+export const adminRetirerPrestataireAbonnement = (id, fournisseurId) =>
+  request(`/api/abonnements/admin/${id}/prestataires/${fournisseurId}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+
+export const adminEnregistrerVersement = (id, payload) =>
+  request(`/api/abonnements/admin/${id}/versements`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+export const adminMarquerAbsence = (reservationId, payload) =>
+  request(`/api/abonnements/admin/visites/${reservationId}/absence`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+export const adminCalculerReglement = (id, debut, fin, brut = '') =>
+  request(`/api/abonnements/admin/${id}/reglement?debut=${debut}&fin=${fin}${brut !== '' ? `&brut=${brut}` : ''}`, {
+    headers: authHeaders(),
+  });
+
+export const adminEnregistrerReglement = (id, payload) =>
+  request(`/api/abonnements/admin/${id}/reglement`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+export const adminPayerReglement = (reglementId, modePaiement, note = '') =>
+  request(`/api/abonnements/admin/reglements/${reglementId}/payer`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ modePaiement, note }),
+  });
+
+// ============================================================
+// ✅ VALIDATION D'UN BON PAR L'ADMIN (client sans smartphone)
+// ============================================================
+export const validerBonInterventionAdmin = (bonId, { note, commentaire } = {}) =>
+  request(`/api/bons-intervention/${bonId}/valider-admin`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ note, commentaire }),
+  });
