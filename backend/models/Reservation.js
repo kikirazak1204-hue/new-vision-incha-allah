@@ -159,6 +159,13 @@ const Reservation = sequelize.define('Reservation', {
         type: DataTypes.STRING,
         allowNull: true
     },
+    
+        // ➕ Abonnement
+    abonnementId: { type: DataTypes.INTEGER, allowNull: true },
+    fournisseurPrevuId: { type: DataTypes.INTEGER, allowNull: true },   // prestataire prévu (reste identifiable)
+    absent: { type: DataTypes.BOOLEAN, defaultValue: false },
+    motifAbsence: { type: DataTypes.TEXT, allowNull: true },
+    demarreLe: { type: DataTypes.DATE, allowNull: true },               // heure réelle de démarrage (ponctualité)
 
     refusePar: {
         type: DataTypes.INTEGER,

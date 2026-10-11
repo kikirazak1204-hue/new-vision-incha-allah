@@ -88,7 +88,7 @@ app.use('/api/soldes', require('./routes/soldes'));
 app.use('/api/missions', require('./routes/missions'));
 app.use('/api/whatsapp', require('./routes/whatsapp'));
 app.use('/api/settings', require('./routes/settings'));
-
+app.use('/api/abonnements', require('./routes/abonnements'));
 // ==========================================
 // 5. GESTION DES ROUTES INEXISTANTES (404)
 // ==========================================
@@ -154,6 +154,12 @@ const repairDatabase = async () => {
         // ── Confirmées manquantes par les logs de production (09/09) ──
         "ALTER TABLE reservations ADD COLUMN commentaireGlobal TEXT;",
         "ALTER TABLE paiements ADD COLUMN reservationId INT;",
+                "ALTER TABLE reservations ADD COLUMN abonnementId INT;",
+        "ALTER TABLE reservations ADD COLUMN fournisseurPrevuId INT;",
+        "ALTER TABLE reservations ADD COLUMN absent BOOLEAN DEFAULT false;",
+        "ALTER TABLE reservations ADD COLUMN motifAbsence TEXT;",
+        "ALTER TABLE reservations ADD COLUMN demarreLe DATETIME;",
+        "ALTER TABLE bons_intervention ADD COLUMN valideParAdmin BOOLEAN DEFAULT false;",
         // ── Colonnes bons_intervention ──
         "ALTER TABLE bons_intervention ADD COLUMN tauxCommissionApplique DECIMAL(5,2) DEFAULT 0;",
         "ALTER TABLE bons_intervention ADD COLUMN montantCommission DECIMAL(10,2) DEFAULT 0;",
@@ -194,6 +200,12 @@ const demarrerJobAutoValidation = () => {
             console.error('[auto-validation] Erreur lors du passage planifié :', err.message)
         );
     }, INTERVALLE_JOB_MS);
+        setTimeout(() => {
+        runCreerVisitesAbonnements().catch(err => console.error('[abonnements] Erreur passage initial :', err.message));
+    }, 20_000);
+    setInterval(() => {
+        runCreerVisitesAbonnements().catch(err => console.error('[abonnements] Erreur passage planifié :', err.message));
+    }, INTERVALLE_JOB_MS);
 
     console.log(`⏱️ Job de validation automatique des bons d'intervention planifié (toutes les ${INTERVALLE_JOB_MS / 60000} min).`);
 };
@@ -202,6 +214,8 @@ const demarrerJobAutoValidation = () => {
 // 7. INITIALISATION ET DÉMARRAGE
 // ==========================================
 const PORT = process.env.PORT || 5000;
+
+const { runCreerVisitesAbonnements } = require('./jobs/creerVisitesAbonnements');
 
 const startServer = async () => {
     try {

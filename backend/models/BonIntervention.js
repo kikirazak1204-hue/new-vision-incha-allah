@@ -72,6 +72,8 @@ const BonIntervention = sequelize.define('BonIntervention', {
         defaultValue: false
     },
 
+        valideParAdmin: { type: DataTypes.BOOLEAN, defaultValue: false },
+
     note: {
         type: DataTypes.INTEGER,
         allowNull: true,

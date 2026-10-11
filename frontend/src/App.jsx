@@ -35,6 +35,7 @@ import PanierPage from './pages/PanierPage';
 import ProduitsParService from './pages/ProduitsParService';
 import VoirProduits from './pages/VoirProduitsPage';
 import OrderTracking from './components/OrderTracking';
+import NotificationsInit from './components/NotificationsInit';
 
 export default function App() {
     const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -101,6 +102,8 @@ export default function App() {
 
                         {/* 📍 BARRE DE GÉOLOCALISATION GLOBALE */}
                         <GlobalLocationBar />
+
+                        <NotificationsInit />
 
                         {/* BOUTON D'INSTALLATION PWA */}
                         {showInstallBtn && (

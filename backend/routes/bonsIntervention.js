@@ -20,4 +20,6 @@ router.put('/:id/valider', protect, validerBon);
 // ── Liste des bons en attente depuis +24h (pour job auto) ──
 router.get('/en-attente', protect, getBonsEnAttenteValidation);
 
+router.put('/:id/valider-admin', protect, adminOnly, validerBonParAdmin);
+
 module.exports = router;

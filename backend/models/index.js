@@ -16,6 +16,7 @@ const Retrait = require('./Retrait');
 const Devis = require('./Devis');
 const BonIntervention = require('./BonIntervention');
 const Setting = require('./Setting');
+const { Abonnement, AbonnementPrestataire, AbonnementVersement, AbonnementReglement } = require('./AbonnementModels');
 // Correction de la casse pour Render (h minuscule correspondant au fichier Git)
 const SettingHistory = require('./Settinghistory'); 
 
@@ -119,7 +120,23 @@ BonIntervention.belongsTo(Fournisseur, { foreignKey: 'fournisseurId', as: 'fourn
 // ==========================================
 User.hasMany(SettingHistory, { foreignKey: 'modifiePar', as: 'modificationsParametres' });
 SettingHistory.belongsTo(User, { foreignKey: 'modifiePar', as: 'auteur' });
+// ==========================================
+// Abonnements
+// ==========================================
+Abonnement.belongsTo(User, { foreignKey: 'clientId', as: 'client' });
+Abonnement.hasMany(Reservation, { foreignKey: 'abonnementId', as: 'visites', constraints: false });
+Reservation.belongsTo(Abonnement, { foreignKey: 'abonnementId', as: 'abonnement', constraints: false });
 
+Abonnement.hasMany(AbonnementPrestataire, { foreignKey: 'abonnementId', as: 'prestataires' });
+AbonnementPrestataire.belongsTo(Abonnement, { foreignKey: 'abonnementId', as: 'abonnement' });
+AbonnementPrestataire.belongsTo(Fournisseur, { foreignKey: 'fournisseurId', as: 'fournisseur' });
+
+Abonnement.hasMany(AbonnementVersement, { foreignKey: 'abonnementId', as: 'versements' });
+AbonnementVersement.belongsTo(Abonnement, { foreignKey: 'abonnementId', as: 'abonnement' });
+
+Abonnement.hasMany(AbonnementReglement, { foreignKey: 'abonnementId', as: 'reglements' });
+AbonnementReglement.belongsTo(Abonnement, { foreignKey: 'abonnementId', as: 'abonnement' });
+AbonnementReglement.belongsTo(Fournisseur, { foreignKey: 'fournisseurId', as: 'fournisseur' });
 // 3. Export global
 module.exports = {
   sequelize,

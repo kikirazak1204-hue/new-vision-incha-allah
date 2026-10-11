@@ -12,8 +12,9 @@ router.put('/fcm-token', protect, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Le token FCM est requis' });
         }
 
+        // ✏️ CORRIGÉ : le champ du modèle s'appelle fcmToken (colonne fcm_token)
         await User.update(
-            { fcm_token },
+            { fcmToken: fcm_token },
             { where: { id: req.user.id } }
         );
 
@@ -76,12 +77,15 @@ router.put('/:id', protect, async (req, res) => {
             return res.status(404).json({ success: false, message: 'Utilisateur non trouvé' });
         }
 
-        // Interdire la modification du rôle sauf pour admin
-        if (req.body.role && !isAdmin) {
-            delete req.body.role;
-        }
+        // ✏️ MODIFIÉ : seuls ces champs peuvent être changés (plus de update(req.body))
+        const CHAMPS_AUTORISES = ['nom', 'prenom', 'email', 'telephone', 'ville'];
+        const donnees = {};
+        CHAMPS_AUTORISES.forEach((c) => {
+            if (req.body[c] !== undefined) donnees[c] = req.body[c];
+        });
+        if (isAdmin && req.body.role) donnees.role = req.body.role;
 
-        const updated = await user.update(req.body);
+        const updated = await user.update(donnees);
         const userResponse = updated.toJSON();
         delete userResponse.password;
 

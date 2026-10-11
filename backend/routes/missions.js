@@ -127,6 +127,8 @@ router.put('/:id/demarrer', protect, checkFournisseur, async (req, res) => {
         console.error(err);
         res.status(500).json({ success: false, message: 'Erreur serveur.' });
     }
+
+    await mission.update({ statut: 'EN_COURS', demarreLe: new Date() });
 });
 
 // PUT /api/missions/:id/terminer — Fournisseur marque la mission terminée

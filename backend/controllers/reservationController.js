@@ -190,7 +190,8 @@ exports.getReservationsDisponibles = async (req, res) => {
             where: {
                 statut: 'EN_ATTENTE',
                 fournisseurId: null,
-                serviceId: fournisseur.serviceId
+                serviceId: fournisseur.serviceId,
+                abonnementId: null
             },
             order: [['createdAt', 'DESC']]
         });
