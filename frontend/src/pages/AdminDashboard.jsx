@@ -8,6 +8,7 @@ import ParametresAdmin from '../components/admin/ParametresAdmin';
 import AbonnementsAdmin from '../components/admin/AbonnementsAdmin';
 import AdminLiveDispatch from './AdminLiveDispatch';
 import PaiementAdmin from '../components/admin/PaiementAdmin';
+import ServicesAdmin from '../components/admin/ServicesAdmin';
 
 export default function AdminDashboard() {
   const [tab, setTab] = useState('reservations');
@@ -15,6 +16,7 @@ export default function AdminDashboard() {
   const menuItems = [
     { id: 'reservations', label: 'Missions', color: 'from-pink-600 to-rose-500' },
     { id: 'abonnements', label: 'Abonnements', color: 'from-fuchsia-600 to-purple-500' },
+    { id: 'services', label: 'Services', color: 'from-teal-600 to-cyan-500' },
     { id: 'live-gps', label: '📍 Tour de Contrôle', color: 'from-amber-400 to-orange-500' },
     { id: 'validations', label: 'Validations', color: 'from-blue-600 to-cyan-500' },
     { id: 'utilisateurs', label: 'Utilisateurs', color: 'from-purple-600 to-indigo-500' },
@@ -35,6 +37,7 @@ export default function AdminDashboard() {
       case 'paiements': return 'Paiements';
       case 'produits': return 'Produits';
       case 'parametres': return 'Paramètres';
+      case 'services': return 'Services et branches';
       default: return 'Administration';
     }
   };
@@ -105,6 +108,7 @@ export default function AdminDashboard() {
           {tab === 'paiements' && <PaiementAdmin />}
           {tab === 'produits' && <ProduitsAdmin />}
           {tab === 'parametres' && <ParametresAdmin />}
+          {tab === 'services' && <ServicesAdmin />}
         </div>
       </main>
     </div>

@@ -89,6 +89,7 @@ app.use('/api/missions', require('./routes/missions'));
 app.use('/api/whatsapp', require('./routes/whatsapp'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/abonnements', require('./routes/abonnements'));
+app.use('/api/branches', require('./routes/branches'));
 // ==========================================
 // 5. GESTION DES ROUTES INEXISTANTES (404)
 // ==========================================

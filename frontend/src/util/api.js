@@ -505,3 +505,17 @@ export const validerBonInterventionAdmin = (bonId, { note, commentaire } = {}) =
     headers: authHeaders(),
     body: JSON.stringify({ note, commentaire }),
   });
+
+  export const getBranches = (serviceId = '') =>
+  request(`/api/branches${serviceId ? `?serviceId=${serviceId}` : ''}`);
+export const setMesBranches = (brancheIds) =>
+  request('/api/branches/mes', { method: 'PUT', headers: authHeaders(), body: JSON.stringify({ brancheIds }) });
+export const getAdminBranches = () => request('/api/branches/admin/tout', { headers: authHeaders() });
+export const adminCreerService = (p) =>
+  request('/api/branches/admin/service', { method: 'POST', headers: authHeaders(), body: JSON.stringify(p) });
+export const adminModifierService = (id, p) =>
+  request(`/api/branches/admin/service/${id}`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify(p) });
+export const adminCreerBranche = (p) =>
+  request('/api/branches/admin/branche', { method: 'POST', headers: authHeaders(), body: JSON.stringify(p) });
+export const adminModifierBranche = (id, p) =>
+  request(`/api/branches/admin/branche/${id}`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify(p) });

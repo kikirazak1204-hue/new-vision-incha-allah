@@ -17,6 +17,7 @@ const Devis = require('./Devis');
 const BonIntervention = require('./BonIntervention');
 const Setting = require('./Setting');
 const { Abonnement, AbonnementPrestataire, AbonnementVersement, AbonnementReglement } = require('./AbonnementModels');
+const { ServiceBranche, FournisseurBranche } = require('./BranchesModels');
 // Correction de la casse pour Render (h minuscule correspondant au fichier Git)
 const SettingHistory = require('./Settinghistory');
 
@@ -117,6 +118,13 @@ AbonnementVersement.belongsTo(Abonnement, { foreignKey: 'abonnementId', as: 'abo
 Abonnement.hasMany(AbonnementReglement, { foreignKey: 'abonnementId', as: 'reglements' });
 AbonnementReglement.belongsTo(Abonnement, { foreignKey: 'abonnementId', as: 'abonnement' });
 AbonnementReglement.belongsTo(Fournisseur, { foreignKey: 'fournisseurId', as: 'fournisseur' });
+
+// Branches
+Service.hasMany(ServiceBranche, { foreignKey: 'serviceId', as: 'branches' });
+ServiceBranche.belongsTo(Service, { foreignKey: 'serviceId', as: 'service' });
+FournisseurBranche.belongsTo(ServiceBranche, { foreignKey: 'brancheId', as: 'branche' });
+FournisseurBranche.belongsTo(Fournisseur, { foreignKey: 'fournisseurId', as: 'fournisseur' });
+Fournisseur.hasMany(FournisseurBranche, { foreignKey: 'fournisseurId', as: 'branchesChoisies' }); 
 
 // 3. Export global
 module.exports = {
