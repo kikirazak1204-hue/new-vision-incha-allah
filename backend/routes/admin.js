@@ -123,7 +123,6 @@ router.put('/fournisseurs/:id/statut', protect, adminOnly, async (req, res) => {
 // 📅 GESTION DES RÉSERVATIONS (MISSIONS KANARI)
 // ============================================================
 
-// 🟢 GET /api/admin/reservations
 router.get('/reservations', protect, adminOnly, async (req, res) => {
     try {
         const reservations = await Reservation.findAll({
@@ -136,7 +135,6 @@ router.get('/reservations', protect, adminOnly, async (req, res) => {
     }
 });
 
-// 🟢 PATCH /api/admin/reservations/:id/statut
 router.patch('/reservations/:id/statut', protect, adminOnly, async (req, res) => {
     try {
         const { statut: rawStatut } = req.body;
@@ -156,19 +154,6 @@ router.patch('/reservations/:id/statut', protect, adminOnly, async (req, res) =>
     }
 });
 
-// 🟢 PUT /api/admin/reservations/:id/assigner
-//
-// ✅ CORRIGÉ : cette route mettait le statut à 'EN_PREPARATION' juste après
-// l'assignation d'un prestataire. Or routes/missions.js n'autorise le
-// prestataire à accepter/refuser une mission QUE si son statut est
-// 'EN_ATTENTE' ou 'ASSIGNEE'. Résultat : toute mission assignée par l'admin
-// devenait immédiatement bloquée — le prestataire ne pouvait plus l'accepter,
-// et DashboardFournisseur.jsx l'affichait à tort comme "matériel manquant".
-// C'était très probablement la cause principale du blocage observé.
-//
-// Exception : si l'admin coche "accord téléphonique direct obtenu", la
-// mission saute directement à 'ACCEPTEE' (prête à démarrer), sans attendre
-// que le prestataire confirme sur l'application — comportement voulu.
 router.put('/reservations/:id/assigner', protect, adminOnly, async (req, res) => {
     try {
         const { id } = req.params;
@@ -190,11 +175,6 @@ router.put('/reservations/:id/assigner', protect, adminOnly, async (req, res) =>
     }
 });
 
-// 🟢 PUT /api/admin/reservations/:id/autoriser
-//
-// N'a de sens que lorsque le prestataire a déjà accepté la mission
-// (statut EN_VALIDATION_ADMIN) — voir le fix correspondant dans
-// MissionDetailsModal.jsx qui n'affiche plus ce bouton pour 'ASSIGNEE'.
 router.put('/reservations/:id/autoriser', protect, adminOnly, async (req, res) => {
     try {
         const { id } = req.params;
@@ -213,17 +193,6 @@ router.put('/reservations/:id/autoriser', protect, adminOnly, async (req, res) =
     }
 });
 
-// SUPPRIMÉ : PUT /api/admin/reservations/:id/valider
-//
-// Cette route court-circuitait le bon d'intervention (pas de bon.valide,
-// pas de note, pas de mise à jour de la réputation du fournisseur).
-// Décision prise : un seul chemin de validation existe désormais —
-// PUT /api/bons-intervention/:id/valider — exclusivement déclenché par
-// le client depuis DashboardClient.jsx. La validation automatique après
-// 24h sans action du client est gérée par le job planifié
-// backend/jobs/autoValiderBonsIntervention.js (voir server.js).
-
-// 🟢 PUT /api/admin/reservations/:id/refuser
 router.put('/reservations/:id/refuser', protect, adminOnly, async (req, res) => {
     try {
         const { motif } = req.body;
@@ -242,7 +211,6 @@ router.put('/reservations/:id/refuser', protect, adminOnly, async (req, res) => 
     }
 });
 
-// 🟢 POST /api/admin/reservations/admin-creer
 router.post('/reservations/admin-creer', protect, adminOnly, async (req, res) => {
     try {
         const {
@@ -291,13 +259,6 @@ router.post('/reservations/admin-creer', protect, adminOnly, async (req, res) =>
     }
 });
 
-// 🟢 DELETE /api/admin/reservations/:id
-//
-// ✅ AJOUTÉ : le frontend (util/api.js → deleteReservation) appelait déjà
-// cette route depuis le début, mais elle n'existait nulle part à ce
-// chemin — seule une version équivalente vivait dans l'ancien
-// routes/reservations.js (désormais retiré). Sans cette route, supprimer
-// une réservation depuis l'admin échouait silencieusement en 404.
 router.delete('/reservations/:id', protect, adminOnly, async (req, res) => {
     try {
         const reservation = await Reservation.findByPk(req.params.id);
@@ -316,12 +277,6 @@ router.delete('/reservations/:id', protect, adminOnly, async (req, res) => {
 
 router.get('/paiements', protect, adminOnly, async (req, res) => {
     try {
-        // ✅ CORRIGÉ : l'alias réel défini dans models/index.js est 'commande',
-        // pas 'commandePaiement' — Sequelize renvoyait une EagerLoadingError
-        // qui faisait planter tout l'onglet Paiements de l'admin.
-        // Ajout de l'inclusion Reservation, absente ici alors qu'un paiement
-        // peut être lié à une réservation plutôt qu'à une commande
-        // (voir backend/models/Paiement.js, champ reservationId).
         const paiements = await Paiement.findAll({
             include: [
                 {
@@ -353,6 +308,7 @@ router.put('/paiements/:id', protect, adminOnly, async (req, res) => {
         await paiement.update({ statut });
         res.json({ success: true, data: paiement });
     } catch (err) {
+        console.error(err);
         res.status(500).json({ success: false, message: 'Erreur serveur.' });
     }
 });
@@ -381,6 +337,7 @@ router.delete('/produits/:id', protect, adminOnly, async (req, res) => {
         await produit.destroy();
         res.json({ success: true, message: 'Produit supprimé.' });
     } catch (err) {
+        console.error(err);
         res.status(500).json({ success: false, message: 'Erreur serveur.' });
     }
 });
@@ -391,7 +348,7 @@ router.delete('/produits/:id', protect, adminOnly, async (req, res) => {
 
 router.get('/live-locations', protect, adminOnly, async (req, res) => {
     try {
-        // Récupération des fournisseurs actifs avec leur position GPS et éventuelle mission en cours
+        // 1. Récupérer TOUS les fournisseurs de la base de données
         const fournisseurs = await Fournisseur.findAll({
             include: [
                 { 
@@ -402,22 +359,32 @@ router.get('/live-locations', protect, adminOnly, async (req, res) => {
             ]
         });
 
-        // Formater les données pour correspondre exactement à ce qu'attend AdminLiveDispatch.jsx
-        const liveData = fournisseurs.map(f => {
+        // 2. Associer pour chaque fournisseur sa mission active s'il en a une
+        const liveData = await Promise.all(fournisseurs.map(async (f) => {
+            const missionActive = await Reservation.findOne({
+                where: {
+                    fournisseurId: f.id,
+                    statut: ['ASSIGNEE', 'ACCEPTEE', 'EN_COURS', 'EN_ROUTE']
+                },
+                order: [['createdAt', 'DESC']]
+            });
+
             return {
                 id: f.id.toString(),
                 name: f.nomEntreprise || (f.userFournisseur ? `${f.userFournisseur.prenom || ''} ${f.userFournisseur.nom}` : 'Prestataire'),
                 role: f.specialite || 'Prestataire',
-                // Si tes colonnes s'appellent latitude / longitude en base :
-                lat: f.latitude || 13.5116, // Coordonnée par défaut (Niamey) si null
+                lat: f.latitude || 13.5116, // Niamey par défaut si non renseigné
                 lon: f.longitude || 2.1254,
                 phone: f.userFournisseur?.telephone || f.telephone || 'N/A',
-                status: f.statut === 'CONFORME' ? 'DISPONIBLE' : 'EN_COURS',
-                missionId: null // Tu pourras lier une mission active si besoin
+                status: missionActive ? missionActive.statut : (f.statut === 'CONFORME' ? 'DISPONIBLE' : 'EN_ATTENTE'),
+                missionId: missionActive ? `CMD-${missionActive.id}` : null
             };
-        });
+        }));
 
-        res.json(liveData);
+        // Filtrer pour ne garder que ceux qui ont des coordonnées GPS exploitables
+        const validProviders = liveData.filter(item => item.lat && item.lon);
+
+        res.json(validProviders);
     } catch (err) {
         console.error("❌ Erreur GET /api/admin/live-locations :", err);
         res.status(500).json({ success: false, message: 'Erreur serveur lors de la récupération des positions GPS.', error: err.message });
