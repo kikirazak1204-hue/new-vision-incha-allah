@@ -385,4 +385,43 @@ router.delete('/produits/:id', protect, adminOnly, async (req, res) => {
     }
 });
 
+// ============================================================
+// 📍 GÉOLOCALISATION EN DIRECT (TOUR DE CONTRÔLE)
+// ============================================================
+
+router.get('/live-locations', protect, adminOnly, async (req, res) => {
+    try {
+        // Récupération des fournisseurs actifs avec leur position GPS et éventuelle mission en cours
+        const fournisseurs = await Fournisseur.findAll({
+            include: [
+                { 
+                    model: User, 
+                    as: 'userFournisseur', 
+                    attributes: ['id', 'nom', 'prenom', 'telephone'] 
+                }
+            ]
+        });
+
+        // Formater les données pour correspondre exactement à ce qu'attend AdminLiveDispatch.jsx
+        const liveData = fournisseurs.map(f => {
+            return {
+                id: f.id.toString(),
+                name: f.nomEntreprise || (f.userFournisseur ? `${f.userFournisseur.prenom || ''} ${f.userFournisseur.nom}` : 'Prestataire'),
+                role: f.specialite || 'Prestataire',
+                // Si tes colonnes s'appellent latitude / longitude en base :
+                lat: f.latitude || 13.5116, // Coordonnée par défaut (Niamey) si null
+                lon: f.longitude || 2.1254,
+                phone: f.userFournisseur?.telephone || f.telephone || 'N/A',
+                status: f.statut === 'CONFORME' ? 'DISPONIBLE' : 'EN_COURS',
+                missionId: null // Tu pourras lier une mission active si besoin
+            };
+        });
+
+        res.json(liveData);
+    } catch (err) {
+        console.error("❌ Erreur GET /api/admin/live-locations :", err);
+        res.status(500).json({ success: false, message: 'Erreur serveur lors de la récupération des positions GPS.', error: err.message });
+    }
+});
+
 module.exports = router;
