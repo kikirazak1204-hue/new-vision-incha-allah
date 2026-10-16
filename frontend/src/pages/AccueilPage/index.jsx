@@ -47,8 +47,22 @@ const AccueilPage = ({ services = [], loading, setSelectedService, navigateTo })
         restauration: '/backgrounds/restauration.png', peinture: '/backgrounds/peinture.jpg',
     };
 
-    const normalizeKey = (value = '') => String(value || '').toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+    const normalizeKey = (value = '') => String(value || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+
+    // 🔍 MISE À JOUR DYNAMIQUE DES BALISES GOOGLE (SEO)
+    useEffect(() => {
+        document.title = "Kanari Service — Plateforme Multi-Services & Réservation en Ligne";
+        let metaDescription = document.querySelector('meta[name="description"]');
+        if (metaDescription) {
+            metaDescription.setAttribute("content", "Kanari Service à Niamey : Réservez facilement vos prestations professionnelles (électricité, plomberie, mécanique, coiffure, restauration) et achetez en ligne en toute sécurité.");
+        }
+    }, []);
 
     // Carrousel héroïque automatique
     useEffect(() => {
@@ -250,7 +264,7 @@ const AccueilPage = ({ services = [], loading, setSelectedService, navigateTo })
                 )}
             </main>
 
-            {/* 4. BARRE DE NAVIGATION INFÉRIEURE SEPARÉE (Boutons flottants individuels) */}
+            {/* 4. BARRE DE NAVIGATION INFÉRIEURE SEPARÉE */}
             <div className="fixed bottom-4 inset-x-0 z-50 flex justify-center items-center px-4 pointer-events-none">
                 <nav className="pointer-events-auto flex items-center gap-2 sm:gap-3 bg-[#061a3a]/90 backdrop-blur-2xl p-2 rounded-full border border-white/15 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
                     {navItems.map((item) => (
