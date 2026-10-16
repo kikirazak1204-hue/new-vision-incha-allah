@@ -5,8 +5,10 @@ const Paiement = require('../models/Paiement');
 const Commande = require('../models/Commande');
 const Reservation = require('../models/Reservation');
 const Fournisseur = require('../models/Fournisseur');
+const BonIntervention = require('../models/BonIntervention');
+const Solde = require('../models/Solde');
 const {
-    ErreurPaiement, calculerDu, appliquerStatut, notifierFournisseur
+    ErreurPaiement, calculerDu, appliquerStatut, notifierFournisseur, commissionDuBon, MODES_DIRECTS
 } = require('../services/paiementService');
 
 const reponseErreur = (res, error, contexte) => {
@@ -253,4 +255,140 @@ exports.getPaiementsFournisseur = async (req, res) => {
             totaux: { total: somme('montant'), commission: somme('commissionKanari'), net: somme('montantNet') }
         });
     } catch (e) { return reponseErreur(res, e, 'getPaiementsFournisseur'); }
+};
+
+// ═══════════════════════════════════════════════════════════
+// 9. CLIENT : situation financière, mission par mission
+//    1 mission = 1 bon (prix final) = 1 paiement. Le « devis » n'est qu'une estimation.
+// ═══════════════════════════════════════════════════════════
+exports.getClientMissions = async (req, res) => {
+    try {
+        const reservations = await Reservation.findAll({
+            where: { clientId: req.user.id },
+            attributes: ['id', 'serviceNom', 'statut', 'modePaiement', 'fournisseurId', 'createdAt'],
+            include: [
+                { model: BonIntervention, as: 'bonIntervention', required: false },
+                { model: Paiement, as: 'paiements', required: false, where: { typePaiement: 'MISSION' } }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+
+        const data = reservations.map((r) => {
+            const bon = r.bonIntervention;
+            const pays = [...(r.paiements || [])].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            const paiement = pays.find((p) => ['valide', 'en_attente'].includes(p.statut)) || pays[0] || null;
+            const direct = MODES_DIRECTS.includes(r.modePaiement);
+            const montant = bon
+                ? Number(bon.montantFinal ?? (Number(bon.montantMainOeuvre || 0) + Number(bon.montantPiecesOutils || 0)))
+                : null;
+
+            let etat;
+            if (r.statut === 'ANNULEE') etat = 'annulee';
+            else if (!bon) etat = 'sans_bon';
+            else if (!(bon.valide || bon.valideParAdmin)) etat = 'bon_a_valider';
+            else if (paiement?.statut === 'valide') etat = 'paye';
+            else if (paiement?.statut === 'en_attente') etat = 'en_attente';
+            else if (direct) etat = 'direct';
+            else if (paiement?.statut === 'rejete') etat = 'rejete';
+            else if (paiement?.statut === 'rembourse') etat = 'rembourse';
+            else etat = 'a_payer';
+
+            return {
+                reservationId: r.id,
+                serviceNom: r.serviceNom,
+                statutMission: r.statut,
+                modePaiement: r.modePaiement,
+                montant,
+                mainOeuvre: bon ? Number(bon.montantMainOeuvre || 0) : null,
+                pieces: bon ? Number(bon.montantPiecesOutils || 0) : null,
+                etat,
+                paiement: paiement ? {
+                    id: paiement.id, statut: paiement.statut, transactionId: paiement.transactionId,
+                    modePaiement: paiement.modePaiement, referenceClient: paiement.referenceClient,
+                    motif: paiement.motif, date: paiement.confirmationDate || paiement.createdAt
+                } : null
+            };
+        });
+
+        const somme = (etat) => data.filter((x) => x.etat === etat).reduce((s, x) => s + (x.montant || 0), 0);
+        const commandesPayees = Number(await Paiement.sum('montant', {
+            where: { clientId: req.user.id, typePaiement: 'COMMANDE', statut: 'valide' }
+        })) || 0;
+
+        return res.json({
+            success: true,
+            data,
+            totaux: { paye: somme('paye') + commandesPayees, enAttente: somme('en_attente'), aPayer: somme('a_payer') }
+        });
+    } catch (e) { return reponseErreur(res, e, 'getClientMissions'); }
+};
+
+// ═══════════════════════════════════════════════════════════
+// 10. PRESTATAIRE : portefeuille (solde, encaissements, commissions dues + retard)
+//     Le retard est calculé à la lecture (date limite dépassée) : aucun cron nécessaire.
+// ═══════════════════════════════════════════════════════════
+exports.getPortefeuilleFournisseur = async (req, res) => {
+    try {
+        const profil = await Fournisseur.findOne({ where: { userId: req.user.id }, attributes: ['id'] });
+        if (!profil) throw new ErreurPaiement(403, 'Profil prestataire introuvable.');
+        const fid = profil.id;
+
+        const solde = await Solde.findOne({ where: { fournisseurId: fid } });
+        const paiements = await Paiement.findAll({
+            where: { fournisseurId: fid, typePaiement: { [Op.in]: ['COMMANDE', 'MISSION'] }, statut: { [Op.in]: ['valide', 'en_attente'] } },
+            order: [['createdAt', 'DESC']], limit: 300
+        });
+        const ligne = (p) => ({
+            id: p.id, type: p.typePaiement, commandeId: p.commandeId, reservationId: p.reservationId,
+            montant: Number(p.montant), commission: Number(p.commissionKanari), net: Number(p.montantNet),
+            taux: Number(p.tauxCommission), statut: p.statut, modePaiement: p.modePaiement,
+            transactionId: p.transactionId, date: p.confirmationDate || p.createdAt
+        });
+        const encaissements = paiements.filter((p) => p.statut === 'valide').map(ligne);
+        const enAttente = paiements.filter((p) => p.statut === 'en_attente').map(ligne);
+
+        // Missions réglées directement au prestataire : il doit sa commission à Kanari
+        const directes = await Reservation.findAll({
+            where: { fournisseurId: fid, modePaiement: { [Op.in]: MODES_DIRECTS }, commissionStatut: { [Op.in]: ['en_attente', 'en_retard'] } },
+            attributes: ['id', 'serviceNom', 'commissionStatut', 'commissionDateLimite'],
+            include: [{
+                model: BonIntervention, as: 'bonIntervention', required: true,
+                where: { [Op.or]: [{ valide: true }, { valideParAdmin: true }] }
+            }]
+        });
+        const depots = await Paiement.findAll({
+            where: { fournisseurId: fid, typePaiement: 'COMMISSION', statut: 'en_attente' }, attributes: ['reservationId']
+        });
+        const enVerification = new Set(depots.map((d) => d.reservationId));
+        const maintenant = Date.now();
+
+        const commissionsDues = directes
+            .map((r) => {
+                const bon = r.bonIntervention;
+                const limite = r.commissionDateLimite ? new Date(r.commissionDateLimite) : null;
+                const retard = r.commissionStatut === 'en_retard' || (!!limite && limite.getTime() < maintenant);
+                return {
+                    reservationId: r.id, serviceNom: r.serviceNom,
+                    montantMission: Number(bon.montantFinal || 0), commission: commissionDuBon(bon),
+                    dateLimite: limite, retard,
+                    joursRetard: retard && limite ? Math.max(1, Math.ceil((maintenant - limite.getTime()) / 86400000)) : 0,
+                    depotEnVerification: enVerification.has(r.id)
+                };
+            })
+            .filter((c) => c.commission > 0)
+            .sort((a, b) => Number(b.retard) - Number(a.retard));
+
+        const somme = (arr, k) => arr.reduce((s, x) => s + x[k], 0);
+        return res.json({
+            success: true,
+            totaux: {
+                solde: Number(solde?.solde || 0), totalGagne: Number(solde?.totalGagne || 0), totalRetire: Number(solde?.totalRetire || 0),
+                brut: somme(encaissements, 'montant'), commission: somme(encaissements, 'commission'), net: somme(encaissements, 'net'),
+                enAttenteNet: somme(enAttente, 'net'),
+                commissionsDues: somme(commissionsDues, 'commission'),
+                commissionsEnRetard: somme(commissionsDues.filter((c) => c.retard), 'commission')
+            },
+            encaissements, enAttente, commissionsDues
+        });
+    } catch (e) { return reponseErreur(res, e, 'getPortefeuilleFournisseur'); }
 };

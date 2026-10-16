@@ -5,6 +5,9 @@ import { STATUT, STATUT_FALLBACK, STATUTS_ACTIFS } from '../constants/statuts';
 import BonInterventionPrint from '../components/BonInterventionPrint';
 import KanariGeoMap from '../components/KanariGeoMap';
 import MesAbonnements from '../components/MesAbonnements'; // ➕ AJOUT
+import OngletPaiementsClient from '../components/paiements/OngletPaiementsClient';
+import EtatPaiementBadge from '../components/paiements/EtatPaiementBadge';
+import { getPaiementsClientMissions, fcfa } from '../util/paiementsApi';
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -426,7 +429,7 @@ function CarteDevisReservation({ mission, token, onAccepte }) {
                                 {devis.description && <p className="text-xs text-slate-500 mt-1">{devis.description}</p>}
                             </div>
                             <div className="flex items-center gap-3 shrink-0">
-                                <span className="text-base font-black text-emerald-400">{Number(devis.montant).toLocaleString()} FCFA</span>
+                                <span className="text-base font-black text-emerald-400 text-right">{Number(devis.montant).toLocaleString('fr-FR')} FCFA<span className="block text-[10px] font-semibold text-slate-500">Devis estimatif</span></span>
                                 <button
                                     onClick={() => accepter(devis.id)}
                                     disabled={acceptation === devis.id}
@@ -468,7 +471,7 @@ function OngletOffresRecues({ missions, token, onDevisAccepte }) {
 // ════════════════════════════════════════════════════════════════
 // ONGLET : MES REÇUS
 // ════════════════════════════════════════════════════════════════
-function CarteRecu({ mission, token }) {
+function CarteRecu({ mission, token, montant }) {
     const [bon, setBon] = useState(null);
     const [loading, setLoading] = useState(false);
     const printRef = useRef(null);
@@ -496,7 +499,7 @@ function CarteRecu({ mission, token }) {
                 <span className="text-xs font-bold text-purple-400">Mission #{mission.id}</span>
                 <p className="text-[#061a3a] font-bold text-sm mt-0.5">{mission.serviceNom || mission.service?.nom || 'Service'}</p>
                 <p className="text-xs text-slate-500 mt-0.5">
-                    {mission.prestataire?.nomEntreprise || 'Prestataire'} · {Number(mission.montantTotal || 0).toLocaleString()} FCFA
+                    {mission.prestataire?.nomEntreprise || 'Prestataire'} · {Number(montant ?? mission.montantTotal ?? 0).toLocaleString('fr-FR')} FCFA
                 </p>
             </div>
             <button
@@ -527,7 +530,7 @@ function CarteRecu({ mission, token }) {
     );
 }
 
-function OngletRecus({ missions, token }) {
+function OngletRecus({ missions, token, finance = {} }) {
     const missionsValidees = missions.filter(m => m.statut === 'VALIDEE');
 
     if (missionsValidees.length === 0) {
@@ -541,7 +544,7 @@ function OngletRecus({ missions, token }) {
 
     return (
         <div className="space-y-3 text-left">
-            {missionsValidees.map(m => <CarteRecu key={m.id} mission={m} token={token} />)}
+            {missionsValidees.map(m => <CarteRecu key={m.id} mission={m} token={token} montant={finance[m.id]?.montant} />)}
         </div>
     );
 }
@@ -648,6 +651,7 @@ export default function DashboardClient() {
     const [bonMission, setBonMission] = useState(null);
     const [activeTab, setActiveTab] = useState('overview');
     const [menuOuvert, setMenuOuvert] = useState(false);
+    const [finance, setFinance] = useState({ missions: {}, totaux: null, erreur: null });
 
     const pubAleatoire = useMemo(() => BANNIERES_PUB[Math.floor(Math.random() * BANNIERES_PUB.length)], []);
     const token = useMemo(() => localStorage.getItem('token'), []);
@@ -668,9 +672,22 @@ export default function DashboardClient() {
         setMissions(prev => prev.map(m => m.id === missionId ? { ...m, remarqueClient: nouvelleRemarque } : m));
     };
 
-    const handleBonValide = () => {
+    // Après validation du bon : on enchaîne sur le paiement (la page gère aussi le cas « payé sur place »)
+    const handleBonValide = (missionId) => {
         setBonMission(null);
         setTimeout(() => chargerDashboard(true), 0);
+        if (missionId) navigate('/paiement', { state: { reservationId: missionId } });
+    };
+
+    const chargerFinance = async () => {
+        try {
+            const f = await getPaiementsClientMissions();
+            const map = {};
+            (f.data || []).forEach(x => { map[x.reservationId] = x; });
+            setFinance({ missions: map, totaux: f.totaux || null, erreur: null });
+        } catch (e) {
+            setFinance(p => ({ ...p, erreur: e?.message || 'Paiements indisponibles.' }));
+        }
     };
 
     const chargerDashboard = async (silencieux = false) => {
@@ -681,6 +698,7 @@ export default function DashboardClient() {
             if (res?.success) {
                 setMissions(Array.isArray(res.data?.missions) ? res.data.missions : []);
                 setError(null);
+                chargerFinance();
             } else {
                 throw new Error(res?.message || 'Réponse invalide du serveur.');
             }
@@ -733,8 +751,18 @@ export default function DashboardClient() {
     // ✏️ MODIFIÉ : les visites d'abonnement sont exclues des offres
     const missionsEnAttenteOffres = missionsList.filter(m => m?.statut === 'EN_ATTENTE' && !m?.fournisseurId && !m?.abonnementId);
 
-    const toutesTransactions = missionsList.filter(m => Number(m?.montantTotal || m?.montant || 0) > 0);
-    const totalDepense = toutesTransactions.filter(m => m?.statutPaiement === 'paye').reduce((acc, m) => acc + Number(m?.montantTotal || m?.montant || 0), 0);
+    // Source unique : les paiements réels rattachés aux missions (et non Reservation.montantTotal, toujours à 0)
+    const toutesTransactions = Object.values(finance.missions).filter(x => !['sans_bon', 'annulee'].includes(x.etat));
+    const totalDepense = Number(finance.totaux?.paye || 0);
+
+    // Montant affiché pour une mission : prix du bon > estimation > « À définir »
+    const montantAffiche = (m) => {
+        const f = finance.missions[m?.id];
+        if (f?.montant != null) return { texte: fcfa(f.montant), libelle: 'Montant du bon' };
+        const estime = Number(m?.montantTotal || m?.montant || 0);
+        if (estime > 0) return { texte: fcfa(estime), libelle: 'Montant estimé' };
+        return { texte: 'À définir (après le bon)', libelle: 'Montant' };
+    };
 
     const tabs = [
         { id: 'overview', label: 'Vue d\'ensemble', icon: '' },
@@ -925,8 +953,14 @@ export default function DashboardClient() {
                                             </button>
                                         )}
 
+                                        {finance.missions[m?.id]?.etat === 'a_payer' && (
+                                            <button onClick={() => navigate('/paiement', { state: { reservationId: m.id } })} className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black rounded-xl text-xs shadow-lg transition-all">
+                                                Payer {fcfa(finance.missions[m.id].montant)}
+                                            </button>
+                                        )}
+
                                         <div className="flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-slate-200">
-                                            <span>Montant : <strong className="text-[#061a3a]">{Number(m?.montantTotal || m?.montant || m?.montantMainOeuvre || 0).toLocaleString()} FCFA</strong></span>
+                                            <span className="flex items-center gap-2 flex-wrap">{montantAffiche(m).libelle} : <strong className="text-[#061a3a]">{montantAffiche(m).texte}</strong>{finance.missions[m?.id] && !['sans_bon', 'annulee'].includes(finance.missions[m.id].etat) && <EtatPaiementBadge etat={finance.missions[m.id].etat} />}</span>
                                             <div className="flex items-center gap-4">
                                                 {m?.statut === 'VALIDEE' && (
                                                     <button onClick={() => setRemarqueMission(m)} className="text-amber-400 font-bold hover:underline">Laisser un avis</button>
@@ -955,42 +989,17 @@ export default function DashboardClient() {
                 {activeTab === 'abonnements' && <MesAbonnements />}
 
                 {activeTab === 'recus' && (
-                    <OngletRecus missions={missionsList} token={token} />
+                    <OngletRecus missions={missionsList} token={token} finance={finance.missions} />
                 )}
 
                 {activeTab === 'paiements' && (
-                    <div className="space-y-6 text-left">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h3 className="font-extrabold text-xl text-[#061a3a]">Paiements & Transactions</h3>
-                                <p className="text-xs text-slate-500 mt-1">Historique complet de vos règlements de services.</p>
-                            </div>
-                            <button onClick={() => navigate('/historique-paiements')} className="px-4 py-2 bg-amber-500 hover:bg-indigo-500 text-[#061a3a] rounded-xl text-xs font-bold transition">
-                                Voir la page dédiée 
-                            </button>
-                        </div>
-
-                        {toutesTransactions.length === 0 ? (
-                            <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center space-y-3">
-                                <p className="text-slate-500 text-sm">Aucune transaction enregistrée pour l'instant.</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {toutesTransactions.map(t => (
-                                    <div key={t?.id} className="bg-white border border-slate-200 rounded-2xl p-5 flex justify-between items-center">
-                                        <div>
-                                            <span className="text-xs font-bold text-indigo-400">Transaction liée à la réservation #{t?.id}</span>
-                                            <p className="text-[#061a3a] font-bold text-sm mt-0.5">{t?.service?.nom || t?.serviceNom || 'Prestation'}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-[#061a3a] font-mono font-extrabold">{Number(t?.montantTotal || t?.montant || t?.montantMainOeuvre || 0).toLocaleString()} FCFA</p>
-                                            <span className={`text-[10px] font-bold uppercase ${t?.statutPaiement === 'paye' ? 'text-emerald-600' : t?.statutPaiement === 'echoue' ? 'text-red-600' : 'text-amber-600'}`}>{t?.statutPaiement === 'paye' ? 'Réglé' : t?.statutPaiement === 'echoue' ? 'Échec' : t?.statutPaiement === 'en_attente' ? 'En attente' : 'Non payé'}</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    <OngletPaiementsClient
+                        missions={missionsList}
+                        finance={finance}
+                        navigate={navigate}
+                        onValiderBon={(id) => { const m = missionsList.find(x => x.id === id); if (m) setBonMission(m); }}
+                        onRefresh={() => chargerDashboard(true)}
+                    />
                 )}
 
                 {activeTab === 'profil' && (

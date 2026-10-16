@@ -84,6 +84,15 @@ async function calculerDu({ commandeId, reservationId, user, t }) {
     };
 }
 
+// Commission due sur un bon d'intervention (main-d'œuvre uniquement, taux figé sur le bon)
+function commissionDuBon(bon) {
+    if (!bon) return 0;
+    const taux = Number(bon.tauxCommissionApplique ?? TAUX_MISSION_DEFAUT);
+    return bon.montantCommission != null
+        ? arrondi(bon.montantCommission)
+        : arrondi(arrondi(bon.montantMainOeuvre) * taux / 100);
+}
+
 // ═══════════════════════════════════════════════════════════
 // SOLDE PRESTATAIRE
 // ═══════════════════════════════════════════════════════════
@@ -214,5 +223,5 @@ async function marquerCommissionsEnRetard() {
 
 module.exports = {
     ErreurPaiement, calculerDu, appliquerStatut,
-    notifierFournisseur, marquerCommissionsEnRetard
+    notifierFournisseur, marquerCommissionsEnRetard, commissionDuBon, MODES_DIRECTS
 };
