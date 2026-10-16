@@ -1,8 +1,5 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
-const Commande = require('./Commande');
-const User = require('./User');
-const Fournisseur = require('./Fournisseur');
 
 const Facture = sequelize.define('Facture', {
     id: {
@@ -17,6 +14,10 @@ const Facture = sequelize.define('Facture', {
         onDelete: 'SET NULL',
         onUpdate: 'CASCADE'
     },
+    // ➕ Facture d'une mission
+    reservationId: { type: DataTypes.INTEGER, allowNull: true },
+    // ➕ Paiement à l'origine de la facture (1 facture par paiement validé)
+    paiementId: { type: DataTypes.INTEGER, allowNull: true },
     fournisseurId: {
         type: DataTypes.INTEGER,
         allowNull: true,
@@ -35,6 +36,9 @@ const Facture = sequelize.define('Facture', {
         type: DataTypes.FLOAT,
         allowNull: false
     },
+    // ➕ Répartition figée
+    commissionKanari: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0 },
+    montantNet: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0 },
     dateEmission: {
         type: DataTypes.DATE,
         allowNull: false,
@@ -58,7 +62,5 @@ const Facture = sequelize.define('Facture', {
     tableName: 'factures',
     timestamps: true
 });
-
-
 
 module.exports = Facture;

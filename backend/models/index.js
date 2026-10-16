@@ -5,7 +5,7 @@ const User = require('./User');
 const Service = require('./Service');
 const Fournisseur = require('./Fournisseur');
 const Produit = require('./Produit');
-const Commande = require('./Commande');
+const Commande = require('./Commande'); 
 const CommandeProduit = require('./CommandeProduit');
 const Facture = require('./Facture');
 const Paiement = require('./Paiement');
@@ -126,7 +126,7 @@ FournisseurBranche.belongsTo(ServiceBranche, { foreignKey: 'brancheId', as: 'bra
 FournisseurBranche.belongsTo(Fournisseur, { foreignKey: 'fournisseurId', as: 'fournisseur' });
 Fournisseur.hasMany(FournisseurBranche, { foreignKey: 'fournisseurId', as: 'branchesChoisies' }); 
 
-// 3. Export global
+/// 3. Export global
 module.exports = {
   sequelize,
   User,
@@ -148,5 +148,7 @@ module.exports = {
   Abonnement,
   AbonnementPrestataire,
   AbonnementVersement,
-  AbonnementReglement
+  AbonnementReglement,
+  ServiceBranche,     // 👈 Ajouté ici
+  FournisseurBranche  // 👈 Ajouté ici
 };

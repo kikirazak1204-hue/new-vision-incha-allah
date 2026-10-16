@@ -1,285 +1,256 @@
+const { Op } = require('sequelize');
+const { v4: uuidv4 } = require('uuid');
+const sequelize = require('../config/database');
 const Paiement = require('../models/Paiement');
 const Commande = require('../models/Commande');
-const Reservation = require('../models/Reservation'); // 💡 Prise en charge des Réservations
-const sequelize = require('../config/database');
-const { v4: uuidv4 } = require('uuid');
+const Reservation = require('../models/Reservation');
+const Fournisseur = require('../models/Fournisseur');
+const {
+    ErreurPaiement, calculerDu, appliquerStatut, notifierFournisseur
+} = require('../services/paiementService');
 
-// 🔐 1. Paiements du client connecté (Historique)
+const reponseErreur = (res, error, contexte) => {
+    if (error instanceof ErreurPaiement) {
+        return res.status(error.status).json({ success: false, message: error.message, code: error.code });
+    }
+    if (error.name === 'SequelizeUniqueConstraintError') {
+        return res.status(409).json({ success: false, message: 'Cette référence de paiement a déjà été enregistrée.' });
+    }
+    console.error(`❌ Erreur ${contexte}:`, error);
+    return res.status(500).json({ success: false, message: 'Erreur serveur.' });
+};
+
+const paiementExistant = (commandeId, reservationId, typePaiement, t) =>
+    Paiement.findOne({
+        where: {
+            ...(commandeId ? { commandeId } : { reservationId }),
+            typePaiement,
+            statut: { [Op.in]: ['en_attente', 'valide'] }
+        },
+        transaction: t
+    });
+
+const INCLUDES = [
+    { model: Commande, as: 'commande', required: false },
+    { model: Reservation, as: 'reservation', required: false }
+];
+
+// ═══════════════════════════════════════════════════════════
+// 1. Historique du client connecté
+// ═══════════════════════════════════════════════════════════
 exports.getPaiementsClient = async (req, res) => {
     try {
-        if (!req.user?.id) {
-            return res.status(401).json({ success: false, message: 'Non autorisé. Utilisateur introuvable.' });
-        }
-
+        if (!req.user?.id) throw new ErreurPaiement(401, 'Non autorisé.');
         const paiements = await Paiement.findAll({
             where: { clientId: req.user.id },
-            include: [
-                { model: Commande, as: 'commande', required: false },
-                { model: Reservation, as: 'reservation', required: false } // 💡 Inclus aussi les réservations
-            ],
+            include: INCLUDES,
             order: [['createdAt', 'DESC']]
         });
-
         return res.status(200).json({ success: true, data: paiements });
-    } catch (error) {
-        console.error('❌ Erreur getPaiementsClient:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Erreur serveur lors de la récupération des paiements',
-            error: error.message
-        });
-    }
+    } catch (e) { return reponseErreur(res, e, 'getPaiementsClient'); }
 };
 
-// 🛠️ 2. Paiements pour l’admin (Historique complet)
+// ═══════════════════════════════════════════════════════════
+// 2. Historique complet (admin) — filtres : ?statut= &typePaiement= &limit=
+// ═══════════════════════════════════════════════════════════
 exports.getAllPaiements = async (req, res) => {
     try {
-        const paiements = await Paiement.findAll({
-            include: [
-                { model: Commande, as: 'commande', required: false },
-                { model: Reservation, as: 'reservation', required: false }
-            ],
-            order: [['createdAt', 'DESC']]
-        });
+        const where = {};
+        if (req.query.statut) where.statut = req.query.statut;
+        if (req.query.typePaiement) where.typePaiement = req.query.typePaiement;
+        const limit = Math.min(Number(req.query.limit) || 200, 500);
 
-        return res.status(200).json({ success: true, data: paiements });
-    } catch (error) {
-        console.error('❌ Erreur getAllPaiements:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Erreur serveur lors de la récupération de l\'historique',
-            error: error.message
+        const paiements = await Paiement.findAll({
+            where, include: INCLUDES, order: [['createdAt', 'DESC']], limit
         });
-    }
+        return res.status(200).json({ success: true, data: paiements });
+    } catch (e) { return reponseErreur(res, e, 'getAllPaiements'); }
 };
 
-// 🔍 3. Vérification d'un paiement par transactionId ou referenceClient
+// ═══════════════════════════════════════════════════════════
+// 3. Vérification par transactionId (propriétaire ou admin)
+// ═══════════════════════════════════════════════════════════
 exports.verifyPaiement = async (req, res) => {
     try {
         const { txId } = req.params;
+        if (!txId) throw new ErreurPaiement(400, 'Le paramètre txId est requis.');
 
-        if (!txId) {
-            return res.status(400).json({ success: false, message: 'Le paramètre txId est requis.' });
+        const paiement = await Paiement.findOne({ where: { transactionId: txId }, include: INCLUDES });
+        if (!paiement) throw new ErreurPaiement(404, 'Paiement introuvable.');
+        if (paiement.clientId !== req.user.id && req.user.role !== 'admin') {
+            throw new ErreurPaiement(403, 'Accès refusé.');
         }
-
-        const paiement = await Paiement.findOne({
-            where: { transactionId: txId },
-            include: [
-                { model: Commande, as: 'commande', required: false },
-                { model: Reservation, as: 'reservation', required: false }
-            ]
-        });
-
-        if (!paiement) {
-            return res.status(404).json({ success: false, message: 'Paiement introuvable.' });
-        }
-
         return res.status(200).json({ success: true, data: paiement });
-    } catch (error) {
-        console.error('❌ Erreur verifyPaiement:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Erreur serveur lors de la vérification',
-            error: error.message
-        });
-    }
+    } catch (e) { return reponseErreur(res, e, 'verifyPaiement'); }
 };
 
-// 💳 4. Création d’un paiement (Gère COMMANDE et RÉSERVATION)
-exports.createMobileMoneyPaiement = async (req, res) => {
-    const transaction = await sequelize.transaction();
-
+// ═══════════════════════════════════════════════════════════
+// 4. Montant à payer (calculé serveur) — GET ?commandeId= ou ?reservationId=
+// ═══════════════════════════════════════════════════════════
+exports.getAPayer = async (req, res) => {
     try {
-        const { 
-            commandeId, 
-            reservationId, 
-            montant, 
-            telephone, 
-            nom, 
-            messageClient, 
-            referenceClient, 
-            modePaiement 
-        } = req.body;
+        const { commandeId, reservationId } = req.query;
+        if (!!commandeId === !!reservationId) {
+            throw new ErreurPaiement(400, 'Fournir commandeId ou reservationId.');
+        }
+        const du = await calculerDu({ commandeId, reservationId, user: req.user });
 
-        // Vérification d'authentification
-        if (!req.user?.id) {
-            await transaction.rollback();
-            return res.status(401).json({ success: false, message: 'Session expirée ou utilisateur non identifié.' });
+        const existant = await paiementExistant(commandeId, reservationId, du.typePaiement);
+        if (existant) {
+            throw new ErreurPaiement(409,
+                existant.statut === 'valide' ? 'Déjà réglé.' : 'Un paiement est déjà en attente de validation.',
+                existant.statut === 'valide' ? 'DEJA_REGLE' : 'EN_ATTENTE');
+        }
+        return res.json({ success: true, data: { ...du, devise: 'FCFA' } });
+    } catch (e) { return reponseErreur(res, e, 'getAPayer'); }
+};
+
+// ═══════════════════════════════════════════════════════════
+// 5. Choix du mode de règlement d'une mission (avant le bon d'intervention)
+//    direct_prestataire = le client paiera le prestataire sur place
+// ═══════════════════════════════════════════════════════════
+exports.definirModeReservation = async (req, res) => {
+    try {
+        const { reservationId, modePaiement } = req.body;
+        if (!['mobile_money', 'carte_bancaire', 'direct_prestataire'].includes(modePaiement)) {
+            throw new ErreurPaiement(400, 'Mode de règlement invalide.');
+        }
+        const r = await Reservation.findByPk(reservationId);
+        if (!r) throw new ErreurPaiement(404, 'Mission introuvable.');
+        if (r.clientId !== req.user.id) throw new ErreurPaiement(403, 'Cette mission ne vous appartient pas.');
+
+        const deja = await Paiement.count({
+            where: { reservationId, statut: { [Op.in]: ['en_attente', 'valide'] } }
+        });
+        if (deja > 0) throw new ErreurPaiement(409, 'Un paiement existe déjà pour cette mission.');
+
+        await r.update({ modePaiement });
+        return res.json({ success: true, message: 'Mode de règlement enregistré.' });
+    } catch (e) { return reponseErreur(res, e, 'definirModeReservation'); }
+};
+
+// ═══════════════════════════════════════════════════════════
+// 6. Création d'un paiement (commande, mission ou dépôt de commission)
+//    Le montant n'est JAMAIS lu depuis le client.
+// ═══════════════════════════════════════════════════════════
+exports.createMobileMoneyPaiement = async (req, res) => {
+    const t = await sequelize.transaction();
+    try {
+        const { commandeId, reservationId, telephone, nom, messageClient, referenceClient, modePaiement } = req.body;
+
+        if (!req.user?.id) throw new ErreurPaiement(401, 'Session expirée ou utilisateur non identifié.');
+        if (!!commandeId === !!reservationId) throw new ErreurPaiement(400, 'Fournir soit commandeId, soit reservationId.');
+        if (!telephone || !String(telephone).trim()) throw new ErreurPaiement(400, 'Le téléphone est obligatoire.');
+
+        const mode = modePaiement || 'mobile_money';
+        if (!['mobile_money', 'carte_bancaire', 'depot_kanari', 'orange_money', 'moov_money', 'airtel_money', 'amanata', 'mynita', 'virement_bancaire'].includes(mode)) {
+            throw new ErreurPaiement(400, 'Mode de paiement non autorisé.');
         }
 
-        // 💡 Doit fournir SOIT une commande, SOIT une réservation
-        if ((!commandeId && !reservationId) || !montant || !telephone) {
-            await transaction.rollback();
-            return res.status(400).json({
-                success: false,
-                message: 'Informations obligatoires manquantes (commandeId ou reservationId, montant, telephone).'
-            });
+        const du = await calculerDu({ commandeId, reservationId, user: req.user, t });
+        if (du.montant <= 0) throw new ErreurPaiement(409, 'Aucun montant à régler.');
+
+        const existant = await paiementExistant(commandeId, reservationId, du.typePaiement, t);
+        if (existant) {
+            throw new ErreurPaiement(409,
+                existant.statut === 'valide' ? 'Déjà réglé.' : 'Un paiement est déjà en attente de validation.');
         }
 
-        // Vérification de l'existence de la Commande si transmise
-        if (commandeId) {
-            const commande = await Commande.findByPk(commandeId, { transaction });
-            if (!commande) {
-                await transaction.rollback();
-                return res.status(404).json({ success: false, message: 'La commande associée est introuvable.' });
-            }
-        }
-
-        // Vérification de l'existence de la Réservation si transmise
-        if (reservationId) {
-            const reservation = await Reservation.findByPk(reservationId, { transaction });
-            if (!reservation) {
-                await transaction.rollback();
-                return res.status(404).json({ success: false, message: 'La réservation associée est introuvable.' });
-            }
-        }
-
-        // Validation du montant
-        const montantSecurise = parseFloat(montant);
-        if (isNaN(montantSecurise) || montantSecurise <= 0) {
-            await transaction.rollback();
-            return res.status(400).json({ success: false, message: 'Le montant doit être un nombre valide et supérieur à 0.' });
-        }
-
-        const transactionId = "NV-TRX-" + uuidv4().substring(0, 8).toUpperCase();
-        const refEffective = referenceClient ? referenceClient.trim() : `REF-${Date.now()}`;
-
-        // 1️⃣ Enregistrement de la ligne de Paiement
         const paiement = await Paiement.create({
             commandeId: commandeId || null,
             reservationId: reservationId || null,
             clientId: req.user.id,
-            montant: montantSecurise,
-            telephone: telephone.trim(),
-            nom: nom ? nom.trim() : (req.user.nom || 'Client'),
+            fournisseurId: du.fournisseurId,
+            typePaiement: du.typePaiement,
+            montant: du.montant,
+            tauxCommission: du.tauxCommission,
+            commissionKanari: du.commission,
+            montantNet: du.net,
+            telephone: String(telephone).trim(),
+            nom: nom?.trim() || req.user.nom || 'Client',
             statut: 'en_attente',
-            modePaiement: modePaiement || 'mobile_money',
-            transactionId,
-            referenceClient: refEffective,
-            messageClient: messageClient ? messageClient.trim() : null
-        }, { transaction });
+            modePaiement: mode,
+            transactionId: 'NV-TRX-' + uuidv4().substring(0, 8).toUpperCase(),
+            referenceClient: referenceClient?.trim() || `REF-${Date.now()}`,
+            messageClient: messageClient?.trim() || null
+        }, { transaction: t });
 
-        // 2️⃣ Mise à jour du statut de la Commande ou de la Réservation
-        if (commandeId) {
-            await Commande.update(
-                { statutPaiement: 'en_attente_verification' },
-                { where: { id: commandeId }, transaction }
-            );
+        if (du.typePaiement === 'MISSION') {
+            await Reservation.update({ statutPaiement: 'en_attente' }, { where: { id: reservationId }, transaction: t });
         }
 
-        if (reservationId) {
-            await Reservation.update(
-                { statutPaiement: 'en_attente_verification' },
-                { where: { id: reservationId }, transaction }
-            );
-        }
-
-        await transaction.commit();
-
+        await t.commit();
         return res.status(201).json({
             success: true,
-            message: 'Paiement enregistré et transmis à l\'administration pour validation.',
+            message: "Paiement enregistré et transmis à l'administration pour validation.",
             data: paiement
         });
-
-    } catch (error) {
-        await transaction.rollback();
-        console.error('❌ Erreur createMobileMoneyPaiement:', error);
-
-        if (error.name === 'SequelizeUniqueConstraintError') {
-            return res.status(400).json({
-                success: false,
-                message: 'Cette référence de paiement a déjà été enregistrée.'
-            });
-        }
-
-        return res.status(500).json({
-            success: false,
-            message: 'Erreur serveur lors de la création du paiement',
-            error: error.message
-        });
+    } catch (e) {
+        if (!t.finished) await t.rollback();
+        return reponseErreur(res, e, 'createMobileMoneyPaiement');
     }
 };
 
-// 🛠️ 5. Validation ou Rejet du paiement par l'Admin
+// ═══════════════════════════════════════════════════════════
+// 7. Validation / rejet / remboursement par l'admin
+// ═══════════════════════════════════════════════════════════
 exports.updateStatutPaiement = async (req, res) => {
-    const transaction = await sequelize.transaction();
-
+    const t = await sequelize.transaction();
     try {
-        const { id } = req.params;
-        const { statut } = req.body;
+        const { statut, motif } = req.body;
+        if (!['valide', 'rejete', 'rembourse'].includes(statut)) {
+            throw new ErreurPaiement(400, 'Statut invalide. Utilisez : valide, rejete, rembourse.');
+        }
+        const p = await Paiement.findByPk(req.params.id, { transaction: t, lock: t.LOCK.UPDATE });
+        if (!p) throw new ErreurPaiement(404, 'Paiement introuvable.');
 
-        const statutsAutorises = ['valide', 'rejete', 'en_attente'];
-        if (!statutsAutorises.includes(statut)) {
-            await transaction.rollback();
-            return res.status(400).json({
-                success: false,
-                message: `Statut invalide. Utilisez : ${statutsAutorises.join(', ')}`
-            });
+        if (p.statut === statut) {
+            await t.rollback();
+            return res.status(200).json({ success: true, message: 'Le paiement possède déjà ce statut.', data: p });
         }
 
-        const paiement = await Paiement.findByPk(id, { transaction });
-        if (!paiement) {
-            await transaction.rollback();
-            return res.status(404).json({ success: false, message: 'Paiement introuvable.' });
-        }
+        await appliquerStatut(p, statut, { motif }, t);
+        await t.commit();
 
-        if (paiement.statut === statut) {
-            await transaction.rollback();
-            return res.status(200).json({ success: true, message: 'Le paiement possède déjà ce statut.', data: paiement });
-        }
-
-        // 1️⃣ Mise à jour du statut de paiement
-        paiement.statut = statut;
-        if (statut === 'valide') {
-            paiement.confirmationDate = new Date();
-        }
-        await paiement.save({ transaction });
-
-        // 2️⃣ Synchronisation de la Commande OU de la Réservation associée
-        if (statut === 'valide') {
-            if (paiement.commandeId) {
-                await Commande.update(
-                    { statutPaiement: 'paye', statut: 'en_cours' },
-                    { where: { id: paiement.commandeId }, transaction }
-                );
-            }
-            if (paiement.reservationId) {
-                await Reservation.update(
-                    { statutPaiement: 'paye', statut: 'confirmee' },
-                    { where: { id: paiement.reservationId }, transaction }
-                );
-            }
-        } else if (statut === 'rejete') {
-            if (paiement.commandeId) {
-                await Commande.update(
-                    { statutPaiement: 'echec' },
-                    { where: { id: paiement.commandeId }, transaction }
-                );
-            }
-            if (paiement.reservationId) {
-                await Reservation.update(
-                    { statutPaiement: 'echec' },
-                    { where: { id: paiement.reservationId }, transaction }
-                );
+        // Notifications APRÈS commit (non bloquantes)
+        if (statut === 'valide' && p.fournisseurId) {
+            const f = (n) => Number(n).toLocaleString('fr-FR') + ' FCFA';
+            if (p.typePaiement === 'COMMANDE') {
+                notifierFournisseur(p.fournisseurId, 'Nouvelle vente 🛒',
+                    `Un client a acheté. Total ${f(p.montant)} · commission Kanari ${f(p.commissionKanari)} · votre net ${f(p.montantNet)}`);
+            } else if (p.typePaiement === 'MISSION') {
+                notifierFournisseur(p.fournisseurId, 'Mission payée ✅',
+                    `Total ${f(p.montant)} · commission ${f(p.commissionKanari)} · crédité ${f(p.montantNet)}`);
+            } else {
+                notifierFournisseur(p.fournisseurId, 'Commission reçue ✅',
+                    `Votre dépôt de ${f(p.montant)} a bien été validé.`);
             }
         }
 
-        await transaction.commit();
-
-        return res.status(200).json({
-            success: true,
-            message: `Paiement mis à jour avec succès au statut : ${statut}.`,
-            data: paiement
-        });
-
-    } catch (error) {
-        await transaction.rollback();
-        console.error('❌ Erreur updateStatutPaiement:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Erreur serveur lors de la mise à jour du statut',
-            error: error.message
-        });
+        return res.status(200).json({ success: true, message: `Paiement mis à jour : ${statut}.`, data: p });
+    } catch (e) {
+        if (!t.finished) await t.rollback();
+        return reponseErreur(res, e, 'updateStatutPaiement');
     }
+};
+
+// ═══════════════════════════════════════════════════════════
+// 8. Vue prestataire : total, commission Kanari et net
+// ═══════════════════════════════════════════════════════════
+exports.getPaiementsFournisseur = async (req, res) => {
+    try {
+        const profil = await Fournisseur.findOne({ where: { userId: req.user.id }, attributes: ['id'] });
+        if (!profil) throw new ErreurPaiement(403, 'Profil prestataire introuvable.');
+
+        const data = await Paiement.findAll({
+            where: { fournisseurId: profil.id, typePaiement: { [Op.ne]: 'COMMISSION' }, statut: 'valide' },
+            order: [['createdAt', 'DESC']]
+        });
+        const somme = (k) => data.reduce((s, p) => s + Number(p[k]), 0);
+        return res.json({
+            success: true,
+            data,
+            totaux: { total: somme('montant'), commission: somme('commissionKanari'), net: somme('montantNet') }
+        });
+    } catch (e) { return reponseErreur(res, e, 'getPaiementsFournisseur'); }
 };

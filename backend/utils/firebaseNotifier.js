@@ -42,4 +42,4 @@ const sendPushNotification = async ({ token, topic, userId, title, body, data })
   }
 };
 
-module.exports = { sendPushNotification };
+module.exports = { sendPushNotification }; 

@@ -1,7 +1,7 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-const { sequelize, Service, ServiceBranche } = require('../models');
+const { sequelize, Service, BranchesModels: ServiceBranche } = require('../models');
 
 const norm = (t = '') => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
