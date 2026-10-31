@@ -3,7 +3,9 @@ const sequelize = require('../config/database');
 
 const Retrait = sequelize.define('Retrait', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    fournisseurId: { type: DataTypes.INTEGER, allowNull: false },
+    fournisseurId: { type: DataTypes.INTEGER, allowNull: true },     // renseigné si le demandeur est un partenaire
+    userId: { type: DataTypes.INTEGER, allowNull: true },            // demandeur (client ou partenaire)
+    source: { type: DataTypes.STRING(10), allowNull: false, defaultValue: 'GAINS' }, // GAINS | RISTOURNE | DEPOT
     montant: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
     operateur: {
         type: DataTypes.STRING(20), allowNull: false,

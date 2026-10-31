@@ -10,8 +10,8 @@ const {
     getAPayer,
     definirModeReservation,
     createMobileMoneyPaiement,
+    payerParPortefeuille,
     updateStatutPaiement,
-    getPaiementsFournisseur,
     getClientMissions,
     getPortefeuilleFournisseur
 } = require('../controllers/paiementController');
@@ -19,11 +19,11 @@ const {
 // ── CLIENTS / PRESTATAIRES (protect) ──────────────────────
 router.post('/', protect, createMobileMoneyPaiement);
 router.post('/mobile-money', protect, createMobileMoneyPaiement);
+router.post('/payer-portefeuille', protect, payerParPortefeuille);
 
 router.get('/historique', protect, getPaiementsClient);
 router.get('/a-payer', protect, getAPayer);                       // montant calculé par le serveur
 router.post('/mode-reservation', protect, definirModeReservation); // choix : en ligne / sur place
-router.get('/fournisseur', protect, getPaiementsFournisseur);
 router.get('/fournisseur/portefeuille', protect, getPortefeuilleFournisseur); // solde, encaissements, commissions + retard
 router.get('/client/missions', protect, getClientMissions);                   // 1 mission = 1 bon = 1 paiement      // total / commission / net
 router.get('/verify/:txId', protect, verifyPaiement);

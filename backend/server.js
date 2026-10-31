@@ -193,6 +193,9 @@ const repairDatabase = async () => {
         // ── Portefeuilles : retraits tracés, fonds de soutien (sur accord) ──
         "ALTER TABLE retraits MODIFY COLUMN operateur VARCHAR(20) NOT NULL;",
         "ALTER TABLE retraits MODIFY COLUMN telephone VARCHAR(40) NOT NULL;",
+        "ALTER TABLE retraits MODIFY COLUMN fournisseurId INT NULL;",
+        "ALTER TABLE retraits ADD COLUMN userId INT NULL;",
+        "ALTER TABLE retraits ADD COLUMN source VARCHAR(10) NOT NULL DEFAULT 'GAINS';",
         "ALTER TABLE retraits ADD COLUMN reference VARCHAR(80) NULL;",
         "ALTER TABLE retraits ADD COLUMN motif TEXT NULL;",
         "ALTER TABLE retraits ADD COLUMN traitePar INT NULL;",

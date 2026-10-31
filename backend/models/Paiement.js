@@ -33,13 +33,14 @@ const Paiement = sequelize.define('Paiement', {
 
     // COMMANDE = vente boutique | MISSION = règlement client d'une mission (Kanari encaisse)
     // COMMISSION = dépôt de commission par le prestataire (mission encaissée en direct)
+    // DEPOT = recharge du portefeuille (client ou partenaire)
     typePaiement: {
         type: DataTypes.STRING(20),
         allowNull: false,
         defaultValue: 'COMMANDE',
         validate: {
             isIn: {
-                args: [['COMMANDE', 'MISSION', 'COMMISSION']],
+                args: [['COMMANDE', 'MISSION', 'COMMISSION', 'DEPOT']],
                 msg: "Type de paiement invalide."
             }
         }
@@ -82,7 +83,7 @@ const Paiement = sequelize.define('Paiement', {
         defaultValue: 'mobile_money',
         validate: {
             isIn: {
-                args: [['mobile_money', 'carte_bancaire', 'depot_kanari', 'especes', 'orange_money', 'moov_money', 'airtel_money', 'amanata', 'mynita', 'virement_bancaire']],
+                args: [['mobile_money', 'carte_bancaire', 'depot_kanari', 'especes', 'orange_money', 'moov_money', 'airtel_money', 'amanata', 'mynita', 'virement_bancaire', 'portefeuille']],
                 msg: "Mode de paiement non pris en charge."
             }
         }

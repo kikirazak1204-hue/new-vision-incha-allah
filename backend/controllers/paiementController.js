@@ -7,6 +7,8 @@ const Reservation = require('../models/Reservation');
 const Fournisseur = require('../models/Fournisseur');
 const BonIntervention = require('../models/BonIntervention');
 const Solde = require('../models/Solde');
+const PaiementPart = require('../models/PaiementPart');
+const PF = require('../services/portefeuilleService');
 const {
     ErreurPaiement, calculerDu, appliquerStatut, notifierFournisseur, commissionDuBon, MODES_DIRECTS
 } = require('../services/paiementService');
@@ -91,19 +93,22 @@ exports.verifyPaiement = async (req, res) => {
 // ═══════════════════════════════════════════════════════════
 exports.getAPayer = async (req, res) => {
     try {
-        const { commandeId, reservationId } = req.query;
-        if (!!commandeId === !!reservationId) {
-            throw new ErreurPaiement(400, 'Fournir commandeId ou reservationId.');
+        const { commandeId, reservationId, depot } = req.query;
+        if ([commandeId, reservationId, depot].filter(Boolean).length !== 1) {
+            throw new ErreurPaiement(400, 'Fournir commandeId, reservationId ou depot.');
         }
-        const du = await calculerDu({ commandeId, reservationId, user: req.user });
+        const du = await calculerDu({ commandeId, reservationId, depotMontant: depot, user: req.user });
 
-        const existant = await paiementExistant(commandeId, reservationId, du.typePaiement);
-        if (existant) {
-            throw new ErreurPaiement(409,
-                existant.statut === 'valide' ? 'Déjà réglé.' : 'Un paiement est déjà en attente de validation.',
-                existant.statut === 'valide' ? 'DEJA_REGLE' : 'EN_ATTENTE');
+        if (du.typePaiement !== 'DEPOT') {
+            const existant = await paiementExistant(commandeId, reservationId, du.typePaiement);
+            if (existant) {
+                throw new ErreurPaiement(409,
+                    existant.statut === 'valide' ? 'Déjà réglé.' : 'Un paiement est déjà en attente de validation.',
+                    existant.statut === 'valide' ? 'DEJA_REGLE' : 'EN_ATTENTE');
+            }
         }
-        return res.json({ success: true, data: { ...du, devise: 'FCFA' } });
+        const { parts, commission, net, tauxCommission, fournisseurId, ...visible } = du; // jamais exposés
+        return res.json({ success: true, data: { ...visible, devise: 'FCFA' } });
     } catch (e) { return reponseErreur(res, e, 'getAPayer'); }
 };
 
@@ -135,51 +140,68 @@ exports.definirModeReservation = async (req, res) => {
 // 6. Création d'un paiement (commande, mission ou dépôt de commission)
 //    Le montant n'est JAMAIS lu depuis le client.
 // ═══════════════════════════════════════════════════════════
+// Enregistre le paiement + sa ventilation par partenaire et marque la cible « en attente »
+async function creerPaiement(du, { commandeId, reservationId, user, mode, telephone, nom, messageClient, referenceClient, transactionId }, t) {
+    const paiement = await Paiement.create({
+        commandeId: commandeId || null,
+        reservationId: reservationId || null,
+        clientId: user.id,
+        fournisseurId: du.fournisseurId,
+        typePaiement: du.typePaiement,
+        montant: du.montant,
+        tauxCommission: du.tauxCommission,
+        commissionKanari: du.commission,
+        montantNet: du.net,
+        telephone: String(telephone).trim(),
+        nom: nom?.trim() || user.nom || 'Client',
+        statut: 'en_attente',
+        modePaiement: mode,
+        transactionId: transactionId || 'NV-TRX-' + uuidv4().substring(0, 8).toUpperCase(),
+        referenceClient: referenceClient?.trim() || `REF-${Date.now()}`,
+        messageClient: messageClient?.trim() || null
+    }, { transaction: t });
+
+    if (du.parts?.length) {
+        await PaiementPart.bulkCreate(du.parts.map((x) => ({
+            paiementId: paiement.id, fournisseurId: x.fournisseurId, montant: x.montant,
+            commission: x.commission, net: x.net, taux: x.taux
+        })), { transaction: t });
+    }
+    if (du.typePaiement === 'MISSION') await Reservation.update({ statutPaiement: 'en_attente' }, { where: { id: reservationId }, transaction: t });
+    if (du.typePaiement === 'COMMANDE') await Commande.update({ statutPaiement: 'en_attente' }, { where: { id: commandeId }, transaction: t });
+    return paiement;
+}
+
 exports.createMobileMoneyPaiement = async (req, res) => {
     const t = await sequelize.transaction();
     try {
-        const { commandeId, reservationId, telephone, nom, messageClient, referenceClient, modePaiement } = req.body;
+        const { commandeId, reservationId, depot, telephone, nom, messageClient, referenceClient, modePaiement } = req.body;
 
         if (!req.user?.id) throw new ErreurPaiement(401, 'Session expirée ou utilisateur non identifié.');
-        if (!!commandeId === !!reservationId) throw new ErreurPaiement(400, 'Fournir soit commandeId, soit reservationId.');
+        if ([commandeId, reservationId, depot].filter(Boolean).length !== 1) throw new ErreurPaiement(400, 'Fournir commandeId, reservationId ou depot.');
         if (!telephone || !String(telephone).trim()) throw new ErreurPaiement(400, 'Le téléphone est obligatoire.');
+        if (!referenceClient || !String(referenceClient).trim()) throw new ErreurPaiement(400, 'La référence de la transaction est obligatoire.');
 
         const mode = modePaiement || 'mobile_money';
         if (!['mobile_money', 'carte_bancaire', 'depot_kanari', 'orange_money', 'moov_money', 'airtel_money', 'amanata', 'mynita', 'virement_bancaire'].includes(mode)) {
             throw new ErreurPaiement(400, 'Mode de paiement non autorisé.');
         }
 
-        const du = await calculerDu({ commandeId, reservationId, user: req.user, t });
+        const du = await calculerDu({ commandeId, reservationId, depotMontant: depot, user: req.user, t });
         if (du.montant <= 0) throw new ErreurPaiement(409, 'Aucun montant à régler.');
 
-        const existant = await paiementExistant(commandeId, reservationId, du.typePaiement, t);
-        if (existant) {
-            throw new ErreurPaiement(409,
-                existant.statut === 'valide' ? 'Déjà réglé.' : 'Un paiement est déjà en attente de validation.');
+        if (du.typePaiement === 'DEPOT') {
+            const enCours = await Paiement.count({ where: { clientId: req.user.id, typePaiement: 'DEPOT', statut: 'en_attente' }, transaction: t });
+            if (enCours >= 3) throw new ErreurPaiement(409, 'Vous avez déjà 3 dépôts en attente de vérification.');
+        } else {
+            const existant = await paiementExistant(commandeId, reservationId, du.typePaiement, t);
+            if (existant) {
+                throw new ErreurPaiement(409,
+                    existant.statut === 'valide' ? 'Déjà réglé.' : 'Un paiement est déjà en attente de validation.');
+            }
         }
 
-        const paiement = await Paiement.create({
-            commandeId: commandeId || null,
-            reservationId: reservationId || null,
-            clientId: req.user.id,
-            fournisseurId: du.fournisseurId,
-            typePaiement: du.typePaiement,
-            montant: du.montant,
-            tauxCommission: du.tauxCommission,
-            commissionKanari: du.commission,
-            montantNet: du.net,
-            telephone: String(telephone).trim(),
-            nom: nom?.trim() || req.user.nom || 'Client',
-            statut: 'en_attente',
-            modePaiement: mode,
-            transactionId: 'NV-TRX-' + uuidv4().substring(0, 8).toUpperCase(),
-            referenceClient: referenceClient?.trim() || `REF-${Date.now()}`,
-            messageClient: messageClient?.trim() || null
-        }, { transaction: t });
-
-        if (du.typePaiement === 'MISSION') {
-            await Reservation.update({ statutPaiement: 'en_attente' }, { where: { id: reservationId }, transaction: t });
-        }
+        const paiement = await creerPaiement(du, { commandeId, reservationId, user: req.user, mode, telephone, nom, messageClient, referenceClient }, t);
 
         await t.commit();
         return res.status(201).json({
@@ -190,6 +212,40 @@ exports.createMobileMoneyPaiement = async (req, res) => {
     } catch (e) {
         if (!t.finished) await t.rollback();
         return reponseErreur(res, e, 'createMobileMoneyPaiement');
+    }
+};
+
+// ═══════════════════════════════════════════════════════════
+// 6 bis. Paiement avec le portefeuille (dépôt + récompenses + gains) : immédiat, sans attente de l'admin,
+//        car cet argent a déjà été vérifié. Même calcul serveur, mêmes commissions, même facture.
+// ═══════════════════════════════════════════════════════════
+exports.payerParPortefeuille = async (req, res) => {
+    const t = await sequelize.transaction();
+    try {
+        const { commandeId, reservationId } = req.body;
+        if (!req.user?.id) throw new ErreurPaiement(401, 'Session expirée.');
+        if (!!commandeId === !!reservationId) throw new ErreurPaiement(400, 'Fournir soit commandeId, soit reservationId.');
+
+        const du = await calculerDu({ commandeId, reservationId, user: req.user, t });
+        if (du.montant <= 0) throw new ErreurPaiement(409, 'Aucun montant à régler.');
+        const existant = await paiementExistant(commandeId, reservationId, du.typePaiement, t);
+        if (existant) throw new ErreurPaiement(409, existant.statut === 'valide' ? 'Déjà réglé.' : 'Un paiement est déjà en attente de validation.');
+
+        const ref = 'WAL-' + uuidv4().substring(0, 8).toUpperCase();
+        const paiement = await creerPaiement(du, {
+            commandeId, reservationId, user: req.user, mode: 'portefeuille', telephone: req.user.telephone || 'portefeuille',
+            nom: req.user.nom, messageClient: 'Payé avec le portefeuille Kanari', referenceClient: ref, transactionId: ref
+        }, t);
+
+        await PF.debiterPortefeuille(req.user.id, du.montant, paiement.id, t);       // échoue si solde insuffisant → tout est annulé
+        const { notifications } = await appliquerStatut(paiement, 'valide', { motif: null }, t);
+        await t.commit();
+
+        notifications.forEach((n) => notifierFournisseur(n.fournisseurId, n.title, n.body));
+        return res.status(201).json({ success: true, message: 'Paiement effectué avec votre portefeuille.', data: paiement });
+    } catch (e) {
+        if (!t.finished) await t.rollback();
+        return reponseErreur(res, e, 'payerParPortefeuille');
     }
 };
 
@@ -211,23 +267,11 @@ exports.updateStatutPaiement = async (req, res) => {
             return res.status(200).json({ success: true, message: 'Le paiement possède déjà ce statut.', data: p });
         }
 
-        await appliquerStatut(p, statut, { motif }, t);
+        const { notifications } = await appliquerStatut(p, statut, { motif }, t);
         await t.commit();
 
-        // Notifications APRÈS commit (non bloquantes)
-        if (statut === 'valide' && p.fournisseurId) {
-            const f = (n) => Number(n).toLocaleString('fr-FR') + ' FCFA';
-            if (p.typePaiement === 'COMMANDE') {
-                notifierFournisseur(p.fournisseurId, 'Nouvelle vente 🛒',
-                    `Un client a acheté. Total ${f(p.montant)} · commission Kanari ${f(p.commissionKanari)} · votre net ${f(p.montantNet)}`);
-            } else if (p.typePaiement === 'MISSION') {
-                notifierFournisseur(p.fournisseurId, 'Mission payée ✅',
-                    `Total ${f(p.montant)} · commission ${f(p.commissionKanari)} · crédité ${f(p.montantNet)}`);
-            } else {
-                notifierFournisseur(p.fournisseurId, 'Commission reçue ✅',
-                    `Votre dépôt de ${f(p.montant)} a bien été validé.`);
-            }
-        }
+        // Notifications APRÈS commit (non bloquantes) : un message par fournisseur concerné
+        notifications.forEach((n) => notifierFournisseur(n.fournisseurId, n.title, n.body));
 
         return res.status(200).json({ success: true, message: `Paiement mis à jour : ${statut}.`, data: p });
     } catch (e) {
@@ -237,30 +281,18 @@ exports.updateStatutPaiement = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// 8. Vue prestataire : total, commission Kanari et net
+// 8. CLIENT : situation financière — missions ET commandes boutique
+//    1 mission = 1 bon (prix final) = 1 paiement. 1 commande = 1 paiement.
 // ═══════════════════════════════════════════════════════════
-exports.getPaiementsFournisseur = async (req, res) => {
-    try {
-        const profil = await Fournisseur.findOne({ where: { userId: req.user.id }, attributes: ['id'] });
-        if (!profil) throw new ErreurPaiement(403, 'Profil prestataire introuvable.');
-
-        const data = await Paiement.findAll({
-            where: { fournisseurId: profil.id, typePaiement: { [Op.ne]: 'COMMISSION' }, statut: 'valide' },
-            order: [['createdAt', 'DESC']]
-        });
-        const somme = (k) => data.reduce((s, p) => s + Number(p[k]), 0);
-        return res.json({
-            success: true,
-            data,
-            totaux: { total: somme('montant'), commission: somme('commissionKanari'), net: somme('montantNet') }
-        });
-    } catch (e) { return reponseErreur(res, e, 'getPaiementsFournisseur'); }
+const choisirPaiement = (liste) => {
+    const pays = [...(liste || [])].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return pays.find((p) => ['valide', 'en_attente'].includes(p.statut)) || pays[0] || null;
 };
+const resumePaiement = (p) => (p ? {
+    id: p.id, statut: p.statut, transactionId: p.transactionId, modePaiement: p.modePaiement,
+    referenceClient: p.referenceClient, motif: p.motif, date: p.confirmationDate || p.createdAt
+} : null);
 
-// ═══════════════════════════════════════════════════════════
-// 9. CLIENT : situation financière, mission par mission
-//    1 mission = 1 bon (prix final) = 1 paiement. Le « devis » n'est qu'une estimation.
-// ═══════════════════════════════════════════════════════════
 exports.getClientMissions = async (req, res) => {
     try {
         const reservations = await Reservation.findAll({
@@ -275,8 +307,7 @@ exports.getClientMissions = async (req, res) => {
 
         const data = reservations.map((r) => {
             const bon = r.bonIntervention;
-            const pays = [...(r.paiements || [])].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-            const paiement = pays.find((p) => ['valide', 'en_attente'].includes(p.statut)) || pays[0] || null;
+            const paiement = choisirPaiement(r.paiements);
             const direct = MODES_DIRECTS.includes(r.modePaiement);
             const montant = bon
                 ? Number(bon.montantFinal ?? (Number(bon.montantMainOeuvre || 0) + Number(bon.montantPiecesOutils || 0)))
@@ -294,58 +325,84 @@ exports.getClientMissions = async (req, res) => {
             else etat = 'a_payer';
 
             return {
-                reservationId: r.id,
-                serviceNom: r.serviceNom,
-                statutMission: r.statut,
-                modePaiement: r.modePaiement,
+                reservationId: r.id, serviceNom: r.serviceNom, statutMission: r.statut, modePaiement: r.modePaiement,
                 montant,
                 mainOeuvre: bon ? Number(bon.montantMainOeuvre || 0) : null,
                 pieces: bon ? Number(bon.montantPiecesOutils || 0) : null,
-                etat,
-                paiement: paiement ? {
-                    id: paiement.id, statut: paiement.statut, transactionId: paiement.transactionId,
-                    modePaiement: paiement.modePaiement, referenceClient: paiement.referenceClient,
-                    motif: paiement.motif, date: paiement.confirmationDate || paiement.createdAt
-                } : null
+                etat, paiement: resumePaiement(paiement)
             };
         });
 
-        const somme = (etat) => data.filter((x) => x.etat === etat).reduce((s, x) => s + (x.montant || 0), 0);
-        const commandesPayees = Number(await Paiement.sum('montant', {
-            where: { clientId: req.user.id, typePaiement: 'COMMANDE', statut: 'valide' }
-        })) || 0;
+        const cmds = await Commande.findAll({
+            where: { clientId: req.user.id },
+            include: [{ model: Paiement, as: 'paiements', required: false, where: { typePaiement: 'COMMANDE' } }],
+            order: [['createdAt', 'DESC']]
+        });
+        const commandes = cmds.map((c) => {
+            const paiement = choisirPaiement(c.paiements);
+            let etat;
+            if (paiement?.statut === 'valide') etat = 'paye';
+            else if (paiement?.statut === 'en_attente') etat = 'en_attente';
+            else if (paiement?.statut === 'rembourse') etat = 'rembourse';
+            else if (c.statut === 'annulée') etat = 'annulee';
+            else if (paiement?.statut === 'rejete') etat = 'rejete';
+            else etat = 'a_payer';
+            return {
+                commandeId: c.id, montant: Number(c.montantTotal), etat, statutCommande: c.statut,
+                date: c.createdAt, paiement: resumePaiement(paiement)
+            };
+        });
 
+        const somme = (arr, etat) => arr.filter((x) => x.etat === etat).reduce((s, x) => s + (x.montant || 0), 0);
         return res.json({
-            success: true,
-            data,
-            totaux: { paye: somme('paye') + commandesPayees, enAttente: somme('en_attente'), aPayer: somme('a_payer') }
+            success: true, data, commandes,
+            totaux: {
+                paye: somme(data, 'paye') + somme(commandes, 'paye'),
+                enAttente: somme(data, 'en_attente') + somme(commandes, 'en_attente'),
+                aPayer: somme(data, 'a_payer') + somme(commandes, 'a_payer')
+            }
         });
     } catch (e) { return reponseErreur(res, e, 'getClientMissions'); }
 };
 
 // ═══════════════════════════════════════════════════════════
-// 10. PRESTATAIRE : portefeuille (solde, encaissements, commissions dues + retard)
-//     Le retard est calculé à la lecture (date limite dépassée) : aucun cron nécessaire.
+// 9. PRESTATAIRE : portefeuille (solde, encaissements, commissions dues + retard)
+//    Les encaissements viennent de la ventilation (paiement_parts) : un panier multi-fournisseurs
+//    donne à chacun SA part. Le retard est calculé à la lecture (aucun cron nécessaire).
 // ═══════════════════════════════════════════════════════════
 exports.getPortefeuilleFournisseur = async (req, res) => {
     try {
         const profil = await Fournisseur.findOne({ where: { userId: req.user.id }, attributes: ['id'] });
         if (!profil) throw new ErreurPaiement(403, 'Profil prestataire introuvable.');
         const fid = profil.id;
+        const TYPES = { [Op.in]: ['COMMANDE', 'MISSION'] };
+        const STATUTS = { [Op.in]: ['valide', 'en_attente'] };
 
         const solde = await Solde.findOne({ where: { fournisseurId: fid } });
-        const paiements = await Paiement.findAll({
-            where: { fournisseurId: fid, typePaiement: { [Op.in]: ['COMMANDE', 'MISSION'] }, statut: { [Op.in]: ['valide', 'en_attente'] } },
-            order: [['createdAt', 'DESC']], limit: 300
+
+        const parts = await PaiementPart.findAll({ where: { fournisseurId: fid } });
+        const idsParts = parts.map((x) => x.paiementId);
+        const partParPaiement = new Map(parts.map((x) => [x.paiementId, x]));
+        const avecParts = idsParts.length
+            ? await Paiement.findAll({ where: { id: { [Op.in]: idsParts }, typePaiement: TYPES, statut: STATUTS } })
+            : [];
+        const anciens = await Paiement.findAll({ // paiements d'avant la ventilation
+            where: { fournisseurId: fid, typePaiement: TYPES, statut: STATUTS, ...(idsParts.length ? { id: { [Op.notIn]: idsParts } } : {}) }
         });
-        const ligne = (p) => ({
+
+        const ligne = (p, part) => ({
             id: p.id, type: p.typePaiement, commandeId: p.commandeId, reservationId: p.reservationId,
-            montant: Number(p.montant), commission: Number(p.commissionKanari), net: Number(p.montantNet),
-            taux: Number(p.tauxCommission), statut: p.statut, modePaiement: p.modePaiement,
-            transactionId: p.transactionId, date: p.confirmationDate || p.createdAt
+            montant: Number(part ? part.montant : p.montant),
+            commission: Number(part ? part.commission : p.commissionKanari),
+            net: Number(part ? part.net : p.montantNet),
+            taux: Number(part ? part.taux : p.tauxCommission),
+            statut: p.statut, modePaiement: p.modePaiement, transactionId: p.transactionId,
+            date: p.confirmationDate || p.createdAt
         });
-        const encaissements = paiements.filter((p) => p.statut === 'valide').map(ligne);
-        const enAttente = paiements.filter((p) => p.statut === 'en_attente').map(ligne);
+        const toutes = [...avecParts.map((p) => ligne(p, partParPaiement.get(p.id))), ...anciens.map((p) => ligne(p))]
+            .sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 300);
+        const encaissements = toutes.filter((x) => x.statut === 'valide');
+        const enAttente = toutes.filter((x) => x.statut === 'en_attente');
 
         // Missions réglées directement au prestataire : il doit sa commission à Kanari
         const directes = await Reservation.findAll({

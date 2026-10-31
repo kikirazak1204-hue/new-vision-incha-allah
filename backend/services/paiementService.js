@@ -16,13 +16,7 @@ const MODES_DIRECTS = ['direct_prestataire', 'especes'];                   // le
 const arrondi = (n) => Math.round(Number(n) || 0);
 const fmt = (n) => Number(n).toLocaleString('fr-FR') + ' FCFA';
 
-class ErreurPaiement extends Error {
-    constructor(status, message, code) {
-        super(message);
-        this.status = status;
-        this.code = code;
-    }
-}
+const { ErreurPaiement } = PF; // même classe d'erreur partout
 
 // ═══════════════════════════════════════════════════════════
 // COMMANDES : lignes (prix figés) et ventilation par fournisseur
@@ -76,8 +70,19 @@ function ventilerCommande(lignes, frais, total) {
 // ═══════════════════════════════════════════════════════════
 // MONTANT DÛ — toujours calculé par le serveur.
 // ═══════════════════════════════════════════════════════════
-async function calculerDu({ commandeId, reservationId, user, t }) {
+async function calculerDu({ commandeId, reservationId, depotMontant, user, t }) {
     const opt = t ? { transaction: t, lock: t.LOCK.UPDATE } : {};
+
+    // ── DÉPÔT sur le portefeuille (montant choisi par la personne, borné) ─────
+    if (depotMontant) {
+        const m = arrondi(depotMontant);
+        if (m < PF.DEPOT_MIN) throw new ErreurPaiement(400, `Dépôt minimum : ${PF.DEPOT_MIN} FCFA.`);
+        if (m > PF.DEPOT_MAX) throw new ErreurPaiement(400, `Dépôt maximum : ${PF.DEPOT_MAX.toLocaleString('fr-FR')} FCFA.`);
+        return {
+            typePaiement: 'DEPOT', montant: m, fournisseurId: null, tauxCommission: 0, commission: 0, net: 0, parts: [],
+            details: { articles: [{ nom: 'Dépôt sur mon portefeuille Kanari', quantite: 1, sousTotal: m }] }
+        };
+    }
 
     // ── COMMANDE BOUTIQUE (panier, 1 à N fournisseurs) ─────
     if (commandeId) {
@@ -171,7 +176,7 @@ async function partsDe(p, t) {
 }
 
 async function crediter(p, t) {
-    if (p.typePaiement === 'COMMISSION' || p.soldeCredite) return;
+    if (p.typePaiement === 'COMMISSION' || p.typePaiement === 'DEPOT' || p.soldeCredite) return;
     for (const part of await partsDe(p, t)) {
         let s = await Solde.findOne({ where: { fournisseurId: part.fournisseurId }, transaction: t, lock: t.LOCK.UPDATE });
         if (!s) s = await Solde.create({ fournisseurId: part.fournisseurId }, { transaction: t });
@@ -236,7 +241,7 @@ async function debiter(p, t) {
 // FACTURE (1 par paiement validé, hors dépôt de commission)
 // ═══════════════════════════════════════════════════════════
 async function creerFacture(p, t) {
-    if (p.typePaiement === 'COMMISSION') return;
+    if (p.typePaiement === 'COMMISSION' || p.typePaiement === 'DEPOT') return;
     await Facture.findOrCreate({
         where: { paiementId: p.id },
         defaults: {
@@ -283,6 +288,8 @@ async function appliquerStatut(p, nouveau, { motif }, t) {
             await Commande.update({ statut: 'validée' }, { where: { id: comId, statut: 'en_attente' }, transaction: t });
         } else if (p.typePaiement === 'MISSION') {
             await Reservation.update({ statutPaiement: 'paye' }, { where: { id: resId }, transaction: t });
+        } else if (p.typePaiement === 'DEPOT') {
+            await PF.crediterDepot(p, t);
         } else { // COMMISSION déposée par le prestataire
             await Reservation.update({ commissionStatut: 'recue' }, { where: { id: resId }, transaction: t });
         }
@@ -296,7 +303,9 @@ async function appliquerStatut(p, nouveau, { motif }, t) {
 
     if (nouveau === 'rembourse') {
         p.motif = motif || null;
+        if (p.typePaiement === 'DEPOT') await PF.annulerDepot(p, t);
         await debiter(p, t);
+        await PF.restituerPaiementPortefeuille(p, t);
         await Facture.update({ statut: 'annulée' }, { where: { paiementId: p.id }, transaction: t });
         if (p.typePaiement === 'COMMANDE') await Commande.update({ statut: 'annulée', statutPaiement: 'rembourse' }, { where: { id: comId }, transaction: t });
         if (p.typePaiement === 'MISSION') await Reservation.update({ statutPaiement: 'non_paye' }, { where: { id: resId }, transaction: t });
