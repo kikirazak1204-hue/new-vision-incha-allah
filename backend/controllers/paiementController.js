@@ -19,7 +19,7 @@ const reponseErreur = (res, error, contexte) => {
         return res.status(409).json({ success: false, message: 'Cette référence de paiement a déjà été enregistrée.' });
     }
     console.error(`❌ Erreur ${contexte}:`, error);
-    return res.status(500).json({ success: false, message: 'Erreur serveur.' });
+    return res.status(500).json({ success: false, message: 'Erreur serveur.', detail: error.message });
 };
 
 const paiementExistant = (commandeId, reservationId, typePaiement, t) =>

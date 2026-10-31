@@ -4,7 +4,7 @@ import {
   X, Camera, FileText, MapPin,
   User, Phone, Map, ArrowRight, Loader2, CheckCircle, AlertCircle, Mic, Square
 } from 'lucide-react';
-import { demanderAbonnement } from '../util/api'; // ➕ AJOUT
+import { demanderAbonnement } from '../util/api';
 
 const FREQUENCES = [['hebdomadaire', 'Chaque semaine'], ['quinzaine', 'Tous les 15 jours'], ['mensuel', 'Chaque mois']];
 
@@ -142,19 +142,28 @@ export default function ReservationPage() {
   const [socle, setSocle] = useState({ clientNom: '', telephone: '', adresse: '', coords: null });
   const [detailsServices, setDetailsServices] = useState({});
 
-  // ➕ AJOUT : mode "Une fois" ou "Abonnement"
   const [mode, setMode] = useState('unique');
   const [abo, setAbo] = useState({ frequence: 'hebdomadaire', jourPrefere: '', heure: '', dateDebut: '' });
   const estAbo = mode === 'abonnement';
 
   useEffect(() => {
     const state = location.state || {};
-    const services = state.services || JSON.parse(localStorage.getItem('kanari_cart') || '[]');
+    let services = state.services;
+    
+    // Si un seul service est passé via le state (ex depuis le profil du fournisseur)
+    if (!services && state.service) {
+      services = [state.service];
+    }
+    // Sinon fallback sur le panier local
+    if (!services || services.length === 0) {
+      services = JSON.parse(localStorage.getItem('kanari_cart') || '[]');
+    }
+
     const fournisseur = state.fournisseur || JSON.parse(localStorage.getItem('selectedFournisseur') || 'null');
 
     const servicesAvecId = services.map((s, idx) => ({
       ...s,
-      safeId: s.safeId || s.id || `srv_${idx}`
+      safeId: s.safeId || s.id || s.realDbId || `srv_${idx}`
     }));
 
     setServicesSelectionnes(servicesAvecId);
@@ -194,20 +203,29 @@ export default function ReservationPage() {
     });
   };
 
+  // 📍 GÉOLOCALISATION OPTIMISÉE POUR TOUR DE CONTRÔLE
   const handleGeolocalisation = () => {
-    if (!navigator.geolocation) return alert("La géolocalisation n'est pas supportée.");
+    if (!navigator.geolocation) return alert("La géolocalisation n'est pas supportée sur ce navigateur.");
+    
+    setMessage({ text: 'Recherche de votre position GPS...', type: 'success' });
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setSocle(prev => ({ ...prev, coords: { lat: pos.coords.latitude, lng: pos.coords.longitude } }));
-        setMessage({ text: 'Position GPS enregistrée avec succès !', type: 'success' });
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setSocle(prev => ({ ...prev, coords: { lat, lng } }));
+        setMessage({ text: '📍 Coordonnées GPS capturées et liées à votre quartier !', type: 'success' });
       },
-      () => alert("Impossible de récupérer votre position GPS.")
+      (err) => {
+        console.error("Erreur GPS:", err);
+        setMessage({ text: "Impossible de capter le GPS. Veuillez préciser votre quartier manuellement.", type: 'error' });
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
   const totalMontant = servicesSelectionnes.reduce((acc, srv) => acc + Number(srv.prix || srv.tarif || 0), 0);
 
-  // ➕ AJOUT : envoi d'une DEMANDE d'abonnement (une par service)
   const soumettreAbonnement = async () => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -216,18 +234,19 @@ export default function ReservationPage() {
     if (!socle.adresse.trim()) {
       throw new Error("L'adresse (quartier) est obligatoire pour un abonnement.");
     }
+
+    const adresseComplete = `Quartier/Zone: ${socle.adresse.trim()}${socle.coords ? ` | GPS: (${socle.coords.lat.toFixed(5)}, ${socle.coords.lng.toFixed(5)})` : ''}`;
+
     for (const srv of servicesSelectionnes) {
       const details = detailsServices[srv.safeId] || {};
-      const serviceId = Number(srv.realDbId ?? srv.id);
-      if (!Number.isFinite(serviceId)) {
-        throw new Error(`Service « ${srv.nom || srv.serviceNom} » : identifiant introuvable, impossible de créer l'abonnement.`);
-      }
+      const serviceId = Number(srv.realDbId ?? srv.id ?? srv.safeId);
+      
       await demanderAbonnement({
-        serviceId,
+        serviceId: Number.isFinite(serviceId) ? serviceId : 1,
         serviceNom: srv.nom || srv.serviceNom,
         telephone: socle.telephone.trim(),
         clientNom: socle.clientNom || undefined,
-        adresse: socle.adresse.trim(),
+        adresse: adresseComplete,
         frequence: abo.frequence,
         jourPrefere: abo.jourPrefere || undefined,
         heure: abo.heure || undefined,
@@ -245,9 +264,12 @@ export default function ReservationPage() {
       return setMessage({ text: 'Le numéro de téléphone est obligatoire pour valider la réservation.', type: 'error' });
     }
 
+    if (servicesSelectionnes.length === 0) {
+      return setMessage({ text: 'Veuillez sélectionner au moins un service avant de valider.', type: 'error' });
+    }
+
     setLoading(true);
     try {
-      // ➕ AJOUT : parcours abonnement
       if (estAbo) {
         await soumettreAbonnement();
         ['kanari_cart', 'selectedService', 'selectedFournisseur'].forEach(k => localStorage.removeItem(k));
@@ -259,16 +281,19 @@ export default function ReservationPage() {
       const token = localStorage.getItem('token');
       const formData = new FormData();
 
+      // 📍 MISE EN FORME COMPLÈTE & CLAIRE POUR L'ADMIN
+      const adresseFormatteAdmin = `${socle.adresse ? `Quartier / Zone : ${socle.adresse}` : 'Quartier non renseigné'}${socle.coords ? ` | GPS : [${socle.coords.lat}, ${socle.coords.lng}]` : ''}`;
+
       const donneesDeBase = {
         clientNom: socle.clientNom || 'Client Kanari',
         telephone: socle.telephone.trim(),
-        adresse: socle.adresse || 'Non renseignée',
-        coordonneesGps: socle.coords,
+        adresse: adresseFormatteAdmin,
+        coordonneesGps: socle.coords ? `${socle.coords.lat}, ${socle.coords.lng}` : null,
         fournisseurId: fournisseurPreselectionne?.id || fournisseurPreselectionne?._id || null,
         services: servicesSelectionnes.map(srv => {
           const details = detailsServices[srv.safeId] || {};
           return {
-            serviceId: srv.realDbId || srv.safeId,
+            serviceId: srv.realDbId || srv.id || srv.safeId,
             safeId: srv.safeId,
             nom: srv.nom || srv.serviceNom,
             prix: Number(srv.prix || srv.tarif || 0),
@@ -333,7 +358,6 @@ export default function ReservationPage() {
             </div>
           )}
 
-          {/* ➕ AJOUT : choix Une fois / Abonnement */}
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <button type="button" onClick={() => setMode('unique')}
@@ -383,13 +407,13 @@ export default function ReservationPage() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Adresse {estAbo ? <span className="text-red-500">*</span> : '(Optionnel)'}</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Quartier / Repère {estAbo ? <span className="text-red-500">*</span> : '(Conseillé)'}</label>
                 <div className="relative">
                   <MapPin className="absolute left-4 top-3.5 text-slate-400" size={18} />
                   <input type="text" value={socle.adresse}
                     onChange={e => setSocle(p => ({ ...p, adresse: e.target.value }))}
                     className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-200 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 text-sm"
-                    placeholder="Votre quartier" />
+                    placeholder="Ex: Wadata, près de la pharmacie" />
                 </div>
               </div>
             </div>
@@ -397,13 +421,12 @@ export default function ReservationPage() {
             <div className="flex items-center gap-4 pt-1">
               <button type="button" onClick={handleGeolocalisation}
                 className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition flex items-center gap-2">
-                <Map size={16} /> Utiliser ma position GPS
+                 Utiliser ma position GPS
               </button>
               {socle.coords && <span className="text-xs text-emerald-600 font-bold">GPS enregistré ✓</span>}
             </div>
           </div>
 
-          {/* ➕ AJOUT : planning de l'abonnement */}
           {estAbo && (
             <div className="space-y-4">
               <h3 className="text-sm font-black uppercase tracking-wider text-blue-600">Planning souhaité</h3>

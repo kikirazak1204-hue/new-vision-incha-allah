@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePanier } from '../../context/PanierContext';
+import { creerCommande } from '../../util/paiementsApi';
 
 const API_URL = import.meta.env?.VITE_API_URL || 'http://localhost:5000';
 
@@ -27,6 +28,10 @@ export default function PanierPage() {
     } = usePanier();
 
     const [devise, setDevise] = useState('FCFA');
+    const [adresse, setAdresse] = useState('');
+    const [telephone, setTelephone] = useState('');
+    const [envoi, setEnvoi] = useState(false);
+    const [erreur, setErreur] = useState('');
 
     const tauxConversion = { FCFA: 1, EUR: 1 / 655.95, USD: 1 / 600 };
     const symbolesDevise = { FCFA: 'FCFA', EUR: '€', USD: '$' };
@@ -37,31 +42,28 @@ export default function PanierPage() {
         return `${montantConverti.toFixed(2)} ${symbolesDevise[devise]}`;
     };
 
-    // ⭐ FONCTION DE REDIRECTION ROBUSTE VERS LE PAIEMENT
-    const handleProcederPaiement = () => {
-        if (!panier || panier.length === 0) return;
-
-        // 1. Création d'un objet commande standardisé
-        const commandeData = {
-            id: 'CMD-' + Date.now(),
-            articles: panier,
-            montantTotal: totalPanier,
-            devise: devise,
-            date: new Date().toISOString()
-        };
-
-        // 2. Sauvegarde de secours dans le localStorage (anti-bug si F5/rechargement)
-        localStorage.setItem('commandeCourante', JSON.stringify(commandeData));
-
-        // 3. Navigation avec transmission complète dans le state
-        navigate('/paiement', {
-            state: {
-                commande: commandeData, // Format attendu par la plupart des logiques
-                panier: panier,         // Format alternatif
-                total: totalPanier,     // Format alternatif
-                devise: devise
-            }
-        });
+    // Crée la commande côté serveur (prix relus en base), puis ouvre l'unique page de paiement
+    const handleProcederPaiement = async () => {
+        if (!panier || panier.length === 0 || envoi) return;
+        if (!adresse.trim() || telephone.replace(/\D/g, '').length < 8) {
+            setErreur("Indiquez votre adresse de livraison et un numéro de téléphone valide.");
+            return;
+        }
+        setEnvoi(true); setErreur('');
+        try {
+            const r = await creerCommande({
+                produits: panier.map((i) => ({ produitId: i.id || i._id, quantite: i.quantite })),
+                fraisLivraison: 0,
+                adresseLivraison: adresse.trim(),
+                telephoneLivraison: telephone.trim()
+            });
+            viderPanier();
+            navigate('/paiement', { state: { commandeId: r.commandeId } });
+        } catch (e) {
+            setErreur(e.message || 'Impossible de créer la commande.');
+        } finally {
+            setEnvoi(false);
+        }
     };
 
     return (
@@ -226,6 +228,18 @@ export default function PanierPage() {
                                 </div>
                             </div>
 
+                            <div className="space-y-3">
+                                <input
+                                    value={adresse} onChange={(e) => setAdresse(e.target.value)} placeholder="Adresse de livraison"
+                                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                                />
+                                <input
+                                    value={telephone} onChange={(e) => setTelephone(e.target.value)} placeholder="Téléphone" inputMode="tel"
+                                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                                />
+                                {erreur && <p className="text-xs font-semibold text-rose-400">{erreur}</p>}
+                            </div>
+
                             <div className="border-t border-slate-800 pt-4 flex items-baseline justify-between">
                                 <span className="font-bold text-base">Total</span>
                                 <p className="text-2xl font-black text-purple-400">{formatPrix(totalPanier)}</p>
@@ -233,9 +247,10 @@ export default function PanierPage() {
 
                             <button
                                 onClick={handleProcederPaiement}
-                                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 text-white font-black text-sm py-4 rounded-xl transition shadow-lg shadow-purple-900/30 active:scale-[0.98]"
+                                disabled={envoi}
+                                className="disabled:opacity-60 w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 text-white font-black text-sm py-4 rounded-xl transition shadow-lg shadow-purple-900/30 active:scale-[0.98]"
                             >
-                                Procéder au paiement 💳
+                                {envoi ? 'Création de la commande…' : 'Procéder au paiement 💳'}
                             </button>
                         </div>
                     </div>

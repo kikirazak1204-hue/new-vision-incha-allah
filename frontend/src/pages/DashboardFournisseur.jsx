@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { getDashboardFournisseur, getProduitsFournisseur, deleteProduit, addProduit } from '../util/api';
 import { useNotification } from '../context/NotificationContext.jsx';
-import SoldeRetrait from '../components/SoldeRetrait';
+import PortefeuilleFournisseur from '../components/paiements/PortefeuilleFournisseur';
+import OngletCommandesFournisseur from '../components/paiements/OngletCommandesFournisseur';
 import { STATUT, STATUT_FALLBACK, BADGE_PROFIL, STATUTS_TELEPHONE_VISIBLE } from '../constants/statuts';
 import BonInterventionPrint from '../components/BonInterventionPrint';
 
@@ -1010,33 +1011,9 @@ export default function DashboardFournisseur({ setCurrentView }) {
                     <section className="space-y-6 text-left">
                         <div className="bg-white p-6 rounded-3xl border border-slate-200">
                             <h2 className="text-2xl font-black text-[#061a3a]">Commandes de la Boutique</h2>
-                            <p className="text-slate-500 text-xs mt-1">Achats directs passés sur votre vitrine Kanari</p>
+                            <p className="text-slate-500 text-xs mt-1">Commandes payées : préparez, expédiez et suivez la livraison</p>
                         </div>
-                        {commandesRecentes.length === 0 ? (
-                            <div className="text-center py-20 bg-white border border-slate-200 rounded-3xl text-slate-500">
-                                <p className="text-sm font-medium">Aucune commande récente.</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">
-                                {commandesRecentes.map(cmd => (
-                                    <div key={cmd.id} className="bg-white border border-slate-200 rounded-3xl p-6 space-y-4 shadow-xl">
-                                        <div className="flex justify-between items-center pb-3 border-b border-slate-200">
-                                            <span className="font-extrabold text-[#061a3a] text-base">Commande #{cmd.id}</span>
-                                            <span className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">{new Date(cmd.createdAt).toLocaleDateString('fr-FR')}</span>
-                                        </div>
-                                        <p className="text-xs text-slate-500 font-medium">Destinataire : <span className="text-[#061a3a] font-bold">{cmd.clientCommande?.nom || 'Non spécifié'}</span></p>
-                                        <div className="space-y-2 pt-1">
-                                            {cmd.itemsCommande?.map(item => (
-                                                <div key={item.id} className="flex justify-between items-center text-xs bg-slate-50 rounded-xl px-3.5 py-2.5 border border-slate-200">
-                                                    <span className="text-[#334155] font-semibold">{item.produitCommandeProduit?.nom}</span>
-                                                    <span className="text-amber-700 font-extrabold bg-slate-100 px-2 py-0.5 rounded">x{item.quantite}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        <OngletCommandesFournisseur />
                     </section>
                 )}
 
@@ -1092,10 +1069,10 @@ export default function DashboardFournisseur({ setCurrentView }) {
                     <section className="space-y-6 text-left">
                         <div className="bg-white p-6 rounded-3xl border border-slate-200">
                             <h2 className="text-2xl font-black text-[#061a3a]">Flux Financiers</h2>
-                            <p className="text-slate-500 text-xs mt-1">Gérez vos encaissements et demandez vos virements</p>
+                            <p className="text-slate-500 text-xs mt-1">Vos gains, commissions, retraits et récompenses</p>
                         </div>
                         <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-2xl">
-                            <SoldeRetrait />
+                            <PortefeuilleFournisseur />
                         </div>
                     </section>
                 )}

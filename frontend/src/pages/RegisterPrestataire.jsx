@@ -3,11 +3,8 @@ import { getServices, registerUser, registerFournisseur } from '../util/api';
 import { branchesDuService } from '../constants/branches';
 
 /*
-  KANARI — inscription simple et fiable
-  - Un profil peut choisir PLUSIEURS services (tous types de profil).
-  - Chaque service coché propose ses spécialités (branches).
-  - Les champs secondaires restent optionnels au premier passage.
-  - Documents de transport demandés seulement pour Livraison / Transport.
+  KANARI — Inscription prestataire, partenaire et fournisseur
+  - Intégration complète de la liste des quartiers de Niamey + champ de précision libre.
 */
 
 const TYPES = {
@@ -15,6 +12,33 @@ const TYPES = {
   partenaire: 'Partenaire',
   fournisseur: 'Fournisseur',
 };
+
+// 📍 Liste complète des principaux quartiers de Niamey
+const QUARTIERS_NIAMEY = [
+  'Plateau',
+  'Katako',
+  'Grand Marché',
+  'Yantala',
+  'Kalley',
+  'Rive Droite (Lamorde / Gawèye)',
+  'Talladjé',
+  'Boukoki',
+  'Poudrière',
+  'Liberté',
+  'Koira Kano',
+  'Francophonie',
+  'Cité 15 Ans',
+  'Badalabougou',
+  'Bongouanou / Zongo',
+  'Dar es Salam',
+  'Wadata',
+  'Gamkallé',
+  'Koubia',
+  'Nouveau Marché',
+  'Ambodou / Bani Fandou',
+  'Haoussaoussa',
+  'Autre / Préciser ci-dessous'
+];
 
 const PAYMENTS = [
   { id: 'NITA', name: 'NITA', mark: 'N', note: 'Paiement / transfert' },
@@ -179,8 +203,9 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
     telephone: '',
     numeroUrgence: '',
     pays: 'Niger',
-    ville: '',
+    ville: 'Niamey',
     quartier: '',
+    precisionZone: '', // 📍 Précision géographique pour Niamey (repère, carrefour...)
     secteur: '',
     adresse: '',
     langues: '',
@@ -224,7 +249,6 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
   const contract = CONTRACTS[form.typeProfil];
   const international = form.pays !== 'Niger';
 
-  // Les noms des services cochés sont dérivés des identifiants (toujours cohérents)
   const selectedServiceNames = useMemo(
     () => form.serviceIds
       .map((id) => services.find((s) => String(s.id) === String(id))?.nom)
@@ -256,7 +280,6 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
     setForm((p) => {
       const exists = p.serviceIds.some((x) => String(x) === String(id));
       const next = exists ? p.serviceIds.filter((x) => String(x) !== String(id)) : [...p.serviceIds, id];
-      // Si on décoche un service, on retire aussi ses spécialités
       const branches = exists && service
         ? p.branches.filter((b) => !b.startsWith(`${service.nom} / `))
         : p.branches;
@@ -281,7 +304,7 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
       return 'Sélectionnez au moins un service.';
     }
     if (step === 2 && !form.nomEntreprise) return 'Indiquez au moins votre nom professionnel ou votre activité.';
-    if (step === 3 && (!form.pays || !form.ville)) return 'Le pays et la ville sont obligatoires.';
+    if (step === 3 && (!form.pays || !form.ville || !form.quartier)) return 'Le pays, la ville et le quartier sont obligatoires.';
     if (step === 4 && form.typeProfil === 'prestataire' && !files.cniRecto) {
       return 'Une pièce d’identité est nécessaire pour commencer la vérification.';
     }
@@ -341,7 +364,6 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
       data.append('serviceIds', JSON.stringify(form.serviceIds));
       data.append('serviceNames', JSON.stringify(selectedServiceNames));
       data.append('branches', JSON.stringify(form.branches));
-      // ✅ Le serveur exige serviceId (singulier) : on envoie le premier service
       if (form.serviceIds[0] != null) data.append('serviceId', String(form.serviceIds[0]));
 
       data.append('contractType', form.typeProfil);
@@ -383,7 +405,7 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
               <div className="text-xs font-black uppercase tracking-[.25em] text-amber-400">KANARI SERVICE</div>
               <h1 className="mt-1 text-2xl font-black text-white md:text-3xl">Créer votre profil professionnel</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-                Inscription rapide. Les informations secondaires peuvent être complétées après l’inscription.
+                Inscription rapide. Indiquez votre quartier à Niamey pour structurer le suivi et la recherche par zone.
               </p>
             </div>
             <div className="hidden h-14 w-14 place-items-center rounded-2xl bg-amber-400 text-3xl font-black text-[#061a3a] md:grid">K</div>
@@ -453,7 +475,6 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
                 </div>
               )}
 
-              {/* Spécialités (branches) de chaque service coché */}
               {selectedServiceNames.map((nom) => {
                 const liste = branchesDuService(nom);
                 if (!liste.length) return null;
@@ -518,16 +539,34 @@ export default function RegisterPartenaireKanari({ setCurrentView }) {
 
           {step === 3 && (
             <>
-              <Title n="03 — LOCALISATION" title="Où intervenez-vous ?" desc="Le pays et la ville suffisent pour commencer. Le reste peut être ajouté plus tard." />
+              <Title n="03 — LOCALISATION" title="Où intervenez-vous à Niamey ?" desc="Sélectionnez votre quartier principal et ajoutez une précision géographique (repère, carrefour) pour faciliter la recherche." />
               <div className="grid gap-4 md:grid-cols-2">
                 <Select label="Pays" name="pays" value={form.pays} onChange={change} required>
                   <option>Niger</option><option>Nigeria</option><option>Bénin</option><option>Togo</option><option>Ghana</option><option>Côte d'Ivoire</option><option>Sénégal</option><option>France</option><option>Autre</option>
                 </Select>
                 <Input label="Ville" name="ville" value={form.ville} onChange={change} required />
-                <Input label="Quartier / zone" name="quartier" value={form.quartier} onChange={change} placeholder="Optionnel" />
+                
+                {/* 📍 Sélection du Quartier (Niamey) */}
+                <Select label="Quartier principal" name="quartier" value={form.quartier} onChange={change} required>
+                  <option value="">Sélectionnez votre quartier...</option>
+                  {QUARTIERS_NIAMEY.map((q) => (
+                    <option key={q} value={q}>{q}</option>
+                  ))}
+                </Select>
+
+                {/* 📍 Précision géographique libre pour compenser l'absence de cartographie fine */}
+                <Input 
+                  label="Précision de zone / Repère" 
+                  name="precisionZone" 
+                  value={form.precisionZone} 
+                  onChange={change} 
+                  placeholder="Ex. Près du grand carrefour, derrière la station..." 
+                />
+
                 <Input label="Secteur / arrondissement" name="secteur" value={form.secteur} onChange={change} placeholder="Optionnel" />
-                <div className="md:col-span-2"><Input label="Adresse professionnelle" name="adresse" value={form.adresse} onChange={change} placeholder="Optionnel au départ" /></div>
+                <div className="md:col-span-2"><Input label="Adresse professionnelle précise" name="adresse" value={form.adresse} onChange={change} placeholder="Optionnel au départ" /></div>
               </div>
+
               {international && (
                 <div className="mt-5 grid gap-4 rounded-2xl border border-blue-200 bg-blue-50 p-5 md:grid-cols-2">
                   <div className="md:col-span-2 text-sm font-semibold text-blue-900">Profil hors Niger : les documents d’immatriculation seront complétés selon le pays.</div>

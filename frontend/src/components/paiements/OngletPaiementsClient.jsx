@@ -1,6 +1,7 @@
 // Onglet « Paiements » du dashboard client : 1 mission = 1 bon = 1 paiement
 import React from 'react';
 import EtatPaiementBadge from './EtatPaiementBadge';
+import RecompensesClient from './RecompensesClient';
 import { fcfa } from '../../util/paiementsApi';
 
 const ORDRE = { a_payer: 0, rejete: 1, bon_a_valider: 2, en_attente: 3, direct: 4, paye: 5, rembourse: 6 };
@@ -17,6 +18,8 @@ function Stat({ label, value, accent }) {
 export default function OngletPaiementsClient({ missions = [], finance, navigate, onValiderBon, onRefresh }) {
     const t = finance?.totaux || {};
     const payer = (id) => navigate('/paiement', { state: { reservationId: id } });
+    const payerCommande = (id) => navigate('/paiement', { state: { commandeId: id } });
+    const commandes = (finance?.commandes || []).filter((c) => c.etat !== 'annulee');
     const lignes = missions
         .map((m) => ({ m, f: finance?.missions?.[m.id] }))
         .filter(({ f }) => f && ORDRE[f.etat] !== undefined)
@@ -34,6 +37,8 @@ export default function OngletPaiementsClient({ missions = [], finance, navigate
                 </button>
             </div>
 
+            <RecompensesClient />
+
             {finance?.erreur && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-xs flex justify-between items-center">
                     <span>{finance.erreur}</span>
@@ -47,7 +52,30 @@ export default function OngletPaiementsClient({ missions = [], finance, navigate
                 <Stat label="Reste à payer" value={fcfa(t.aPayer)} accent="text-blue-600" />
             </div>
 
-            {lignes.length === 0 ? (
+            {commandes.length > 0 && (
+                <div className="space-y-3">
+                    <h4 className="font-extrabold text-xs text-slate-500 uppercase tracking-wider">Commandes boutique</h4>
+                    {commandes.map((c) => (
+                        <div key={`c${c.commandeId}`} className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <span className="text-xs font-bold text-indigo-500">Commande #{c.commandeId}</span>
+                                <p className="text-[#061a3a] font-mono font-extrabold text-lg">{fcfa(c.montant)}</p>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <EtatPaiementBadge etat={c.etat} />
+                                {c.paiement?.transactionId && <span className="text-[11px] text-slate-500 font-mono">{c.paiement.transactionId}</span>}
+                                {(c.etat === 'a_payer' || c.etat === 'rejete') && (
+                                    <button onClick={() => payerCommande(c.commandeId)} className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-xs font-black shadow">
+                                        {c.etat === 'rejete' ? 'Réessayer le paiement' : `Payer ${fcfa(c.montant)}`}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {lignes.length === 0 && commandes.length === 0 ? (
                 <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center">
                     <p className="text-slate-500 text-sm">Aucun paiement pour l'instant. Il apparaît ici dès qu'un bon d'intervention est établi.</p>
                 </div>

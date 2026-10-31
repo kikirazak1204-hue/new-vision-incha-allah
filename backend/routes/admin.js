@@ -41,7 +41,7 @@ const normalizeReservationStatut = (statut) => {
 };
 
 // ============================================================
-// 📊 STATISTIQUES & UTILISATEURS
+// 📊 STATISTIQUES & UTILISATEURS (CONTRÔLE COMPLET)
 // ============================================================
 
 router.get('/stats', protect, adminOnly, async (req, res) => {
@@ -59,15 +59,42 @@ router.get('/stats', protect, adminOnly, async (req, res) => {
     }
 });
 
+// 🔍 Route utilisateurs enrichie avec les données pro et les pièces justificatives associées
 router.get('/utilisateurs', protect, adminOnly, async (req, res) => {
     try {
         const users = await User.findAll({
             attributes: ['id', 'nom', 'prenom', 'email', 'role', 'telephone', 'ville', 'createdAt'],
+            include: [
+                {
+                    model: Fournisseur,
+                    as: 'fournisseurProfil', // Liaison vers le profil pro / prestataire / fournisseur
+                    required: false
+                }
+            ],
             order: [['createdAt', 'DESC']]
         });
         res.json({ success: true, data: users });
     } catch (err) {
-        console.error(err);
+        console.error("❌ Erreur GET /utilisateurs :", err);
+        res.status(500).json({ success: false, message: 'Erreur serveur.' });
+    }
+});
+
+// 🚫 Révocation / Suspension d'un utilisateur ou de son accès
+router.patch('/utilisateurs/:id/statut', protect, adminOnly, async (req, res) => {
+    try {
+        const { statut } = req.body; // ex: 'SUSPENDU', 'ACTIF', 'CONFORME'
+        const user = await User.findByPk(req.params.id);
+        if (!user) return res.status(404).json({ success: false, message: 'Utilisateur introuvable.' });
+        
+        const fournisseur = await Fournisseur.findOne({ where: { userId: user.id } });
+        if (fournisseur) {
+            await fournisseur.update({ statut: statut === 'SUSPENDU' ? 'SUSPENDU' : 'CONFORME' });
+        }
+
+        res.json({ success: true, message: `Statut de l'utilisateur mis à jour avec succès.` });
+    } catch (err) {
+        console.error("❌ Erreur PATCH /utilisateurs/:id/statut :", err);
         res.status(500).json({ success: false, message: 'Erreur serveur.' });
     }
 });
@@ -84,7 +111,7 @@ router.delete('/utilisateurs/:id', protect, adminOnly, async (req, res) => {
 });
 
 // ============================================================
-// 🧑‍💼 GESTION DES FOURNISSEURS
+// 🧑‍💼 GESTION DES FOURNISSEURS & PIÈCES JUSTIFICATIVES (CNI, etc.)
 // ============================================================
 
 router.get('/fournisseurs', protect, adminOnly, async (req, res) => {
@@ -100,6 +127,46 @@ router.get('/fournisseurs', protect, adminOnly, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Erreur serveur.' });
+    }
+});
+
+// 🔍 Examen détaillé d'un dossier prestataire avec toutes les pièces justificatives (CNI, selfie, diplôme, véhicule...)
+router.get('/fournisseurs/:id/dossier', protect, adminOnly, async (req, res) => {
+    try {
+        const fournisseur = await Fournisseur.findByPk(req.params.id, {
+            include: [
+                { 
+                    model: User, 
+                    as: 'userFournisseur', 
+                    attributes: ['id', 'nom', 'prenom', 'email', 'telephone', 'ville', 'createdAt'] 
+                }
+            ]
+        });
+
+        if (!fournisseur) {
+            return res.status(404).json({ success: false, message: 'Fournisseur / Prestataire introuvable.' });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                ...fournisseur.toJSON(),
+                documents: {
+                    cniRecto: fournisseur.cniRecto || null,
+                    cniVerso: fournisseur.cniVerso || null,
+                    selfie: fournisseur.selfie || null,
+                    diplome: fournisseur.diplome || null,
+                    vehicule: fournisseur.vehicule || null,
+                    justificatifVehicule: fournisseur.justificatifVehicule || null,
+                    justificatifEntreprise: fournisseur.justificatifEntreprise || null,
+                    documentFiscal: fournisseur.documentFiscal || null,
+                    catalogue: fournisseur.catalogue || null,
+                }
+            }
+        });
+    } catch (err) {
+        console.error("❌ Erreur GET /fournisseurs/:id/dossier :", err);
+        res.status(500).json({ success: false, message: 'Erreur serveur lors de la récupération du dossier.' });
     }
 });
 
@@ -165,7 +232,6 @@ router.put('/reservations/:id/assigner', protect, adminOnly, async (req, res) =>
         }
 
         const statut = accordTelephone ? 'ACCEPTEE' : 'ASSIGNEE';
-
         await reservation.update({ fournisseurId, statut });
 
         res.json({ success: true, message: 'Fournisseur assigné avec succès.', data: reservation });
@@ -178,14 +244,12 @@ router.put('/reservations/:id/assigner', protect, adminOnly, async (req, res) =>
 router.put('/reservations/:id/autoriser', protect, adminOnly, async (req, res) => {
     try {
         const { id } = req.params;
-
         const reservation = await Reservation.findByPk(id);
         if (!reservation) {
             return res.status(404).json({ success: false, message: 'Réservation introuvable.' });
         }
 
         await reservation.update({ statut: 'ACCEPTEE' });
-
         res.json({ success: true, message: 'Démarrage de la mission autorisé.', data: reservation });
     } catch (err) {
         console.error("❌ Erreur PUT /autoriser :", err);
@@ -348,7 +412,6 @@ router.delete('/produits/:id', protect, adminOnly, async (req, res) => {
 
 router.get('/live-locations', protect, adminOnly, async (req, res) => {
     try {
-        // 1. Récupérer TOUS les fournisseurs de la base de données
         const fournisseurs = await Fournisseur.findAll({
             include: [
                 { 
@@ -359,7 +422,6 @@ router.get('/live-locations', protect, adminOnly, async (req, res) => {
             ]
         });
 
-        // 2. Associer pour chaque fournisseur sa mission active s'il en a une
         const liveData = await Promise.all(fournisseurs.map(async (f) => {
             const missionActive = await Reservation.findOne({
                 where: {
@@ -373,7 +435,7 @@ router.get('/live-locations', protect, adminOnly, async (req, res) => {
                 id: f.id.toString(),
                 name: f.nomEntreprise || (f.userFournisseur ? `${f.userFournisseur.prenom || ''} ${f.userFournisseur.nom}` : 'Prestataire'),
                 role: f.specialite || 'Prestataire',
-                lat: f.latitude || 13.5116, // Niamey par défaut si non renseigné
+                lat: f.latitude || 13.5116,
                 lon: f.longitude || 2.1254,
                 phone: f.userFournisseur?.telephone || f.telephone || 'N/A',
                 status: missionActive ? missionActive.statut : (f.statut === 'CONFORME' ? 'DISPONIBLE' : 'EN_ATTENTE'),
@@ -381,9 +443,7 @@ router.get('/live-locations', protect, adminOnly, async (req, res) => {
             };
         }));
 
-        // Filtrer pour ne garder que ceux qui ont des coordonnées GPS exploitables
         const validProviders = liveData.filter(item => item.lat && item.lon);
-
         res.json(validProviders);
     } catch (err) {
         console.error("❌ Erreur GET /api/admin/live-locations :", err);

@@ -82,7 +82,6 @@ app.use('/api/bons-intervention', require('./routes/bonsIntervention'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/devis', require('./routes/devis'));
 app.use('/api/commandes', require('./routes/commandes'));
-app.use('/api/commande-produits', require('./routes/commandeProduits'));
 app.use('/api/factures', require('./routes/factures'));
 app.use('/api/soldes', require('./routes/soldes'));
 app.use('/api/missions', require('./routes/missions'));
@@ -164,7 +163,43 @@ const repairDatabase = async () => {
         // ── Colonnes bons_intervention ──
         "ALTER TABLE bons_intervention ADD COLUMN tauxCommissionApplique DECIMAL(5,2) DEFAULT 0;",
         "ALTER TABLE bons_intervention ADD COLUMN montantCommission DECIMAL(10,2) DEFAULT 0;",
-        "ALTER TABLE bons_intervention ADD COLUMN montantNet DECIMAL(10,2) DEFAULT 0;"
+        "ALTER TABLE bons_intervention ADD COLUMN montantNet DECIMAL(10,2) DEFAULT 0;",
+        // ── Paiements unifiés (commande / mission / commission) ──
+        "ALTER TABLE paiements ADD COLUMN typePaiement VARCHAR(20) NOT NULL DEFAULT 'COMMANDE';",
+        "ALTER TABLE paiements ADD COLUMN fournisseurId INT NULL;",
+        "ALTER TABLE paiements ADD COLUMN tauxCommission DECIMAL(5,2) NOT NULL DEFAULT 0;",
+        "ALTER TABLE paiements ADD COLUMN commissionKanari DECIMAL(12,2) NOT NULL DEFAULT 0;",
+        "ALTER TABLE paiements ADD COLUMN montantNet DECIMAL(12,2) NOT NULL DEFAULT 0;",
+        "ALTER TABLE paiements ADD COLUMN soldeCredite BOOLEAN NOT NULL DEFAULT false;",
+        "ALTER TABLE paiements ADD COLUMN motif TEXT;",
+        "UPDATE paiements SET typePaiement = 'MISSION' WHERE reservationId IS NOT NULL AND typePaiement = 'COMMANDE';",
+        "ALTER TABLE factures ADD COLUMN reservationId INT NULL;",
+        "ALTER TABLE factures ADD COLUMN paiementId INT NULL;",
+        "ALTER TABLE factures ADD COLUMN commissionKanari DECIMAL(12,2) DEFAULT 0;",
+        "ALTER TABLE factures ADD COLUMN montantNet DECIMAL(12,2) DEFAULT 0;",
+        "CREATE UNIQUE INDEX factures_paiement_unique ON factures (paiementId);",
+        "CREATE INDEX paiements_cible_idx ON paiements (commandeId, reservationId, typePaiement, statut);",
+        // ── Colonnes réservations utilisées par les paiements ──
+        "ALTER TABLE reservations ADD COLUMN modePaiement VARCHAR(50);",
+        "ALTER TABLE reservations ADD COLUMN commissionDateLimite DATETIME;",
+        // ── Commandes boutique : suivi, prix figés, ventilation par fournisseur ──
+        "ALTER TABLE commandes ADD COLUMN statutPaiement VARCHAR(30) NOT NULL DEFAULT 'non_paye';",
+        "ALTER TABLE commandes ADD COLUMN adresseLivraison TEXT;",
+        "ALTER TABLE commandes ADD COLUMN telephoneLivraison VARCHAR(30);",
+        "ALTER TABLE commande_produits ADD COLUMN prixUnitaire DECIMAL(12,2) NULL;",
+        "ALTER TABLE commande_produits ADD COLUMN nomProduit VARCHAR(255) NULL;",
+        "ALTER TABLE commande_produits ADD COLUMN fournisseurId INT NULL;",
+        "ALTER TABLE commande_produits ADD COLUMN statutLivraison VARCHAR(20) NOT NULL DEFAULT 'a_preparer';",
+        // ── Portefeuilles : retraits tracés, fonds de soutien (sur accord) ──
+        "ALTER TABLE retraits MODIFY COLUMN operateur VARCHAR(20) NOT NULL;",
+        "ALTER TABLE retraits MODIFY COLUMN telephone VARCHAR(40) NOT NULL;",
+        "ALTER TABLE retraits ADD COLUMN reference VARCHAR(80) NULL;",
+        "ALTER TABLE retraits ADD COLUMN motif TEXT NULL;",
+        "ALTER TABLE retraits ADD COLUMN traitePar INT NULL;",
+        "ALTER TABLE retraits ADD COLUMN traiteLe DATETIME NULL;",
+        "ALTER TABLE fournisseurs ADD COLUMN fondsSoutienActif BOOLEAN NOT NULL DEFAULT false;",
+        "ALTER TABLE fournisseurs ADD COLUMN fondsSoutienAccepteLe DATETIME NULL;",
+        "UPDATE commandes SET statutPaiement = 'paye' WHERE statutPaiement = 'non_paye' AND id IN (SELECT commandeId FROM paiements WHERE statut = 'valide' AND commandeId IS NOT NULL);"
     ];
 
     console.log("🛠️ Vérification des colonnes manquantes...");

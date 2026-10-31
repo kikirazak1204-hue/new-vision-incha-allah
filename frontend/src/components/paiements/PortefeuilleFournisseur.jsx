@@ -1,7 +1,7 @@
 // Portefeuille prestataire : solde, encaissements (total / commission / net), commissions à déposer + retard
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getPortefeuilleFournisseur, fcfa } from '../../util/paiementsApi';
+import { getPortefeuilleFournisseur, getSoldeMien, demanderRetrait, fcfa } from '../../util/paiementsApi';
 
 const jour = (d) => (d ? new Date(d).toLocaleDateString('fr-FR') : '—');
 
@@ -18,11 +18,18 @@ function Carte({ label, value, accent, note }) {
 export default function PortefeuilleFournisseur() {
     const navigate = useNavigate();
     const [d, setD] = useState(null);
+    const [w, setW] = useState(null); // portefeuille : retraits, journal, ristourne, soutien
+    const [form, setForm] = useState({ montant: '', operateur: 'ORANGE', telephone: '' });
+    const [envoi, setEnvoi] = useState(false);
+    const [retourRetrait, setRetourRetrait] = useState(null);
     const [erreur, setErreur] = useState('');
     const [loading, setLoading] = useState(true);
 
     const charger = useCallback(async () => {
-        try { setD(await getPortefeuilleFournisseur()); setErreur(''); }
+        try {
+            const [a, b] = await Promise.all([getPortefeuilleFournisseur(), getSoldeMien()]);
+            setD(a); setW(b.data); setErreur('');
+        }
         catch (e) { setErreur(e.message || 'Impossible de charger le portefeuille.'); }
         finally { setLoading(false); }
     }, []);
@@ -37,6 +44,20 @@ export default function PortefeuilleFournisseur() {
     );
 
     const t = d.totaux;
+    const retirer = async (e) => {
+        e.preventDefault();
+        setEnvoi(true); setRetourRetrait(null);
+        try {
+            await demanderRetrait({ ...form, montant: Number(form.montant) });
+            setRetourRetrait({ ok: true, msg: 'Demande envoyée. Kanari vérifie puis effectue le transfert.' });
+            setForm((f) => ({ ...f, montant: '' }));
+            await charger();
+        } catch (err) { setRetourRetrait({ ok: false, msg: err.message }); }
+        finally { setEnvoi(false); }
+    };
+    const LIBELLE = { VENTE: 'Vente boutique', MISSION: 'Mission', RETRAIT: 'Retrait', ANNULATION: 'Annulation', CORRECTION: 'Correction',
+        RISTOURNE_PARTENAIRE: 'Ristourne', SOUTIEN: 'Fonds de soutien', UTILISATION: 'Utilisation du fonds' };
+    const STATUT_RETRAIT = { EN_ATTENTE: ['En attente', 'text-amber-700 bg-amber-50 border-amber-200'], TRAITE: ['Effectué', 'text-emerald-700 bg-emerald-50 border-emerald-200'], REFUSE: ['Refusé', 'text-red-700 bg-red-50 border-red-200'] };
     const deposer = (id) => navigate('/paiement', { state: { reservationId: id } });
 
     return (
@@ -100,6 +121,92 @@ export default function PortefeuilleFournisseur() {
                     </div>
                 )}
             </section>
+
+            {w && (
+                <>
+                    <section className="space-y-3">
+                        <h3 className="font-extrabold text-lg text-[#061a3a]">Retirer mon argent</h3>
+                        <form onSubmit={retirer} className="bg-white border border-slate-200 rounded-2xl p-5 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                            <label className="text-xs font-bold text-slate-500">Montant (FCFA)
+                                <input type="number" min={w.retraitMinimum} required value={form.montant} onChange={(e) => setForm({ ...form, montant: e.target.value })}
+                                    className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-[#061a3a]" placeholder={`min. ${w.retraitMinimum}`} />
+                            </label>
+                            <label className="text-xs font-bold text-slate-500">Recevoir par
+                                <select value={form.operateur} onChange={(e) => setForm({ ...form, operateur: e.target.value })}
+                                    className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-[#061a3a]">
+                                    {w.operateurs.map((o) => <option key={o} value={o}>{o}</option>)}
+                                </select>
+                            </label>
+                            <label className="text-xs font-bold text-slate-500">Numéro / compte
+                                <input required value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })}
+                                    className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-[#061a3a]" />
+                            </label>
+                            <button disabled={envoi} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-black">
+                                {envoi ? 'Envoi…' : 'Demander le retrait'}
+                            </button>
+                        </form>
+                        {retourRetrait && <p className={`text-xs font-bold ${retourRetrait.ok ? 'text-emerald-600' : 'text-red-600'}`}>{retourRetrait.msg}</p>}
+                        <p className="text-[11px] text-slate-500">Seul le « solde disponible » est retirable. Les récompenses et le fonds de soutien sont des comptes séparés.</p>
+                    </section>
+
+                    {w.retraits.length > 0 && (
+                        <section className="space-y-3">
+                            <h3 className="font-extrabold text-lg text-[#061a3a]">Mes demandes de retrait</h3>
+                            <div className="bg-white border border-slate-200 rounded-2xl divide-y divide-slate-100">
+                                {w.retraits.map((r) => {
+                                    const [lib, cls] = STATUT_RETRAIT[r.statut] || [r.statut, ''];
+                                    return (
+                                        <div key={r.id} className="p-4 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                            <div>
+                                                <p className="font-bold text-[#061a3a]">RET-{String(r.id).padStart(5, '0')} · {r.operateur} {r.telephone}</p>
+                                                <p className="text-slate-500">{jour(r.createdAt)}{r.reference ? ` · réf. ${r.reference}` : ''}{r.statut === 'REFUSE' && r.motif ? ` · motif : ${r.motif}` : ''}</p>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <span className="font-mono font-extrabold text-[#061a3a]">{fcfa(r.montant)}</span>
+                                                <span className={`font-bold border rounded-full px-3 py-1 ${cls}`}>{lib}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    )}
+
+                    <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Carte label={`Ristourne ${w.ristourne.taux} %`} value={fcfa(w.ristourne.total)} accent="text-emerald-600"
+                            note={`Calculée sur les ${w.ristourne.base}. Non retirable pour l'instant.`} />
+                        {(w.soutien.actif || w.soutien.solde > 0) && (
+                            <Carte label={`Fonds de soutien (${w.soutien.taux} %)`} value={fcfa(w.soutien.solde)} accent="text-indigo-600"
+                                note="Retenue acceptée, destinée à votre développement. Ce n'est pas un revenu de Kanari ni un compte bancaire." />
+                        )}
+                    </section>
+
+                    <section className="space-y-3">
+                        <h3 className="font-extrabold text-lg text-[#061a3a]">Journal des mouvements</h3>
+                        {w.mouvements.length === 0 ? (
+                            <p className="text-sm text-slate-500 bg-white border border-slate-200 rounded-2xl p-6">Aucun mouvement pour l'instant.</p>
+                        ) : (
+                            <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
+                                <table className="w-full text-xs">
+                                    <thead className="text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-200">
+                                        <tr><th className="text-left p-3">Date</th><th className="text-left p-3">Compte</th><th className="text-left p-3">Opération</th><th className="text-right p-3">Montant</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        {w.mouvements.map((m) => (
+                                            <tr key={m.id} className="border-b border-slate-100 last:border-0">
+                                                <td className="p-3 text-slate-600">{jour(m.createdAt)}</td>
+                                                <td className="p-3 text-slate-600">{m.compte === 'GAINS' ? 'Solde' : m.compte === 'RISTOURNE' ? 'Ristourne' : 'Fonds de soutien'}</td>
+                                                <td className="p-3 font-semibold text-[#061a3a]">{LIBELLE[m.categorie] || m.categorie}{m.motif ? <span className="text-slate-400 font-normal"> · {m.motif}</span> : null}</td>
+                                                <td className={`p-3 text-right font-mono font-bold ${m.sens === 'CREDIT' ? 'text-emerald-600' : 'text-rose-600'}`}>{m.sens === 'CREDIT' ? '+' : '−'} {fcfa(m.montant)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </section>
+                </>
+            )}
         </div>
     );
 }

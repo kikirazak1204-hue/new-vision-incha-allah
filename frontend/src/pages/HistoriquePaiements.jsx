@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 
 const API = import.meta.env.VITE_API_URL;
 
+const LIBELLE_STATUT = { valide: 'Confirmé', en_attente: 'En vérification', rejete: 'Refusé', rembourse: 'Remboursé' };
+const origine = (p) => (p.typePaiement === 'COMMISSION' ? `Commission mission #${p.reservationId}`
+    : p.commandeId ? `Commande #${p.commandeId}` : p.reservationId ? `Mission #${p.reservationId}` : 'Paiement');
+
 export default function HistoriquePaiements() {
     const navigate = useNavigate();
     const [paiements, setPaiements] = useState([]);
@@ -118,7 +122,7 @@ export default function HistoriquePaiements() {
                                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 pb-4 border-b border-slate-800">
                                         <div>
                                             <h2 className="text-base font-bold text-white font-mono tracking-wide">
-                                                Transaction #{p.referenceClient || p.referenceTransaction || p.id}
+                                                {origine(p)} <span className="text-slate-500 text-xs font-normal">· réf. {p.referenceClient || p.transactionId || p.id}</span>
                                             </h2>
                                             <p className="text-xs text-slate-400 mt-1">
                                                 {p.createdAt
@@ -127,7 +131,7 @@ export default function HistoriquePaiements() {
                                             </p>
                                         </div>
                                         <span className={`px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${statutStyle}`}>
-                                            {p.statut || 'en_attente'}
+                                            {LIBELLE_STATUT[p.statut] || p.statut || 'En vérification'}
                                         </span>
                                     </div>
 
@@ -135,13 +139,13 @@ export default function HistoriquePaiements() {
                                         <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800/80">
                                             <span className="text-slate-500 block mb-1">Montant payé</span>
                                             <span className="text-indigo-400 font-mono font-bold text-sm sm:text-base">
-                                                {(p.montant || 0).toLocaleString()} FCFA
+                                                {Number(p.montant || 0).toLocaleString('fr-FR')} FCFA
                                             </span>
                                         </div>
                                         <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800/80">
                                             <span className="text-slate-500 block mb-1">Mode de paiement</span>
                                             <span className="text-slate-200 font-semibold uppercase">
-                                                {p.modePaiement || 'Mobile Money'}
+                                                {String(p.modePaiement || 'Mobile Money').replace(/_/g, ' ')}
                                             </span>
                                         </div>
                                         <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800/80">

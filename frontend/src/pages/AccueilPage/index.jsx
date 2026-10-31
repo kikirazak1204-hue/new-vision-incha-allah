@@ -31,21 +31,28 @@ const AccueilPage = ({ services = [], loading, setSelectedService, navigateTo })
 
     const { nombreArticles = 0 } = usePanier() || {};
 
-    const heroImages = [
-        '/backgrounds/mecanique.jpg',
-        '/backgrounds/electricite.png',
-        '/backgrounds/coiffure.jpg',
-        '/backgrounds/plomberie.png',
-        '/backgrounds/restauration.png'
-    ];
-
+    // 🌟 Dictionnaire unique et complet de toutes tes images de services
     const SERVICE_BACKGROUND_IMAGES = {
-        electricite: '/backgrounds/electricite.png', plomberie: '/backgrounds/plomberie.png',
-        transports: '/backgrounds/transport.png', transport: '/backgrounds/transport.png',
-        mecanique: '/backgrounds/mecanique.jpg', coiffure: '/backgrounds/coiffure.jpg',
-        couture: '/backgrounds/couture.jpg', sante: '/backgrounds/sante.png',
-        restauration: '/backgrounds/restauration.png', peinture: '/backgrounds/peinture.jpg',
+        electricite: '/backgrounds/electricite.png',
+        plomberie: '/backgrounds/plomberie.png',
+        mecanique: '/backgrounds/mecanique.jpg',
+        coiffure: '/backgrounds/coiffure.jpg',
+        couture: '/backgrounds/couture.jpg',
+        restauration: '/backgrounds/restauration.png',
+        transport: '/backgrounds/transport.png',
+        transports: '/backgrounds/transport.png',
+        alimentation: '/backgrounds/alimentation.jpg',
+        agriculture: '/backgrounds/agriculture.jpg',
+        sante: '/backgrounds/sante.jpg',
+        divertissement: '/backgrounds/divertissement.jpg',
+        informatique: '/backgrounds/informatique.jpg',
+        nettoyage: '/backgrounds/nettoyage.jpg',
+        securite: '/backgrounds/securite.jpg',
+        peinture: '/backgrounds/peinture.jpg',
     };
+
+    // Génère automatiquement la liste de TOUTES les images pour le carrousel du haut
+    const heroImages = Array.from(new Set(Object.values(SERVICE_BACKGROUND_IMAGES)));
 
     const normalizeKey = (value = '') => String(value || '')
         .toLowerCase()
@@ -152,7 +159,7 @@ const AccueilPage = ({ services = [], loading, setSelectedService, navigateTo })
                 </div>
             </nav>
 
-            {/* 2. HERO ANIMÉ */}
+            {/* 2. HERO ANIMÉ (Toutes les images défilent) */}
             <header className="relative w-full h-[60vh] min-h-[480px] bg-slate-900 rounded-b-[2.5rem] overflow-hidden shadow-2xl">
                 {heroImages.map((src, index) => (
                     <div 
