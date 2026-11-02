@@ -34,7 +34,9 @@ export default function PortefeuilleFournisseur() {
         </div>
     );
 
-    const t = d.totaux;
+    // Réponse incomplète du serveur (ex. ancienne version) : on affiche des zéros au lieu d'une page blanche
+    const t = d?.totaux || {};
+    const donnees = { encaissements: [], commissionsDues: [], ...d };
     const deposer = (id) => navigate('/paiement', { state: { reservationId: id } });
 
     return (
@@ -52,9 +54,9 @@ export default function PortefeuilleFournisseur() {
 
             <section className="space-y-3">
                 <h3 className="font-extrabold text-lg text-[#061a3a]">Commissions à déposer à Kanari</h3>
-                {d.commissionsDues.length === 0 ? (
+                {donnees.commissionsDues.length === 0 ? (
                     <p className="text-sm text-slate-500 bg-white border border-slate-200 rounded-2xl p-6">Aucune commission en attente.</p>
-                ) : d.commissionsDues.map((c) => (
+                ) : donnees.commissionsDues.map((c) => (
                     <div key={c.reservationId} className={`bg-white border rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${c.retard ? 'border-red-300' : 'border-slate-200'}`}>
                         <div>
                             <span className="text-xs font-bold text-indigo-500">Mission #{c.reservationId}</span>
@@ -75,7 +77,7 @@ export default function PortefeuilleFournisseur() {
 
             <section className="space-y-3">
                 <h3 className="font-extrabold text-lg text-[#061a3a]">Mes encaissements</h3>
-                {d.encaissements.length === 0 ? (
+                {donnees.encaissements.length === 0 ? (
                     <p className="text-sm text-slate-500 bg-white border border-slate-200 rounded-2xl p-6">Aucun encaissement validé pour l'instant.</p>
                 ) : (
                     <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
@@ -84,7 +86,7 @@ export default function PortefeuilleFournisseur() {
                                 <tr><th className="text-left p-3">Date</th><th className="text-left p-3">Origine</th><th className="text-right p-3">Total</th><th className="text-right p-3">Commission</th><th className="text-right p-3">Votre net</th></tr>
                             </thead>
                             <tbody>
-                                {d.encaissements.map((p) => (
+                                {donnees.encaissements.map((p) => (
                                     <tr key={p.id} className="border-b border-slate-100 last:border-0">
                                         <td className="p-3 text-slate-600">{jour(p.date)}</td>
                                         <td className="p-3 font-semibold text-[#061a3a]">{p.type === 'COMMANDE' ? `Commande #${p.commandeId}` : `Mission #${p.reservationId}`}</td>
