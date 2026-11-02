@@ -6,6 +6,8 @@ import BonInterventionPrint from '../components/BonInterventionPrint';
 import KanariGeoMap from '../components/KanariGeoMap';
 import MesAbonnements from '../components/MesAbonnements'; // ➕ AJOUT
 import OngletPaiementsClient from '../components/paiements/OngletPaiementsClient';
+import OngletCommandesClient from '../components/paiements/OngletCommandesClient';
+import MonPortefeuille from '../components/paiements/MonPortefeuille';
 import EtatPaiementBadge from '../components/paiements/EtatPaiementBadge';
 import { getPaiementsClientMissions, fcfa } from '../util/paiementsApi';
 
@@ -651,7 +653,7 @@ export default function DashboardClient() {
     const [bonMission, setBonMission] = useState(null);
     const [activeTab, setActiveTab] = useState('overview');
     const [menuOuvert, setMenuOuvert] = useState(false);
-    const [finance, setFinance] = useState({ missions: {}, totaux: null, erreur: null });
+    const [finance, setFinance] = useState({ missions: {}, commandes: [], totaux: null, erreur: null });
 
     const pubAleatoire = useMemo(() => BANNIERES_PUB[Math.floor(Math.random() * BANNIERES_PUB.length)], []);
     const token = useMemo(() => localStorage.getItem('token'), []);
@@ -684,7 +686,7 @@ export default function DashboardClient() {
             const f = await getPaiementsClientMissions();
             const map = {};
             (f.data || []).forEach(x => { map[x.reservationId] = x; });
-            setFinance({ missions: map, totaux: f.totaux || null, erreur: null });
+            setFinance({ missions: map, commandes: f.commandes || [], totaux: f.totaux || null, erreur: null });
         } catch (e) {
             setFinance(p => ({ ...p, erreur: e?.message || 'Paiements indisponibles.' }));
         }
@@ -752,7 +754,7 @@ export default function DashboardClient() {
     const missionsEnAttenteOffres = missionsList.filter(m => m?.statut === 'EN_ATTENTE' && !m?.fournisseurId && !m?.abonnementId);
 
     // Source unique : les paiements réels rattachés aux missions (et non Reservation.montantTotal, toujours à 0)
-    const toutesTransactions = Object.values(finance.missions).filter(x => !['sans_bon', 'annulee'].includes(x.etat));
+    const toutesTransactions = [...Object.values(finance.missions), ...(finance.commandes || [])].filter(x => !['sans_bon', 'annulee'].includes(x.etat));
     const totalDepense = Number(finance.totaux?.paye || 0);
 
     // Montant affiché pour une mission : prix du bon > estimation > « À définir »
@@ -768,8 +770,10 @@ export default function DashboardClient() {
         { id: 'overview', label: 'Vue d\'ensemble', icon: '' },
         { id: 'missions', label: 'Mes Réservations', icon: '', badge: missionsActives.length + missionsAValider.length },
         { id: 'offres', label: 'Offres reçues', icon: '', badge: missionsEnAttenteOffres.length },
+        { id: 'commandes', label: 'Mes Commandes', icon: '', badge: (finance.commandes || []).filter(c => c.etat === 'a_payer').length },
         { id: 'abonnements', label: 'Mes abonnements', icon: '' }, // ➕ AJOUT
         { id: 'recus', label: 'Mes Reçus', icon: '', badge: missionsTerminees.length },
+        { id: 'portefeuille', label: 'Mon Portefeuille', icon: '' },
         { id: 'paiements', label: 'Paiements & Transactions', icon: '', badge: toutesTransactions.length },
         { id: 'profil', label: 'Mon Profil', icon: '' },
     ];
@@ -987,6 +991,18 @@ export default function DashboardClient() {
 
                 {/* ➕ AJOUT : onglet abonnements */}
                 {activeTab === 'abonnements' && <MesAbonnements />}
+
+                {activeTab === 'commandes' && <OngletCommandesClient navigate={navigate} />}
+
+                {activeTab === 'portefeuille' && (
+                    <section className="space-y-6 text-left">
+                        <div className="bg-white p-6 rounded-3xl border border-slate-200">
+                            <h2 className="text-2xl font-black text-[#061a3a]">Mon Portefeuille</h2>
+                            <p className="text-slate-500 text-xs mt-1">Déposez, payez en un clic, retirez vos récompenses</p>
+                        </div>
+                        <MonPortefeuille />
+                    </section>
+                )}
 
                 {activeTab === 'recus' && (
                     <OngletRecus missions={missionsList} token={token} finance={finance.missions} />

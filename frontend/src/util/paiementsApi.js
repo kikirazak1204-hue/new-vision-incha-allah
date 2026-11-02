@@ -20,6 +20,10 @@ export const getMesCommandes = () => appel('GET', '/api/commandes');
 export const getCommandesFournisseur = () => appel('GET', '/api/commandes/fournisseur');
 export const majLivraisonCommande = (id, statut) => appel('PUT', `/api/commandes/${id}/livraison`, { statut });
 
+export const api = appel;
+export const getPortefeuille = () => appel('GET', '/api/soldes/portefeuille');
+export const demanderRetraitPortefeuille = (body) => appel('POST', '/api/soldes/retrait', body);
+export const payerAvecPortefeuille = (body) => appel('POST', '/api/paiements/payer-portefeuille', body);
 export const getSoldeMien = () => appel('GET', '/api/soldes/mien');
 export const demanderRetrait = (body) => appel('POST', '/api/soldes/retrait', body);
 export const getRecompensesClient = () => appel('GET', '/api/soldes/client');

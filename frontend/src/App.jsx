@@ -5,37 +5,44 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
-// Providers et Contexts
+// Providers & Contexts
 import { AuthProvider } from './context/AuthContext';
 import { PanierProvider } from './context/PanierContext';
 import { NavigationProvider } from './context/NavigationContext';
 
-// Composants de protection et globaux
+// Composants de protection & utilitaires globaux
 import ProtectedRoute from './components/ProtectedRoute';
 import GlobalLocationBar from './components/GlobalLocationBar';
 import AutoTranslator from './components/AutoTranslator';
+import NotificationsInit from './components/NotificationsInit';
+import OrderTracking from './components/OrderTracking';
 
-// Importations des pages et composants
+// Pages Publiques & Institutionnelles
 import Accueil from './pages/Accueil';
+import AProposPage from './pages/AProposPage';
 import ServiceSelectionPage from './pages/ServiceSelectionPage';
 import ServiceDetailPage from './pages/ServiceDetailPage';
-import Register from './pages/Register';
-import RegisterPrestataire from './pages/RegisterPrestataire';
-import RegisterUtilisateur from './pages/RegisterUtilisateur';
+import PanierPage from './pages/PanierPage';
+import ReservationPage from './pages/ReservationPage';
+import PaiementPage from './pages/PaiementPage';
+
+// Pages Catalogue & Prestataires
+import VoirProduits from './pages/VoirProduitsPage';
+import ProduitsParFournisseur from './pages/Produitsparfournisseur';
+import ProduitsParService from './pages/ProduitsParService';
+import FournisseurProfilePage from './pages/FournisseurProfilePage';
+
+// Pages Authentification
 import Login from './pages/Login';
+import Register from './pages/Register';
+import RegisterUtilisateur from './pages/RegisterUtilisateur';
+import RegisterPrestataire from './pages/RegisterPrestataire';
+
+// Dashboards & Espace Sécurisés
 import DashboardClient from './pages/DashboardClient';
 import DashboardFournisseur from './pages/DashboardFournisseur';
 import DashboardAdmin from './pages/AdminDashboard';
-import ReservationPage from './pages/ReservationPage';
-import PaiementPage from './pages/PaiementPage';
 import HistoriquePaiements from './pages/HistoriquePaiements';
-import FournisseurProfilePage from './pages/FournisseurProfilePage';
-import ProduitsParFournisseur from './pages/Produitsparfournisseur';
-import PanierPage from './pages/PanierPage';
-import ProduitsParService from './pages/ProduitsParService';
-import VoirProduits from './pages/VoirProduitsPage';
-import OrderTracking from './components/OrderTracking';
-import NotificationsInit from './components/NotificationsInit';
 
 export default function App() {
     const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -91,12 +98,12 @@ export default function App() {
                         {/* 🌐 BARRE D'EN-TÊTE GLOBALE COMPACTE */}
                         <div className="bg-[#061a3a] border-b border-white/10 px-4 py-2 flex items-center justify-between sticky top-0 z-40">
                             <div className="flex items-center gap-2">
-                                <span className="font-black tracking-wider text-[#13d484] text-sm">
-                                    KANARI
+                                <span className="font-black tracking-wider text-[#13d484] text-sm cursor-pointer" onClick={() => window.location.href = '/'}>
+                                    KANARI SERVICE
                                 </span>
                             </div>
 
-                            {/* Bouton de traduction compact à droite */}
+                            {/* Traduction automatique */}
                             <AutoTranslator />
                         </div>
 
@@ -105,7 +112,7 @@ export default function App() {
 
                         <NotificationsInit />
 
-                        {/* BOUTON D'INSTALLATION PWA */}
+                        {/* 📲 BOUTON D'INSTALLATION PWA */}
                         {showInstallBtn && (
                             <div className="fixed bottom-4 left-4 right-4 z-50 bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-2xl flex items-center justify-between max-w-md mx-auto animate-bounce">
                                 <div>
@@ -122,45 +129,44 @@ export default function App() {
                         )}
 
                         <Routes>
-                            {/* 🟢 PAGES PUBLIQUES */}
+                            {/* 🟢 1. PAGES INSTITUTIONNELLES & PUBLIQUES */}
                             <Route path="/" element={<Accueil />} />
+                            <Route path="/a-propos" element={<AProposPage />} />
+
+                            {/* 🛍️ 2. EXPLORATION & CATALOGUE */}
+                            <Route path="/selection" element={<ServiceSelectionPage />} />
+                            <Route path="/service/:id" element={<ServiceDetailPage />} />
                             <Route path="/produits" element={<VoirProduits />} />
+                            <Route path="/produits/:fournisseurId" element={<ProduitsParFournisseur />} />
+                            <Route path="/produits/service/:serviceId" element={<ProduitsParService />} />
+                            <Route path="/fournisseur-profil/:id?" element={<FournisseurProfilePage />} />
+
+                            {/* 🛒 3. PARCOURS COMMANDE & SUIVI */}
+                            <Route path="/panier" element={<PanierPage />} />
+                            <Route path="/reservation" element={<ReservationPage />} />
+                            <Route path="/paiement" element={<PaiementPage />} />
+                            <Route path="/suivi-commande/:missionId" element={<OrderTracking />} />
+
+                            {/* 🔑 4. AUTHENTIFICATION */}
                             <Route path="/login" element={<Login />} />
                             <Route path="/register" element={<Register />} />
                             <Route path="/register-utilisateur" element={<RegisterUtilisateur />} />
                             <Route path="/register-prestataire" element={<RegisterPrestataire />} />
-                            <Route path="/selection" element={<ServiceSelectionPage />} />
 
-                            <Route path="/service/:id" element={<ServiceDetailPage />} />
-                            <Route path="/produits/:fournisseurId" element={<ProduitsParFournisseur />} />
-                            <Route path="/produits/service/:serviceId" element={<ProduitsParService />} />
-                            <Route path="/fournisseur-profil/:id?" element={<FournisseurProfilePage />} />
-                            <Route path="/panier" element={<PanierPage />} />
-
-                            {/* Page Paiement */}
-                            <Route path="/paiement" element={<PaiementPage />} />
-
-                            {/* 🟢 PAGE RÉSERVATION */}
-                            <Route path="/reservation" element={<ReservationPage />} />
-
-                            {/* 📍 PAGE DE SUIVI DE COMMANDE */}
-                            <Route path="/suivi-commande/:missionId" element={<OrderTracking />} />
-
-                            {/* 🟠 PAGES SÉCURISÉES - CLIENTS */}
-                            <Route path="/historique-paiements" element={
-                                <ProtectedRoute role="client">
-                                    <HistoriquePaiements />
-                                </ProtectedRoute>
-                            } />
-
+                            {/* 🟠 5. ESPACE SÉCURISÉ - CLIENT */}
                             <Route path="/dashboard-client" element={
                                 <ProtectedRoute role="client">
                                     <DashboardClient />
                                 </ProtectedRoute>
                             } />
+                            <Route path="/historique-paiements" element={
+                                <ProtectedRoute role="client">
+                                    <HistoriquePaiements />
+                                </ProtectedRoute>
+                            } />
                             <Route path="/dashboard/client" element={<Navigate to="/dashboard-client" replace />} />
 
-                            {/* 🔵 PAGES SÉCURISÉES - FOURNISSEURS */}
+                            {/* 🔵 6. ESPACE SÉCURISÉ - PRESTATAIRE / FOURNISSEUR */}
                             <Route path="/dashboard-fournisseur" element={
                                 <ProtectedRoute role="fournisseur">
                                     <DashboardFournisseur />
@@ -168,7 +174,7 @@ export default function App() {
                             } />
                             <Route path="/dashboard/fournisseur" element={<Navigate to="/dashboard-fournisseur" replace />} />
 
-                            {/* 🔴 PAGES SÉCURISÉES - ADMIN */}
+                            {/* 🔴 7. ESPACE SÉCURISÉ - ADMIN */}
                             <Route path="/admin" element={
                                 <ProtectedRoute role="admin">
                                     <DashboardAdmin />

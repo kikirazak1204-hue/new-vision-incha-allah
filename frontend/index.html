@@ -1,33 +1,55 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-
-<head>
+  <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/svg+xml" href="/logo.png" />
-
-    <!-- 🔑 VALIDATION GOOGLE SEARCH CONSOLE -->
-    <meta name="google-site-verification" content="AZWT7i7ukJ-TciFaQrSsrdvYP6pjlPl4MNps588hnqw" />
-
-    <!-- 🔍 TITRE ET DESCRIPTION OPTIMISÉS (SEO GOOGLE) -->
-    <title>Kanari Service — Plateforme Multi-Services & Réservation en Ligne</title>
-    <meta name="description" content="Kanari Service à Niamey : Réservez facilement vos prestations professionnelles (électricité, plomberie, mécanique, coiffure, restauration) et achetez en ligne en toute sécurité." />
-    <meta name="keywords" content="Kanari Service, Niamey, Niger, réservation services, électricité, plomberie, mécanique, restauration, boutique en ligne" />
+    
+    <!-- 🌐 TITRE & DESCRIPTION SEO PRINCIPALE -->
+    <title>Kanari Service — Vos besoins, notre organisation | Niamey, Niger</title>
+    <meta name="description" content="Plateforme de coordination de services à Niamey, Niger. Particuliers et entreprises : réservez vos prestations (électricité, plomberie, entretien, livraison). Prestataires et partenaires : rejoignez notre réseau professionnel." />
+    <meta name="keywords" content="Kanari Service, devenir partenaire Kanari, rejoindre réseau prestataire Niamey, coordination services Niger, plomberie, électricité, entretien Niamey, transport Niger" />
     <meta name="author" content="Kanari Service" />
 
-    <!-- 🌐 APERÇU PARTAGE (WhatsApp, Facebook, LinkedIn) -->
-    <meta property="og:title" content="Kanari Service — Simplifiez vos services au quotidien" />
-    <meta property="og:description" content="Découvrez nos prestations d'experts certifiés et notre boutique en ligne. Service rapide, fiable et disponible 24h/24." />
-    <meta property="og:image" content="/logo.png" />
+    <!-- 📍 BALISES GÉOGRAPHIQUES ET CONTACT -->
+    <meta name="geo.region" content="NE-8" />
+    <meta name="geo.placename" content="Niamey, Niger" />
+    <meta name="geo.position" content="13.5116;2.1254" />
+    <meta name="ICBM" content="13.5116, 2.1254" />
+
+    <!-- 📲 OPEN GRAPH (PARTAGE WHATSAPP, FACEBOOK, LINKEDIN) -->
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://kanarie.vercel.app" />
+    <meta property="og:title" content="Kanari Service — Vos besoins, notre organisation" />
+    <meta property="og:description" content="Besoin d'un service ou envie de devenir partenaire à Niamey ? Kanari centralise, attribue et coordonne vos interventions en toute confiance." />
+    <meta property="og:site_name" content="Kanari Service" />
 
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#0F172A" />
-</head>
-
-<body>
+    <!-- 🤖 SCHEMA.ORG (POUR L'INDEXATION GOOGLE ENRICHIE) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "ProfessionalService",
+      "name": "Kanari Service",
+      "url": "https://kanarie.vercel.app",
+      "logo": "https://kanarie.vercel.app/favicon.ico",
+      "description": "Plateforme de coordination de services basée à Niamey, Niger. Gestion des prestations pour particuliers et entreprises, et recrutement de partenaires/prestataires qualifiés.",
+      "telephone": "+22782012508",
+      "email": "kanariservice.ne@gmail.com",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Niamey",
+        "addressCountry": "NE"
+      },
+      "areaServed": "Niamey",
+      "offers": {
+        "@type": "Offer",
+        "description": "Mise en relation, coordination d'interventions et partenariat professionnel"
+      }
+    }
+    </script>
+  </head>
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-</body>
-
+  </body>
 </html>

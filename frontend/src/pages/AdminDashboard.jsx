@@ -9,6 +9,7 @@ import AbonnementsAdmin from '../components/admin/AbonnementsAdmin';
 import AdminLiveDispatch from './AdminLiveDispatch';
 import PaiementAdmin from '../components/admin/PaiementAdmin';
 import ServicesAdmin from '../components/admin/ServicesAdmin';
+import FinancesAdmin from '../components/admin/FinancesAdmin';
 
 export default function AdminDashboard() {
   const [tab, setTab] = useState('reservations');
@@ -21,6 +22,7 @@ export default function AdminDashboard() {
     { id: 'validations', label: 'Validations', color: 'from-blue-600 to-cyan-500' },
     { id: 'utilisateurs', label: 'Utilisateurs', color: 'from-purple-600 to-indigo-500' },
     { id: 'paiements', label: 'Paiements', color: 'from-emerald-600 to-teal-500' },
+    { id: 'finances', label: 'Finances', color: 'from-green-600 to-emerald-500' },
     { id: 'produits', label: 'Produits', color: 'from-orange-600 to-red-500' },
     { id: 'parametres', label: 'Paramètres', color: 'from-slate-600 to-slate-500' },
   ];
@@ -35,6 +37,7 @@ export default function AdminDashboard() {
       case 'validations': return 'Validations';
       case 'utilisateurs': return 'Utilisateurs';
       case 'paiements': return 'Paiements';
+      case 'finances': return 'Finances Kanari';
       case 'produits': return 'Produits';
       case 'parametres': return 'Paramètres';
       case 'services': return 'Services et branches';
@@ -106,6 +109,7 @@ export default function AdminDashboard() {
           {tab === 'validations' && <ValidationsAdmin />}
           {tab === 'utilisateurs' && <UtilisateursAdmin />}
           {tab === 'paiements' && <PaiementAdmin />}
+          {tab === 'finances' && <FinancesAdmin />}
           {tab === 'produits' && <ProduitsAdmin />}
           {tab === 'parametres' && <ParametresAdmin />}
           {tab === 'services' && <ServicesAdmin />}
