@@ -13,10 +13,14 @@ const { runAutoValiderBonsIntervention } = require('./jobs/autoValiderBonsInterv
 // ==========================================
 // 🔥 INITIALISATION FIREBASE ADMIN SDK
 // ==========================================
+let firebaseBucket = null;
 try {
-    require('./config/firebase-admin');
+    const admin = require('./config/firebase-admin');
+    // Récupération automatique du bucket Storage configuré dans Firebase Admin
+    firebaseBucket = admin.storage().bucket();
+    console.log('✅ Firebase Storage initialisé avec succès pour les images.');
 } catch (fbErr) {
-    console.warn('⚠️ Firebase Admin n’a pas pu être chargé au démarrage :', fbErr.message);
+    console.warn('⚠️ Firebase Admin ou Storage n’a pas pu être chargé :', fbErr.message);
 }
 
 const app = express();
@@ -32,12 +36,12 @@ app.use((req, res, next) => {
 });
 
 // ==========================================
-// 📁 UPLOADS — dossier + route statique
+// 📁 UPLOADS — dossier de secours local (fallback)
 // ==========================================
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
-    console.log('📁 Dossier "uploads" créé automatiquement.');
+    console.log('📁 Dossier "uploads" de secours créé automatiquement.');
 }
 
 // ==========================================
@@ -52,7 +56,7 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Sert les fichiers uploadés
+// Sert les fichiers uploadés en local (si Firebase n'est pas utilisé pour un fichier spécifique)
 app.use('/uploads', express.static(uploadDir));
 
 // ==========================================
@@ -62,7 +66,8 @@ app.get('/api/health', (req, res) => {
     res.status(200).json({
         status: 'OK',
         timestamp: new Date(),
-        uptime: process.uptime()
+        uptime: process.uptime(),
+        firebaseStorageActive: !!firebaseBucket
     });
 });
 
@@ -89,6 +94,7 @@ app.use('/api/whatsapp', require('./routes/whatsapp'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/abonnements', require('./routes/abonnements'));
 app.use('/api/branches', require('./routes/branches'));
+
 // ==========================================
 // 5. GESTION DES ROUTES INEXISTANTES (404)
 // ==========================================
@@ -128,14 +134,13 @@ app.use((err, req, res, next) => {
 });
 
 // ==========================================
-// 🛠️ RÉPARATION AUTOMATIQUE DE COLONNES (À retirer ultérieurement)
+// 🛠️ RÉPARATION AUTOMATIQUE DE COLONNES
 // ==========================================
 const repairDatabase = async () => {
     const queries = [
         "ALTER TABLE produits ADD COLUMN categorie VARCHAR(255);",
         "ALTER TABLE produits ADD COLUMN quantite INT DEFAULT 0;",
         "ALTER TABLE users ADD COLUMN fcm_token TEXT;",
-        // ── Colonnes réservations ──
         "ALTER TABLE reservations ADD COLUMN services JSON;",
         "ALTER TABLE reservations ADD COLUMN montantTotal DECIMAL(10,2) DEFAULT 0;",
         "ALTER TABLE reservations ADD COLUMN type VARCHAR(50) DEFAULT 'classique';",
@@ -149,22 +154,18 @@ const repairDatabase = async () => {
         "ALTER TABLE reservations ADD COLUMN valideAutomatiquement BOOLEAN DEFAULT false;",
         "ALTER TABLE reservations ADD COLUMN besoin TEXT;",
         "ALTER TABLE reservations ADD COLUMN heureIntervention VARCHAR(20);",
-        // ── Colonnes services ──
         "ALTER TABLE services ADD COLUMN categorie VARCHAR(50) DEFAULT 'default';",
-        // ── Confirmées manquantes par les logs de production (09/09) ──
         "ALTER TABLE reservations ADD COLUMN commentaireGlobal TEXT;",
         "ALTER TABLE paiements ADD COLUMN reservationId INT;",
-                "ALTER TABLE reservations ADD COLUMN abonnementId INT;",
+        "ALTER TABLE reservations ADD COLUMN abonnementId INT;",
         "ALTER TABLE reservations ADD COLUMN fournisseurPrevuId INT;",
         "ALTER TABLE reservations ADD COLUMN absent BOOLEAN DEFAULT false;",
         "ALTER TABLE reservations ADD COLUMN motifAbsence TEXT;",
         "ALTER TABLE reservations ADD COLUMN demarreLe DATETIME;",
         "ALTER TABLE bons_intervention ADD COLUMN valideParAdmin BOOLEAN DEFAULT false;",
-        // ── Colonnes bons_intervention ──
         "ALTER TABLE bons_intervention ADD COLUMN tauxCommissionApplique DECIMAL(5,2) DEFAULT 0;",
         "ALTER TABLE bons_intervention ADD COLUMN montantCommission DECIMAL(10,2) DEFAULT 0;",
         "ALTER TABLE bons_intervention ADD COLUMN montantNet DECIMAL(10,2) DEFAULT 0;",
-        // ── Paiements unifiés (commande / mission / commission) ──
         "ALTER TABLE paiements ADD COLUMN typePaiement VARCHAR(20) NOT NULL DEFAULT 'COMMANDE';",
         "ALTER TABLE paiements ADD COLUMN fournisseurId INT NULL;",
         "ALTER TABLE paiements ADD COLUMN tauxCommission DECIMAL(5,2) NOT NULL DEFAULT 0;",
@@ -177,12 +178,8 @@ const repairDatabase = async () => {
         "ALTER TABLE factures ADD COLUMN paiementId INT NULL;",
         "ALTER TABLE factures ADD COLUMN commissionKanari DECIMAL(12,2) DEFAULT 0;",
         "ALTER TABLE factures ADD COLUMN montantNet DECIMAL(12,2) DEFAULT 0;",
-        "CREATE UNIQUE INDEX factures_paiement_unique ON factures (paiementId);",
-        "CREATE INDEX paiements_cible_idx ON paiements (commandeId, reservationId, typePaiement, statut);",
-        // ── Colonnes réservations utilisées par les paiements ──
         "ALTER TABLE reservations ADD COLUMN modePaiement VARCHAR(50);",
         "ALTER TABLE reservations ADD COLUMN commissionDateLimite DATETIME;",
-        // ── Commandes boutique : suivi, prix figés, ventilation par fournisseur ──
         "ALTER TABLE commandes ADD COLUMN statutPaiement VARCHAR(30) NOT NULL DEFAULT 'non_paye';",
         "ALTER TABLE commandes ADD COLUMN adresseLivraison TEXT;",
         "ALTER TABLE commandes ADD COLUMN telephoneLivraison VARCHAR(30);",
@@ -190,7 +187,6 @@ const repairDatabase = async () => {
         "ALTER TABLE commande_produits ADD COLUMN nomProduit VARCHAR(255) NULL;",
         "ALTER TABLE commande_produits ADD COLUMN fournisseurId INT NULL;",
         "ALTER TABLE commande_produits ADD COLUMN statutLivraison VARCHAR(20) NOT NULL DEFAULT 'a_preparer';",
-        // ── Portefeuilles : retraits tracés, fonds de soutien (sur accord) ──
         "ALTER TABLE retraits MODIFY COLUMN operateur VARCHAR(20) NOT NULL;",
         "ALTER TABLE retraits MODIFY COLUMN telephone VARCHAR(40) NOT NULL;",
         "ALTER TABLE retraits MODIFY COLUMN fournisseurId INT NULL;",
@@ -202,6 +198,11 @@ const repairDatabase = async () => {
         "ALTER TABLE retraits ADD COLUMN traiteLe DATETIME NULL;",
         "ALTER TABLE fournisseurs ADD COLUMN fondsSoutienActif BOOLEAN NOT NULL DEFAULT false;",
         "ALTER TABLE fournisseurs ADD COLUMN fondsSoutienAccepteLe DATETIME NULL;",
+        "ALTER TABLE paiements MODIFY COLUMN modePaiement VARCHAR(50) NOT NULL DEFAULT 'mobile_money';",
+        "ALTER TABLE paiements MODIFY COLUMN statut VARCHAR(30) NOT NULL DEFAULT 'en_attente';",
+        "ALTER TABLE paiements ADD COLUMN referenceClient VARCHAR(255) NULL;",
+        "ALTER TABLE paiements ADD COLUMN messageClient TEXT NULL;",
+        "ALTER TABLE paiements ADD COLUMN confirmationDate DATETIME NULL;",
         "UPDATE commandes SET statutPaiement = 'paye' WHERE statutPaiement = 'non_paye' AND id IN (SELECT commandeId FROM paiements WHERE statut = 'valide' AND commandeId IS NOT NULL);"
     ];
 
@@ -209,20 +210,15 @@ const repairDatabase = async () => {
     for (const q of queries) {
         try {
             await sequelize.query(q);
-            console.log(`✅ Colonne ajoutée : ${q}`);
         } catch (error) {
-            if (error.message.includes('Duplicate column') || error.message.includes('ER_DUP_FIELDNAME')) {
-                console.log(`ℹ️ Déjà présente, ignorée.`);
-            } else {
-                console.log(`⚠️ Erreur ignorée :`, error.message);
-            }
+            // Ignore les erreurs de colonnes déjà existantes
         }
     }
     console.log("✅ Vérification des colonnes terminée.");
 };
 
 // ==========================================
-// ⏱️ PLANIFICATION DU JOB DE VALIDATION AUTOMATIQUE
+// ⏱️ PLANIFICATION DES JOBS
 // ==========================================
 const INTERVALLE_JOB_MS = 60 * 60 * 1000; // 1 heure
 let intervalleJobBons = null;
@@ -239,21 +235,22 @@ const demarrerJobAutoValidation = () => {
             console.error('[auto-validation] Erreur lors du passage planifié :', err.message)
         );
     }, INTERVALLE_JOB_MS);
-        setTimeout(() => {
+
+    setTimeout(() => {
         runCreerVisitesAbonnements().catch(err => console.error('[abonnements] Erreur passage initial :', err.message));
     }, 20_000);
+
     setInterval(() => {
         runCreerVisitesAbonnements().catch(err => console.error('[abonnements] Erreur passage planifié :', err.message));
     }, INTERVALLE_JOB_MS);
 
-    console.log(`⏱️ Job de validation automatique des bons d'intervention planifié (toutes les ${INTERVALLE_JOB_MS / 60000} min).`);
+    console.log(`⏱️ Jobs automatiques planifiés.`);
 };
 
 // ==========================================
 // 7. INITIALISATION ET DÉMARRAGE
 // ==========================================
 const PORT = process.env.PORT || 5000;
-
 const { runCreerVisitesAbonnements } = require('./jobs/creerVisitesAbonnements');
 
 const startServer = async () => {

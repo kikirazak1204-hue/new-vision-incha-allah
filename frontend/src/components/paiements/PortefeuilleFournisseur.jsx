@@ -19,6 +19,8 @@ function Carte({ label, value, accent, note }) {
 export default function PortefeuilleFournisseur() {
     const navigate = useNavigate();
     const [d, setD] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [erreur, setErreur] = useState('');
     const charger = useCallback(async () => {
         try { setD(await getPortefeuilleFournisseur()); setErreur(''); }
         catch (e) { setErreur(e.message || 'Impossible de charger le portefeuille.'); }

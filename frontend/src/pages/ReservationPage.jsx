@@ -1,17 +1,45 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  X, Camera, FileText, MapPin,
-  User, Phone, Map, ArrowRight, Loader2, CheckCircle, AlertCircle, Mic, Square
+  X, Camera, FileText, MapPin, User, Phone, ArrowLeft, ArrowRight,
+  Loader2, CheckCircle, AlertCircle, Mic, Square, CalendarDays,
+  Clock, Repeat2, ClipboardList, LocateFixed, ImagePlus, Volume2,
+  ShieldCheck, Plus, Minus
 } from 'lucide-react';
 import { demanderAbonnement } from '../util/api';
 
-const FREQUENCES = [['hebdomadaire', 'Chaque semaine'], ['quinzaine', 'Tous les 15 jours'], ['mensuel', 'Chaque mois']];
+const FREQUENCES = [
+  ['hebdomadaire', 'Chaque semaine'],
+  ['quinzaine', 'Tous les 15 jours'],
+  ['mensuel', 'Chaque mois']
+];
 
-// ==========================================
-// SOUS-COMPOSANT : FORMULAIRE DÉTAILLÉ PAR SERVICE
-// ==========================================
-const ServiceDetailCard = ({ service, details, onChangeDetail, masquerPrix }) => {
+const BRAND = {
+  navy: '#061A3A',
+  blue: '#123D72',
+  gold: '#F2B632',
+  paleGold: '#FFF7E5',
+  paleBlue: '#EEF4FB'
+};
+
+const inputClass =
+  'w-full min-h-[50px] rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#123D72] focus:ring-4 focus:ring-blue-900/10';
+
+function SectionTitle({ number, title, subtitle }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#F2B632] text-sm font-black text-[#061A3A]">
+        {number}
+      </div>
+      <div>
+        <h3 className="text-base font-extrabold text-[#061A3A] sm:text-lg">{title}</h3>
+        {subtitle && <p className="mt-1 text-sm leading-relaxed text-slate-600">{subtitle}</p>}
+      </div>
+    </div>
+  );
+}
+
+function ServiceDetailCard({ service, details, onChangeDetail, masquerPrix }) {
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -19,231 +47,288 @@ const ServiceDetailCard = ({ service, details, onChangeDetail, masquerPrix }) =>
   const photos = details.photos || [];
   const fichiers = details.fichiers || [];
 
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current?.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+      photos.forEach(photo => {
+        if (photo.preview) URL.revokeObjectURL(photo.preview);
+      });
+    };
+    // Preview URLs are owned by this card and cleaned up on unmount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const startRecording = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      alert("L'enregistrement vocal n'est pas disponible sur cet appareil ou navigateur.");
+      return;
+    }
     audioChunksRef.current = [];
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
-      mediaRecorderRef.current.ondataavailable = (event) => {
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      recorder.ondataavailable = event => {
         if (event.data.size > 0) audioChunksRef.current.push(event.data);
       };
-      mediaRecorderRef.current.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      recorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
         const audioUrl = URL.createObjectURL(audioBlob);
         onChangeDetail('vocal', { blob: audioBlob, url: audioUrl });
+        stream.getTracks().forEach(track => track.stop());
       };
-      mediaRecorderRef.current.start();
+      recorder.start();
       setRecording(true);
-    } catch (err) {
-      console.error('Erreur micro :', err);
-      alert("Impossible d'accéder au microphone.");
+    } catch (error) {
+      console.error('Erreur micro :', error);
+      alert("Autorisez l'accès au microphone pour enregistrer votre message.");
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current) {
+    if (mediaRecorderRef.current?.state === 'recording') {
       mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-      setRecording(false);
     }
+    setRecording(false);
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-      <div className="flex justify-between items-start border-b pb-3">
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
         <div>
-          <h4 className="font-black text-slate-800 text-base">{service.nom || service.serviceNom}</h4>
-          <p className="text-xs text-slate-500">Service Kanari sélectionné</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Prestation sélectionnée</p>
+          <h4 className="mt-1 text-lg font-extrabold text-[#061A3A]">{service.nom || service.serviceNom}</h4>
         </div>
-        <span className="text-sm font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-xl">
-          {masquerPrix ? 'Prix après étude' : `${service.prix || service.tarif || 0} XOF`}
+        <span className="rounded-full bg-[#FFF7E5] px-3 py-2 text-sm font-extrabold text-[#061A3A]">
+          {masquerPrix ? 'Prix après étude' : `${Number(service.prix || service.tarif || 0).toLocaleString('fr-FR')} FCFA`}
         </span>
       </div>
 
-      <div>
-        <label className="text-xs font-bold text-slate-700 block mb-1">Description de votre besoin</label>
+      <div className="mt-4">
+        <label className="mb-2 block text-sm font-bold text-slate-800">
+          Expliquez ce dont vous avez besoin
+        </label>
         <textarea
-          rows="3"
+          rows={3}
           value={details.description || ''}
-          onChange={(e) => onChangeDetail('description', e.target.value)}
-          placeholder="Précisez votre demande pour ce service..."
-          className="w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10"
+          onChange={e => onChangeDetail('description', e.target.value)}
+          placeholder="Exemple : mon robinet fuit dans la cuisine..."
+          className={`${inputClass} min-h-[108px] resize-y`}
         />
+        <p className="mt-1 text-xs text-slate-500">Vous pouvez écrire simplement, avec vos propres mots.</p>
       </div>
 
-      <div className="rounded-xl border border-slate-200 p-3 bg-slate-50">
-        <div className="text-xs font-bold text-slate-700 mb-2">Message vocal (Optionnel)</div>
-        <div className="flex items-center gap-3">
+      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div className="flex items-center gap-2">
+          <Volume2 size={19} className="text-[#123D72]" />
+          <p className="text-sm font-extrabold text-[#061A3A]">Vous préférez parler ?</p>
+          <span className="ml-auto rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-500">Facultatif</span>
+        </div>
+        <p className="mt-1 text-sm text-slate-600">Enregistrez un message vocal pour expliquer votre besoin.</p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
           {!recording ? (
             <button type="button" onClick={startRecording}
-              className="flex items-center gap-2 rounded-xl bg-red-600 px-3 py-2 text-xs font-black text-white hover:bg-red-700 transition">
-              <Mic size={14} /> Enregistrer un vocal
+              className="inline-flex min-h-[46px] items-center gap-2 rounded-xl bg-[#123D72] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#061A3A]">
+              <Mic size={18} /> Enregistrer un vocal
             </button>
           ) : (
             <button type="button" onClick={stopRecording}
-              className="flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2 text-xs font-black text-white animate-pulse">
-              <Square size={14} /> Arrêter l'enregistrement
+              className="inline-flex min-h-[46px] items-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white">
+              <Square size={16} /> Arrêter
             </button>
           )}
+          {recording && <span className="text-sm font-semibold text-red-600">Enregistrement en cours…</span>}
         </div>
         {details.vocal?.url && (
-          <div className="mt-3">
-            <p className="text-[11px] text-slate-500 mb-1">Écouter votre vocal :</p>
-            <audio controls src={details.vocal.url} className="w-full h-10" />
+          <div className="mt-3 rounded-xl bg-white p-3">
+            <p className="mb-2 text-xs font-bold text-slate-600">Votre message vocal est prêt :</p>
+            <audio controls src={details.vocal.url} className="h-10 w-full" />
+            <button type="button" onClick={() => onChangeDetail('removeVocal')}
+              className="mt-2 text-xs font-bold text-red-600 underline">Supprimer le vocal</button>
           </div>
         )}
       </div>
 
-      <div>
-        <label className="text-xs font-bold text-slate-700 block mb-2">Photos (4 max)</label>
-        <div className="flex gap-2 flex-wrap items-center">
-          {photos.map((photoObj, pIdx) => (
-            <div key={pIdx} className="relative w-16 h-16 rounded-xl overflow-hidden border">
-              <img src={photoObj.preview} alt="Aperçu" className="w-full h-full object-cover" />
-              <button type="button" onClick={() => onChangeDetail('removePhoto', pIdx)}
-                className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 shadow">
-                <X size={10} />
+      <div className="mt-4">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-sm font-extrabold text-[#061A3A]">Ajouter des photos</p>
+            <p className="text-xs text-slate-500">Montrez-nous le problème (4 photos maximum).</p>
+          </div>
+          <ImagePlus className="text-[#123D72]" size={22} />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-3">
+          {photos.map((photo, index) => (
+            <div key={`${photo.file?.name || 'photo'}-${index}`} className="relative h-20 w-20 overflow-hidden rounded-xl border border-slate-200">
+              <img src={photo.preview} alt={`Photo ${index + 1}`} className="h-full w-full object-cover" />
+              <button type="button" aria-label="Supprimer cette photo"
+                onClick={() => onChangeDetail('removePhoto', index)}
+                className="absolute right-1 top-1 rounded-full bg-red-600 p-1.5 text-white shadow">
+                <X size={13} />
               </button>
             </div>
           ))}
           {photos.length < 4 && (
-            <label className="w-16 h-16 border-2 border-dashed border-slate-300 hover:border-blue-600 rounded-xl flex flex-col items-center justify-center cursor-pointer text-slate-400 hover:text-blue-600 transition">
-              <Camera size={20} />
-              <input type="file" accept="image/*" multiple onChange={(e) => onChangeDetail('addPhotos', e.target.files)} className="hidden" />
+            <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 text-[#123D72] transition hover:border-[#123D72] hover:bg-[#EEF4FB]">
+              <Camera size={23} />
+              <span className="mt-1 text-[11px] font-bold">Ajouter</span>
+              <input type="file" accept="image/*" multiple className="hidden"
+                onChange={e => {
+                  onChangeDetail('addPhotos', e.target.files);
+                  e.target.value = '';
+                }} />
             </label>
           )}
         </div>
       </div>
 
-      <div>
-        <label className="text-xs font-bold text-slate-700 block mb-2">Documents (PDF, Word)</label>
-        <label className="inline-flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl cursor-pointer transition">
-          <FileText size={16} /> Parcourir les fichiers ({fichiers.length})
-          <input type="file" multiple onChange={(e) => onChangeDetail('addFiles', e.target.files)} className="hidden" />
+      <div className="mt-4 border-t border-slate-100 pt-4">
+        <p className="text-sm font-extrabold text-[#061A3A]">Documents utiles</p>
+        <p className="mb-3 text-xs text-slate-500">Facultatif : PDF ou document Word.</p>
+        <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-[#123D72] hover:bg-[#EEF4FB]">
+          <FileText size={18} /> Choisir des documents
+          <input type="file" accept=".pdf,.doc,.docx" multiple className="hidden"
+            onChange={e => {
+              onChangeDetail('addFiles', e.target.files);
+              e.target.value = '';
+            }} />
         </label>
+        {fichiers.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {fichiers.map((file, index) => (
+              <li key={`${file.nom}-${index}`} className="flex items-center justify-between gap-2 text-xs text-slate-600">
+                <span className="truncate">{file.nom}</span>
+                <button type="button" onClick={() => onChangeDetail('removeFile', index)}
+                  className="font-bold text-red-600">Retirer</button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-    </div>
+    </section>
   );
-};
+}
 
-// ==========================================
-// COMPOSANT PRINCIPAL : RESERVATION PAGE
-// ==========================================
 export default function ReservationPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
-
   const [servicesSelectionnes, setServicesSelectionnes] = useState([]);
   const [fournisseurPreselectionne, setFournisseurPreselectionne] = useState(null);
-
   const [socle, setSocle] = useState({ clientNom: '', telephone: '', adresse: '', coords: null });
   const [detailsServices, setDetailsServices] = useState({});
-
   const [mode, setMode] = useState('unique');
   const [abo, setAbo] = useState({ frequence: 'hebdomadaire', jourPrefere: '', heure: '', dateDebut: '' });
   const estAbo = mode === 'abonnement';
 
   useEffect(() => {
-    const state = location.state || {};
-    let services = state.services;
-    
-    // Si un seul service est passé via le state (ex depuis le profil du fournisseur)
-    if (!services && state.service) {
-      services = [state.service];
-    }
-    // Sinon fallback sur le panier local
-    if (!services || services.length === 0) {
-      services = JSON.parse(localStorage.getItem('kanari_cart') || '[]');
-    }
+    try {
+      const state = location.state || {};
+      let services = state.services;
+      if (!services && state.service) services = [state.service];
+      if (!services || services.length === 0) {
+        services = JSON.parse(localStorage.getItem('kanari_cart') || '[]');
+      }
+      const fournisseur = state.fournisseur || JSON.parse(localStorage.getItem('selectedFournisseur') || 'null');
+      const servicesAvecId = (Array.isArray(services) ? services : []).map((service, index) => ({
+        ...service,
+        safeId: service.safeId || service.id || service.realDbId || `srv_${index}`
+      }));
+      setServicesSelectionnes(servicesAvecId);
+      setFournisseurPreselectionne(fournisseur);
 
-    const fournisseur = state.fournisseur || JSON.parse(localStorage.getItem('selectedFournisseur') || 'null');
-
-    const servicesAvecId = services.map((s, idx) => ({
-      ...s,
-      safeId: s.safeId || s.id || s.realDbId || `srv_${idx}`
-    }));
-
-    setServicesSelectionnes(servicesAvecId);
-    setFournisseurPreselectionne(fournisseur);
-
-    const userStored = JSON.parse(localStorage.getItem('user') || '{}');
-    if (userStored) {
-      setSocle(prev => ({
-        ...prev,
+      const userStored = JSON.parse(localStorage.getItem('user') || '{}');
+      setSocle(previous => ({
+        ...previous,
         clientNom: userStored.nom || userStored.name || '',
         telephone: userStored.telephone || userStored.phone || '',
         adresse: userStored.adresse || ''
       }));
+    } catch (error) {
+      console.error('Erreur de lecture des informations de réservation :', error);
+      setMessage({ text: "Impossible de charger votre panier. Retournez aux services et réessayez.", type: 'error' });
     }
   }, [location]);
 
-  const handleServiceDetailChange = (srvSafeId, actionType, payload) => {
-    setDetailsServices(prev => {
-      const current = prev[srvSafeId] || {};
-      let updated = { ...current };
-
-      if (actionType === 'description') updated.description = payload;
-      if (actionType === 'vocal') updated.vocal = payload;
-      if (actionType === 'addPhotos') {
-        const files = Array.from(payload);
-        const newPhotos = files.map(file => ({ file, preview: URL.createObjectURL(file) }));
-        updated.photos = [...(current.photos || []), ...newPhotos].slice(0, 4);
+  const handleServiceDetailChange = (serviceId, action, payload) => {
+    setDetailsServices(previous => {
+      const current = previous[serviceId] || {};
+      const updated = { ...current };
+      if (action === 'description') updated.description = payload;
+      if (action === 'vocal') updated.vocal = payload;
+      if (action === 'removeVocal') {
+        if (current.vocal?.url) URL.revokeObjectURL(current.vocal.url);
+        updated.vocal = null;
       }
-      if (actionType === 'removePhoto') {
-        updated.photos = (current.photos || []).filter((_, idx) => idx !== payload);
+      if (action === 'addPhotos') {
+        const available = Math.max(0, 4 - (current.photos || []).length);
+        const newPhotos = Array.from(payload || []).filter(file => file.type.startsWith('image/'))
+          .slice(0, available)
+          .map(file => ({ file, preview: URL.createObjectURL(file) }));
+        updated.photos = [...(current.photos || []), ...newPhotos];
       }
-      if (actionType === 'addFiles') {
-        const files = Array.from(payload).map(file => ({ file, nom: file.name, taille: file.size }));
-        updated.fichiers = [...(current.fichiers || []), ...files];
+      if (action === 'removePhoto') {
+        const removed = (current.photos || [])[payload];
+        if (removed?.preview) URL.revokeObjectURL(removed.preview);
+        updated.photos = (current.photos || []).filter((_, index) => index !== payload);
       }
-      return { ...prev, [srvSafeId]: updated };
+      if (action === 'addFiles') {
+        const allowed = Array.from(payload || []).filter(file =>
+          /\.(pdf|doc|docx)$/i.test(file.name)
+        );
+        updated.fichiers = [...(current.fichiers || []), ...allowed.map(file => ({
+          file, nom: file.name, taille: file.size
+        }))];
+      }
+      if (action === 'removeFile') {
+        updated.fichiers = (current.fichiers || []).filter((_, index) => index !== payload);
+      }
+      return { ...previous, [serviceId]: updated };
     });
   };
 
-  // 📍 GÉOLOCALISATION OPTIMISÉE POUR TOUR DE CONTRÔLE
   const handleGeolocalisation = () => {
-    if (!navigator.geolocation) return alert("La géolocalisation n'est pas supportée sur ce navigateur.");
-    
-    setMessage({ text: 'Recherche de votre position GPS...', type: 'success' });
-
+    if (!navigator.geolocation) {
+      setMessage({ text: "La géolocalisation n'est pas disponible sur cet appareil. Indiquez votre quartier.", type: 'error' });
+      return;
+    }
+    setMessage({ text: 'Recherche de votre position…', type: 'info' });
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setSocle(prev => ({ ...prev, coords: { lat, lng } }));
-        setMessage({ text: '📍 Coordonnées GPS capturées et liées à votre quartier !', type: 'success' });
+      position => {
+        setSocle(previous => ({
+          ...previous,
+          coords: { lat: position.coords.latitude, lng: position.coords.longitude }
+        }));
+        setMessage({ text: 'Votre position GPS a été ajoutée à la demande.', type: 'success' });
       },
-      (err) => {
-        console.error("Erreur GPS:", err);
-        setMessage({ text: "Impossible de capter le GPS. Veuillez préciser votre quartier manuellement.", type: 'error' });
+      error => {
+        console.error('Erreur GPS :', error);
+        setMessage({ text: "Position non trouvée. Vous pouvez simplement écrire votre quartier et un repère.", type: 'error' });
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
-  const totalMontant = servicesSelectionnes.reduce((acc, srv) => acc + Number(srv.prix || srv.tarif || 0), 0);
+  const totalMontant = servicesSelectionnes.reduce(
+    (total, service) => total + Number(service.prix || service.tarif || 0), 0
+  );
 
   const soumettreAbonnement = async () => {
     const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('Connectez-vous à votre compte pour demander un abonnement.');
-    }
-    if (!socle.adresse.trim()) {
-      throw new Error("L'adresse (quartier) est obligatoire pour un abonnement.");
-    }
+    if (!token) throw new Error('Connectez-vous à votre compte pour demander un abonnement.');
+    if (!socle.adresse.trim()) throw new Error("Indiquez votre quartier ou un repère pour l'abonnement.");
 
     const adresseComplete = `Quartier/Zone: ${socle.adresse.trim()}${socle.coords ? ` | GPS: (${socle.coords.lat.toFixed(5)}, ${socle.coords.lng.toFixed(5)})` : ''}`;
-
-    for (const srv of servicesSelectionnes) {
-      const details = detailsServices[srv.safeId] || {};
-      const serviceId = Number(srv.realDbId ?? srv.id ?? srv.safeId);
-      
+    for (const service of servicesSelectionnes) {
+      const details = detailsServices[service.safeId] || {};
+      const serviceId = Number(service.realDbId ?? service.id ?? service.safeId);
       await demanderAbonnement({
         serviceId: Number.isFinite(serviceId) ? serviceId : 1,
-        serviceNom: srv.nom || srv.serviceNom,
+        serviceNom: service.nom || service.serviceNom,
         telephone: socle.telephone.trim(),
         clientNom: socle.clientNom || undefined,
         adresse: adresseComplete,
@@ -251,236 +336,366 @@ export default function ReservationPage() {
         jourPrefere: abo.jourPrefere || undefined,
         heure: abo.heure || undefined,
         dateDebut: abo.dateDebut || undefined,
-        remarques: details.description || undefined,
+        remarques: details.description || undefined
       });
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async event => {
+    event.preventDefault();
     setMessage({ text: '', type: '' });
 
-    if (!socle.telephone || !socle.telephone.trim()) {
-      return setMessage({ text: 'Le numéro de téléphone est obligatoire pour valider la réservation.', type: 'error' });
+    if (!socle.telephone.trim()) {
+      setMessage({ text: 'Veuillez saisir votre numéro de téléphone.', type: 'error' });
+      return;
     }
-
     if (servicesSelectionnes.length === 0) {
-      return setMessage({ text: 'Veuillez sélectionner au moins un service avant de valider.', type: 'error' });
+      setMessage({ text: "Votre panier est vide. Choisissez d'abord une prestation.", type: 'error' });
+      return;
+    }
+    if (estAbo && !socle.adresse.trim()) {
+      setMessage({ text: "Pour un abonnement, indiquez votre quartier ou un repère.", type: 'error' });
+      return;
     }
 
     setLoading(true);
     try {
       if (estAbo) {
         await soumettreAbonnement();
-        ['kanari_cart', 'selectedService', 'selectedFournisseur'].forEach(k => localStorage.removeItem(k));
-        setMessage({ text: "Demande reçue. Notre équipe étudie votre besoin et vous envoie un prix adapté. Rien n'est facturé avant votre accord.", type: 'success' });
+        ['kanari_cart', 'selectedService', 'selectedFournisseur'].forEach(key => localStorage.removeItem(key));
+        setMessage({
+          text: "Votre demande d'abonnement a été reçue. Kanari étudie votre besoin et vous proposera un tarif. Aucun paiement ne sera demandé avant votre accord.",
+          type: 'success'
+        });
         setTimeout(() => navigate('/dashboard-client'), 2500);
         return;
       }
 
       const token = localStorage.getItem('token');
       const formData = new FormData();
-
-      // 📍 MISE EN FORME COMPLÈTE & CLAIRE POUR L'ADMIN
-      const adresseFormatteAdmin = `${socle.adresse ? `Quartier / Zone : ${socle.adresse}` : 'Quartier non renseigné'}${socle.coords ? ` | GPS : [${socle.coords.lat}, ${socle.coords.lng}]` : ''}`;
+      const adresseAdmin = `${socle.adresse ? `Quartier / Zone : ${socle.adresse}` : 'Quartier non renseigné'}${socle.coords ? ` | GPS : [${socle.coords.lat}, ${socle.coords.lng}]` : ''}`;
 
       const donneesDeBase = {
         clientNom: socle.clientNom || 'Client Kanari',
         telephone: socle.telephone.trim(),
-        adresse: adresseFormatteAdmin,
+        adresse: adresseAdmin,
         coordonneesGps: socle.coords ? `${socle.coords.lat}, ${socle.coords.lng}` : null,
         fournisseurId: fournisseurPreselectionne?.id || fournisseurPreselectionne?._id || null,
-        services: servicesSelectionnes.map(srv => {
-          const details = detailsServices[srv.safeId] || {};
+        services: servicesSelectionnes.map(service => {
+          const details = detailsServices[service.safeId] || {};
           return {
-            serviceId: srv.realDbId || srv.id || srv.safeId,
-            safeId: srv.safeId,
-            nom: srv.nom || srv.serviceNom,
-            prix: Number(srv.prix || srv.tarif || 0),
+            serviceId: service.realDbId || service.id || service.safeId,
+            safeId: service.safeId,
+            nom: service.nom || service.serviceNom,
+            prix: Number(service.prix || service.tarif || 0),
             description: details.description || ''
           };
         })
       };
 
       formData.append('donneesReservation', JSON.stringify(donneesDeBase));
-
-      servicesSelectionnes.forEach(srv => {
-        const details = detailsServices[srv.safeId] || {};
-        if (details.photos) details.photos.forEach(p => formData.append(`photo_${srv.safeId}`, p.file));
-        if (details.fichiers) details.fichiers.forEach(f => formData.append(`document_${srv.safeId}`, f.file));
-        if (details.vocal?.blob) formData.append(`vocal_${srv.safeId}`, details.vocal.blob, 'vocal-besoin.webm');
+      servicesSelectionnes.forEach(service => {
+        const details = detailsServices[service.safeId] || {};
+        (details.photos || []).forEach(photo => formData.append(`photo_${service.safeId}`, photo.file));
+        (details.fichiers || []).forEach(file => formData.append(`document_${service.safeId}`, file.file));
+        if (details.vocal?.blob) {
+          formData.append(`vocal_${service.safeId}`, details.vocal.blob, 'vocal-besoin.webm');
+        }
       });
 
       const API = import.meta.env.VITE_API_URL || 'https://newvision-backend.onrender.com';
-      const res = await fetch(`${API}/api/reservations/global`, {
+      const response = await fetch(`${API}/api/reservations/global`, {
         method: 'POST',
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: formData,
+        body: formData
       });
-
-      const textRes = await res.text();
-      const data = textRes ? JSON.parse(textRes) : {};
-
-      if (!res.ok || data.success === false) {
-        throw new Error(data.message || 'Erreur lors de l’envoi de la réservation.');
+      const responseText = await response.text();
+      let data = {};
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        throw new Error("Le serveur a renvoyé une réponse inattendue. Réessayez dans un instant.");
+      }
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || "La réservation n'a pas pu être envoyée.");
       }
 
-      ['kanari_cart', 'selectedService', 'selectedFournisseur'].forEach(k => localStorage.removeItem(k));
-
-      setMessage({ text: 'Réservation validée avec succès !', type: 'success' });
-      setTimeout(() => navigate('/dashboard-client'), 1500);
-
-    } catch (err) {
-      console.error('Erreur soumission:', err);
-      setMessage({ text: err.message || 'Erreur de connexion au serveur.', type: 'error' });
+      ['kanari_cart', 'selectedService', 'selectedFournisseur'].forEach(key => localStorage.removeItem(key));
+      setMessage({ text: 'Votre demande a bien été envoyée à Kanari.', type: 'success' });
+      setTimeout(() => navigate('/dashboard-client'), 1800);
+    } catch (error) {
+      console.error('Erreur de réservation :', error);
+      setMessage({ text: error.message || 'Connexion impossible. Vérifiez votre réseau et réessayez.', type: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
-  const champAbo = 'w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-blue-600';
+  const fournisseurNom = fournisseurPreselectionne?.nom || fournisseurPreselectionne?.name;
+  const formatPrix = value => `${Number(value || 0).toLocaleString('fr-FR')} FCFA`;
 
   return (
-    <main className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8 text-[#061a3a]">
-      <div className="max-w-2xl mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200">
+    <main className="min-h-screen bg-[#F4F6F9] px-3 py-5 text-slate-800 sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-3xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-900/5">
+        <header className="relative overflow-hidden bg-[#061A3A] px-5 py-6 text-white sm:px-8 sm:py-8">
+          <div className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full border-[24px] border-white/5" />
+          <div className="pointer-events-none absolute -bottom-20 right-20 h-44 w-44 rounded-full bg-[#F2B632]/10" />
+          <button type="button" onClick={() => navigate(-1)}
+            className="relative mb-5 inline-flex min-h-[40px] items-center gap-2 rounded-lg text-sm font-bold text-white/85 hover:text-[#F2B632]">
+            <ArrowLeft size={18} /> Retour
+          </button>
+          <div className="relative flex items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#F2B632] text-[#061A3A]">
+              <ClipboardList size={26} />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#F2B632]">KANARI SERVICE</p>
+              <h1 className="mt-1 text-2xl font-black leading-tight sm:text-3xl">
+                {estAbo ? 'Demander un abonnement' : 'Votre réservation'}
+              </h1>
+            </div>
+          </div>
+          <p className="relative mt-4 max-w-xl text-sm leading-relaxed text-blue-100 sm:text-base">
+            Décrivez simplement ce qu'il vous faut. Nous organisons votre demande et vous accompagnons jusqu'à la réalisation.
+          </p>
+          <div className="relative mt-5 flex flex-wrap gap-2 text-xs font-semibold">
+            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-2">1. Vos informations</span>
+            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-2">2. Votre besoin</span>
+            <span className="rounded-full border border-[#F2B632]/50 bg-[#F2B632]/15 px-3 py-2 text-[#FFE3A0]">3. Confirmation</span>
+          </div>
+        </header>
 
-        <div className="bg-[#061a3a] text-white p-6 sm:p-8">
-          <button onClick={() => navigate(-1)} className="text-xs font-bold text-amber-400 mb-2 hover:underline">← Retour</button>
-          <h2 className="text-2xl sm:text-3xl font-black">{estAbo ? 'Demande d\'abonnement' : 'Finaliser votre réservation'}</h2>
-          <p className="text-sm text-slate-300 mt-1">Renseignez votre numéro et décrivez votre besoin (texte ou vocal).</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-7 p-4 sm:p-8">
           {message.text && (
-            <div className={`p-4 rounded-2xl flex items-center gap-3 text-sm font-semibold ${message.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
-              {message.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
+            <div role="status" aria-live="polite"
+              className={`flex items-start gap-3 rounded-2xl border p-4 text-sm font-semibold leading-relaxed ${
+                message.type === 'error'
+                  ? 'border-red-200 bg-red-50 text-red-800'
+                  : message.type === 'success'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-blue-200 bg-blue-50 text-blue-800'
+              }`}>
+              {message.type === 'error' ? <AlertCircle className="mt-0.5 shrink-0" size={20} /> :
+                <CheckCircle className="mt-0.5 shrink-0" size={20} />}
               <span>{message.text}</span>
             </div>
           )}
 
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+          <section className="space-y-4">
+            <SectionTitle number="1" title="Quel type de réservation ?" subtitle="Choisissez si vous avez besoin du service une seule fois ou régulièrement." />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <button type="button" onClick={() => setMode('unique')}
-                className={`p-4 rounded-2xl border text-left transition ${!estAbo ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-white'}`}>
-                <p className="font-black text-sm">Une fois</p>
-                <p className="text-xs text-slate-500">Intervention unique</p>
+                aria-pressed={!estAbo}
+                className={`min-h-[92px] rounded-2xl border-2 p-4 text-left transition ${
+                  !estAbo ? 'border-[#123D72] bg-[#EEF4FB] ring-2 ring-[#123D72]/10' : 'border-slate-200 bg-white hover:border-slate-300'
+                }`}>
+                <div className="flex items-center gap-3">
+                  <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${!estAbo ? 'bg-[#123D72] text-white' : 'bg-slate-100 text-slate-600'}`}>
+                    <ClipboardList size={22} />
+                  </div>
+                  <div>
+                    <p className="font-extrabold text-[#061A3A]">Une seule fois</p>
+                    <p className="mt-1 text-sm text-slate-600">Pour une intervention ponctuelle</p>
+                  </div>
+                </div>
               </button>
               <button type="button" onClick={() => setMode('abonnement')}
-                className={`p-4 rounded-2xl border text-left transition ${estAbo ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-white'}`}>
-                <p className="font-black text-sm">Abonnement</p>
-                <p className="text-xs text-slate-500">Je veux ce service régulièrement</p>
+                aria-pressed={estAbo}
+                className={`min-h-[92px] rounded-2xl border-2 p-4 text-left transition ${
+                  estAbo ? 'border-[#123D72] bg-[#EEF4FB] ring-2 ring-[#123D72]/10' : 'border-slate-200 bg-white hover:border-slate-300'
+                }`}>
+                <div className="flex items-center gap-3">
+                  <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${estAbo ? 'bg-[#123D72] text-white' : 'bg-slate-100 text-slate-600'}`}>
+                    <Repeat2 size={22} />
+                  </div>
+                  <div>
+                    <p className="font-extrabold text-[#061A3A]">Régulièrement</p>
+                    <p className="mt-1 text-sm text-slate-600">Chaque semaine ou chaque mois</p>
+                  </div>
+                </div>
               </button>
             </div>
             {estAbo && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-slate-700 leading-relaxed space-y-1">
-                <p className="font-bold text-[#061a3a]">Gagnez du temps</p>
-                <p>Le même prestataire revient chez vous à date fixe, sans que vous ayez à réserver chaque fois.</p>
-                <p>Prestataire suivi et noté · prix fixe sans surprise · résiliation libre. Vous recevez une offre adaptée sous 24 à 48 h, et rien n'est facturé avant votre accord.</p>
+              <div className="rounded-2xl border border-[#F2B632]/50 bg-[#FFF7E5] p-4 text-sm leading-relaxed text-[#061A3A]">
+                <p className="font-extrabold">Comment fonctionne l'abonnement ?</p>
+                <p className="mt-1">Indiquez votre fréquence. Kanari étudie votre demande et vous communique une proposition. Aucun paiement n'est demandé avant votre accord.</p>
               </div>
             )}
-          </div>
+          </section>
 
-          <div className="space-y-4">
-            <h3 className="text-sm font-black uppercase tracking-wider text-blue-600">1. Vos coordonnées</h3>
+          <div className="h-px bg-slate-100" />
 
+          <section className="space-y-4">
+            <SectionTitle number="2" title="Comment vous contacter et vous trouver ?" subtitle="Ces informations permettent à notre équipe de vous joindre et de localiser le lieu de l'intervention." />
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Votre numéro de téléphone <span className="text-red-500">*</span></label>
+              <label htmlFor="telephone" className="mb-2 block text-sm font-bold text-slate-800">
+                Numéro de téléphone <span className="text-red-600">*</span>
+              </label>
               <div className="relative">
-                <Phone className="absolute left-4 top-3.5 text-slate-400" size={18} />
-                <input type="tel" required value={socle.telephone}
-                  onChange={e => setSocle(p => ({ ...p, telephone: e.target.value }))}
-                  className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-200 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 text-sm font-semibold"
-                  placeholder="Ex. 90000000" />
+                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={19} />
+                <input id="telephone" type="tel" required value={socle.telephone}
+                  onChange={event => setSocle(previous => ({ ...previous, telephone: event.target.value }))}
+                  className={`${inputClass} pl-12`} placeholder="Exemple : 90 00 00 00" autoComplete="tel" />
               </div>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Nom complet (Optionnel)</label>
+                <label htmlFor="clientNom" className="mb-2 block text-sm font-bold text-slate-800">Votre nom <span className="font-normal text-slate-500">(facultatif)</span></label>
                 <div className="relative">
-                  <User className="absolute left-4 top-3.5 text-slate-400" size={18} />
-                  <input type="text" value={socle.clientNom}
-                    onChange={e => setSocle(p => ({ ...p, clientNom: e.target.value }))}
-                    className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-200 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 text-sm"
-                    placeholder="Votre nom" />
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={19} />
+                  <input id="clientNom" type="text" value={socle.clientNom}
+                    onChange={event => setSocle(previous => ({ ...previous, clientNom: event.target.value }))}
+                    className={`${inputClass} pl-12`} placeholder="Nom et prénom" autoComplete="name" />
                 </div>
               </div>
-
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Quartier / Repère {estAbo ? <span className="text-red-500">*</span> : '(Conseillé)'}</label>
+                <label htmlFor="adresse" className="mb-2 block text-sm font-bold text-slate-800">
+                  Quartier et repère {estAbo && <span className="text-red-600">*</span>}
+                </label>
                 <div className="relative">
-                  <MapPin className="absolute left-4 top-3.5 text-slate-400" size={18} />
-                  <input type="text" value={socle.adresse}
-                    onChange={e => setSocle(p => ({ ...p, adresse: e.target.value }))}
-                    className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-200 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 text-sm"
-                    placeholder="Ex: Wadata, près de la pharmacie" />
+                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={19} />
+                  <input id="adresse" type="text" value={socle.adresse}
+                    onChange={event => setSocle(previous => ({ ...previous, adresse: event.target.value }))}
+                    className={`${inputClass} pl-12`} placeholder="Ex. : Wadata, près du marché" />
                 </div>
               </div>
             </div>
-
-            <div className="flex items-center gap-4 pt-1">
-              <button type="button" onClick={handleGeolocalisation}
-                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition flex items-center gap-2">
-                 Utiliser ma position GPS
-              </button>
-              {socle.coords && <span className="text-xs text-emerald-600 font-bold">GPS enregistré ✓</span>}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-xl bg-white p-2 text-[#123D72]"><LocateFixed size={22} /></div>
+                  <div>
+                    <p className="text-sm font-extrabold text-[#061A3A]">Préciser ma position GPS</p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-600">Facultatif. Cela peut aider l'équipe à vous localiser.</p>
+                  </div>
+                </div>
+                <button type="button" onClick={handleGeolocalisation}
+                  className="min-h-[44px] rounded-xl border border-[#123D72] bg-white px-4 py-2 text-sm font-bold text-[#123D72] hover:bg-[#EEF4FB]">
+                  {socle.coords ? 'Actualiser ma position' : 'Utiliser ma position'}
+                </button>
+              </div>
+              {socle.coords && (
+                <p className="mt-3 flex items-center gap-2 text-xs font-bold text-emerald-700">
+                  <CheckCircle size={15} /> Position GPS ajoutée
+                </p>
+              )}
             </div>
-          </div>
+          </section>
 
           {estAbo && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-black uppercase tracking-wider text-blue-600">Planning souhaité</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Fréquence</label>
-                  <select className={champAbo} value={abo.frequence} onChange={e => setAbo(p => ({ ...p, frequence: e.target.value }))}>
-                    {FREQUENCES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                  </select>
+            <>
+              <div className="h-px bg-slate-100" />
+              <section className="space-y-4">
+                <SectionTitle number="3" title="Quand souhaitez-vous le service ?" subtitle="Donnez-nous vos préférences. Elles seront confirmées avec vous." />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="frequence" className="mb-2 block text-sm font-bold">Fréquence</label>
+                    <select id="frequence" className={inputClass} value={abo.frequence}
+                      onChange={event => setAbo(previous => ({ ...previous, frequence: event.target.value }))}>
+                      {FREQUENCES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="jour" className="mb-2 block text-sm font-bold">Jour souhaité</label>
+                    <input id="jour" className={inputClass} placeholder="Ex. : lundi"
+                      value={abo.jourPrefere} onChange={event => setAbo(previous => ({ ...previous, jourPrefere: event.target.value }))} />
+                  </div>
+                  <div>
+                    <label htmlFor="heure" className="mb-2 block text-sm font-bold">Heure souhaitée</label>
+                    <div className="relative">
+                      <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                      <input id="heure" type="time" className={`${inputClass} pl-12`} value={abo.heure}
+                        onChange={event => setAbo(previous => ({ ...previous, heure: event.target.value }))} />
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="dateDebut" className="mb-2 block text-sm font-bold">Date de début souhaitée</label>
+                    <div className="relative">
+                      <CalendarDays className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                      <input id="dateDebut" type="date" className={`${inputClass} pl-12`} value={abo.dateDebut}
+                        onChange={event => setAbo(previous => ({ ...previous, dateDebut: event.target.value }))} />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Jour souhaité</label>
-                  <input className={champAbo} placeholder="ex. lundi" value={abo.jourPrefere} onChange={e => setAbo(p => ({ ...p, jourPrefere: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Heure souhaitée</label>
-                  <input className={champAbo} placeholder="ex. 09:00" value={abo.heure} onChange={e => setAbo(p => ({ ...p, heure: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Date de la 1re visite</label>
-                  <input type="date" className={champAbo} value={abo.dateDebut} onChange={e => setAbo(p => ({ ...p, dateDebut: e.target.value }))} />
-                </div>
-              </div>
-              <p className="text-xs text-slate-500">Vous pouvez mettre en pause ou résilier à tout moment depuis votre espace client.</p>
-            </div>
+                <p className="text-xs leading-relaxed text-slate-500">Le calendrier définitif sera confirmé avec vous par Kanari.</p>
+              </section>
+            </>
           )}
 
-          <div className="space-y-4">
-            <h3 className="text-sm font-black uppercase tracking-wider text-blue-600">2. Détails de la prestation</h3>
-            {servicesSelectionnes.map((srv) => (
-              <ServiceDetailCard
-                key={srv.safeId}
-                service={srv}
-                masquerPrix={estAbo}
-                details={detailsServices[srv.safeId] || {}}
-                onChangeDetail={(action, payload) => handleServiceDetailChange(srv.safeId, action, payload)}
-              />
-            ))}
-            {estAbo && <p className="text-xs text-slate-500">Pour un abonnement, seule la description est transmise ; photos et vocal ne sont pas envoyés dans cette version.</p>}
-          </div>
+          <div className="h-px bg-slate-100" />
 
-          <div className="pt-6 border-t flex items-center justify-between">
-            <div>
-              <span className="text-xs text-slate-500 block">{estAbo ? 'Tarif' : 'Total estimé'}</span>
-              <span className="text-xl font-black text-slate-900">{estAbo ? 'Fixé après étude' : `${totalMontant} XOF`}</span>
+          <section className="space-y-4">
+            <SectionTitle number={estAbo ? '4' : '3'} title="Que devons-nous faire pour vous ?" subtitle="Décrivez votre besoin. Vous pouvez écrire, parler ou ajouter des photos." />
+            {servicesSelectionnes.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-amber-400 bg-[#FFF7E5] p-5 text-center">
+                <ClipboardList className="mx-auto text-[#123D72]" size={30} />
+                <p className="mt-2 font-extrabold text-[#061A3A]">Aucune prestation sélectionnée</p>
+                <p className="mt-1 text-sm text-slate-600">Retournez aux services pour choisir ce dont vous avez besoin.</p>
+                <button type="button" onClick={() => navigate(-1)}
+                  className="mt-3 rounded-xl bg-[#123D72] px-4 py-3 text-sm font-bold text-white">Choisir un service</button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {servicesSelectionnes.map(service => (
+                  <ServiceDetailCard key={service.safeId} service={service}
+                    masquerPrix={estAbo}
+                    details={detailsServices[service.safeId] || {}}
+                    onChangeDetail={(action, payload) => handleServiceDetailChange(service.safeId, action, payload)} />
+                ))}
+              </div>
+            )}
+            {estAbo && (
+              <p className="rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
+                Pour les abonnements, la description écrite est transmise dans cette version. Les photos, documents et vocaux ne sont pas envoyés avec la demande d'abonnement.
+              </p>
+            )}
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-[#F8FAFC] p-4 sm:p-5">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="text-[#123D72]" size={21} />
+              <h3 className="font-extrabold text-[#061A3A]">Vérifiez votre demande</h3>
             </div>
+            <div className="mt-3 space-y-2 text-sm">
+              <div className="flex justify-between gap-3"><span className="text-slate-600">Prestations</span><strong className="text-right text-[#061A3A]">{servicesSelectionnes.length}</strong></div>
+              {servicesSelectionnes.map(service => (
+                <div key={service.safeId} className="flex justify-between gap-3 text-slate-700">
+                  <span>{service.nom || service.serviceNom}</span>
+                  <strong className="shrink-0">{estAbo ? 'À étudier' : formatPrix(service.prix || service.tarif)}</strong>
+                </div>
+              ))}
+              <div className="mt-3 border-t border-slate-200 pt-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-bold text-slate-700">{estAbo ? 'Tarif' : 'Total estimé'}</span>
+                  <strong className="text-lg text-[#061A3A]">{estAbo ? 'Après étude' : formatPrix(totalMontant)}</strong>
+                </div>
+                {!estAbo && <p className="mt-1 text-xs leading-relaxed text-slate-500">Le montant affiché est une estimation basée sur les tarifs disponibles. Les éventuels ajustements seront expliqués avant intervention.</p>}
+              </div>
+            </div>
+            {fournisseurNom && (
+              <p className="mt-3 rounded-xl bg-white p-3 text-sm text-slate-700">
+                Prestataire choisi : <strong className="text-[#061A3A]">{fournisseurNom}</strong>
+              </p>
+            )}
+          </section>
 
-            <button type="submit" disabled={loading}
-              className="px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-lg shadow-blue-600/20 transition flex items-center gap-2 disabled:opacity-50">
-              {loading ? <Loader2 className="animate-spin" size={20} /> : <ArrowRight size={20} />}
-              {estAbo ? 'Envoyer ma demande' : 'Confirmer la commande'}
+          <div className="space-y-3 border-t border-slate-100 pt-5">
+            <button type="submit" disabled={loading || servicesSelectionnes.length === 0}
+              className="flex min-h-[56px] w-full items-center justify-center gap-3 rounded-2xl bg-[#F2B632] px-5 py-4 text-base font-black text-[#061A3A] shadow-lg shadow-amber-500/15 transition hover:bg-[#E5A91F] disabled:cursor-not-allowed disabled:opacity-50">
+              {loading ? <Loader2 className="animate-spin" size={21} /> : <ArrowRight size={21} />}
+              {loading ? 'Envoi en cours…' : estAbo ? 'Envoyer ma demande' : 'Confirmer ma réservation'}
             </button>
+            <p className="text-center text-xs leading-relaxed text-slate-500">
+              En envoyant cette demande, vous autorisez Kanari à vous contacter au sujet de votre réservation.
+            </p>
           </div>
         </form>
+
+        <footer className="border-t border-slate-100 bg-[#061A3A] px-5 py-4 text-center text-xs leading-relaxed text-blue-100">
+          <span className="font-extrabold tracking-wider text-[#F2B632]">KANARI SERVICE</span>
+          <span className="mx-2 text-white/40">•</span>
+          Vos besoins, notre organisation.
+        </footer>
       </div>
     </main>
   );
