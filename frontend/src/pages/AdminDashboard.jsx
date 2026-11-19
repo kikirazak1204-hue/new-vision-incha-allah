@@ -15,19 +15,17 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState('reservations');
 
   const menuItems = [
-    { id: 'reservations', label: 'Missions', color: 'from-pink-600 to-rose-500' },
-    { id: 'abonnements', label: 'Abonnements', color: 'from-fuchsia-600 to-purple-500' },
-    { id: 'services', label: 'Services', color: 'from-teal-600 to-cyan-500' },
-    { id: 'live-gps', label: '📍 Tour de Contrôle', color: 'from-amber-400 to-orange-500' },
-    { id: 'validations', label: 'Validations', color: 'from-blue-600 to-cyan-500' },
-    { id: 'utilisateurs', label: 'Utilisateurs', color: 'from-purple-600 to-indigo-500' },
-    { id: 'paiements', label: 'Paiements', color: 'from-emerald-600 to-teal-500' },
-    { id: 'finances', label: 'Finances', color: 'from-green-600 to-emerald-500' },
-    { id: 'produits', label: 'Produits', color: 'from-orange-600 to-red-500' },
-    { id: 'parametres', label: 'Paramètres', color: 'from-slate-600 to-slate-500' },
+    { id: 'reservations', label: 'Missions' },
+    { id: 'abonnements', label: 'Abonnements' },
+    { id: 'services', label: 'Services' },
+    { id: 'live-gps', label: 'Tour de Contrôle' },
+    { id: 'validations', label: 'Validations' },
+    { id: 'utilisateurs', label: 'Utilisateurs' },
+    { id: 'paiements', label: 'Paiements' },
+    { id: 'finances', label: 'Finances' },
+    { id: 'produits', label: 'Produits' },
+    { id: 'parametres', label: 'Paramètres' },
   ];
-
-  const activeItem = menuItems.find((item) => item.id === tab);
 
   const getTitle = () => {
     switch (tab) {
@@ -46,40 +44,47 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-[#061a3a] flex flex-col md:flex-row font-sans">
-      <aside className="w-full md:w-64 bg-white border-r border-slate-200 p-6 flex flex-col shadow-sm">
+    <div className="min-h-screen bg-[#F4F6F9] text-[#061A3A] flex flex-col md:flex-row font-sans">
+      <aside className="w-full md:w-64 bg-[#061A3A] text-white border-r border-white/10 p-6 flex flex-col shadow-lg">
         <div className="mb-10 px-2">
-          <h1 className="text-2xl font-black text-[#061a3a]">PANEL ADMIN</h1>
-          <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mt-1">Kanari Service</p>
+          <h1 className="text-2xl font-black tracking-tight text-white">
+            PANEL <span className="text-[#F2B632]">ADMIN</span>
+          </h1>
+          <p className="text-[10px] text-indigo-200 uppercase tracking-widest font-bold mt-1">
+            Kanari Service
+          </p>
         </div>
 
-        <nav className="space-y-2 flex-1">
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setTab(item.id)}
-              className={`w-full flex items-center p-3 rounded-xl transition-all duration-300 font-semibold ${
-                tab === item.id
-                  ? `bg-gradient-to-r ${item.color} shadow-lg shadow-slate-300/40 text-white translate-x-1`
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-[#061a3a]'
-              }`}
-            >
-              {item.label}
-              {item.id === 'live-gps' && tab !== 'live-gps' && (
-                <span className="ml-auto w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-              )}
-            </button>
-          ))}
+        <nav className="space-y-1.5 flex-1">
+          {menuItems.map((item) => {
+            const isActive = tab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setTab(item.id)}
+                className={`w-full flex items-center px-3.5 py-2.5 rounded-xl transition-all duration-200 text-sm font-bold ${
+                  isActive
+                    ? 'bg-[#F2B632] text-[#061A3A] shadow-md'
+                    : 'text-slate-200 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                <span>{item.label}</span>
+                {item.id === 'live-gps' && !isActive && (
+                  <span className="ml-auto w-2 h-2 rounded-full bg-[#F2B632] animate-pulse" />
+                )}
+              </button>
+            );
+          })}
         </nav>
 
-        <div className="mt-auto pt-6 border-t border-slate-200">
+        <div className="mt-auto pt-6 border-t border-white/10">
           <button
             type="button"
             onClick={() => { localStorage.clear(); window.location.href = '/'; }}
-            className="w-full p-3 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+            className="w-full py-2.5 px-3 text-sm font-bold text-amber-300 hover:bg-white/10 rounded-xl transition-colors"
           >
-            Quitter l'Admin
+            Quitter l&apos;Admin
           </button>
         </div>
       </aside>
@@ -88,21 +93,21 @@ export default function AdminDashboard() {
         <header className="mb-8">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-3xl font-black text-[#061a3a]">{getTitle()}</h2>
+              <h2 className="text-3xl font-black text-[#061A3A]">{getTitle()}</h2>
               <p className="text-slate-500 text-sm mt-1">
-                {tab === 'live-gps' ? 'Suivi en temps réel des prestataires et livreurs' : 'Gestion des données de la plateforme'}
+                {tab === 'live-gps'
+                  ? 'Suivi en temps réel des prestataires et livreurs'
+                  : 'Gestion des données de la plateforme'}
               </p>
             </div>
-            {activeItem && (
-              <div className="hidden sm:flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-sm">
-                <span className={`w-2.5 h-2.5 rounded-full bg-gradient-to-r ${activeItem.color}`} />
-                <span className="text-sm font-semibold text-slate-600">Administration</span>
-              </div>
-            )}
+            <div className="hidden sm:flex items-center gap-2 bg-white border border-indigo-200/80 rounded-xl px-4 py-2 shadow-sm">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" />
+              <span className="text-sm font-bold text-[#061A3A]">Administration</span>
+            </div>
           </div>
         </header>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-1 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-2 md:p-4 shadow-sm">
           {tab === 'reservations' && <ReservationsAdmin />}
           {tab === 'abonnements' && <AbonnementsAdmin />}
           {tab === 'live-gps' && <AdminLiveDispatch />}

@@ -3,9 +3,9 @@
 // ============================================================
 
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, NavLink, Link } from 'react-router-dom';
+import { Routes, Route, Navigate, NavLink, Link, useLocation } from 'react-router-dom';
 import {
-  Home, Briefcase, ShoppingBag, ShoppingCart, User, LogIn,
+  Home, Briefcase, ShoppingBag, ShoppingCart, LogIn,
   Menu, X, Download
 } from 'lucide-react';
 
@@ -16,7 +16,6 @@ import { NavigationProvider } from './context/NavigationContext';
 
 // Composants de protection & utilitaires globaux
 import ProtectedRoute from './components/ProtectedRoute';
-import GlobalLocationBar from './components/GlobalLocationBar';
 import AutoTranslator from './components/AutoTranslator';
 import NotificationsInit from './components/NotificationsInit';
 import OrderTracking from './components/OrderTracking';
@@ -50,8 +49,13 @@ import HistoriquePaiements from './pages/HistoriquePaiements';
 
 function PremiumNavbar({ showInstallBtn, onInstallApp }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const location = useLocation();
   const { user } = useAuth() || {};
   const { panier } = usePanier() || {};
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const nbArticles = Array.isArray(panier)
     ? panier.reduce((acc, item) => acc + (Number(item.quantite) || 1), 0)
@@ -72,8 +76,8 @@ function PremiumNavbar({ showInstallBtn, onInstallApp }) {
     }`;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#061A3A]/95 backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#061A3A]/95 backdrop-blur-md">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-2.5 sm:px-6 lg:px-8">
         {/* Marque Kanari Service */}
         <Link to="/" className="flex shrink-0 items-center gap-2.5">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F2B632] font-black text-[#061A3A] shadow">
@@ -105,8 +109,8 @@ function PremiumNavbar({ showInstallBtn, onInstallApp }) {
           </NavLink>
         </nav>
 
-        {/* Actions à droite : Traducteur, Panier, Espace / Connexion, Mobile */}
-        <div className="flex items-center gap-2">
+        {/* Actions à droite : Traducteur, Panier, Connexion, Mobile */}
+        <div className="relative z-10 flex shrink-0 items-center gap-2">
           <div className="hidden sm:block">
             <AutoTranslator />
           </div>
@@ -125,15 +129,7 @@ function PremiumNavbar({ showInstallBtn, onInstallApp }) {
             )}
           </Link>
 
-          {user ? (
-            <Link
-              to={dashboardPath}
-              className="hidden items-center gap-2 rounded-xl bg-[#123D72] px-3.5 py-2 text-sm font-extrabold text-white transition hover:bg-[#1a5299] md:inline-flex"
-            >
-              <User size={16} className="text-[#F2B632]" />
-              <span>Mon Espace</span>
-            </Link>
-          ) : (
+          {!user && (
             <Link
               to="/login"
               className="hidden items-center gap-2 rounded-xl bg-[#F2B632] px-3.5 py-2 text-sm font-extrabold text-[#061A3A] transition hover:bg-[#E5A91F] md:inline-flex"
@@ -158,6 +154,7 @@ function PremiumNavbar({ showInstallBtn, onInstallApp }) {
             onClick={() => setMobileMenuOpen(prev => !prev)}
             className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white md:hidden"
             aria-label="Ouvrir le menu"
+            aria-expanded={mobileMenuOpen}
           >
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -180,16 +177,23 @@ function PremiumNavbar({ showInstallBtn, onInstallApp }) {
             <NavLink to="/a-propos" className={navLinkClass} onClick={() => setMobileMenuOpen(false)}>
               À propos
             </NavLink>
-            <div className="my-1 border-t border-white/10 pt-2">
-              <Link
-                to={user ? dashboardPath : '/login'}
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#F2B632] px-4 py-2.5 text-sm font-black text-[#061A3A]"
-              >
-                {user ? <User size={17} /> : <LogIn size={17} />}
-                {user ? 'Accéder à mon espace' : 'Se connecter'}
-              </Link>
-            </div>
+            {user && (
+              <NavLink to={dashboardPath} className={navLinkClass} onClick={() => setMobileMenuOpen(false)}>
+                Mon espace
+              </NavLink>
+            )}
+            {!user && (
+              <div className="my-1 border-t border-white/10 pt-2">
+                <Link
+                  to="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#F2B632] px-4 py-2.5 text-sm font-black text-[#061A3A]"
+                >
+                  <LogIn size={17} />
+                  <span>Se connecter</span>
+                </Link>
+              </div>
+            )}
             <div className="pt-1">
               <AutoTranslator />
             </div>
@@ -250,77 +254,78 @@ export default function App() {
         <NavigationProvider>
           <div className="relative min-h-screen bg-[#F4F6F9] font-sans text-slate-900">
             <PremiumNavbar showInstallBtn={showInstallBtn} onInstallApp={handleInstallApp} />
-            <GlobalLocationBar />
             <NotificationsInit />
 
-            <Routes>
-              {/* 1. PAGES INSTITUTIONNELLES & PUBLIQUES */}
-              <Route path="/" element={<Accueil />} />
-              <Route path="/a-propos" element={<AProposPage />} />
+            <main className="relative z-10">
+              <Routes>
+                {/* 1. PAGES INSTITUTIONNELLES & PUBLIQUES */}
+                <Route path="/" element={<Accueil />} />
+                <Route path="/a-propos" element={<AProposPage />} />
 
-              {/* 2. EXPLORATION & CATALOGUE */}
-              <Route path="/selection" element={<ServiceSelectionPage />} />
-              <Route path="/service/:id" element={<ServiceDetailPage />} />
-              <Route path="/produits" element={<VoirProduits />} />
-              <Route path="/produits/:fournisseurId" element={<ProduitsParFournisseur />} />
-              <Route path="/produits/service/:serviceId" element={<ProduitsParService />} />
-              <Route path="/fournisseur-profil/:id?" element={<FournisseurProfilePage />} />
+                {/* 2. EXPLORATION & CATALOGUE */}
+                <Route path="/selection" element={<ServiceSelectionPage />} />
+                <Route path="/service/:id" element={<ServiceDetailPage />} />
+                <Route path="/produits" element={<VoirProduits />} />
+                <Route path="/produits/:fournisseurId" element={<ProduitsParFournisseur />} />
+                <Route path="/produits/service/:serviceId" element={<ProduitsParService />} />
+                <Route path="/fournisseur-profil/:id?" element={<FournisseurProfilePage />} />
 
-              {/* 3. PARCOURS COMMANDE & SUIVI */}
-              <Route path="/panier" element={<PanierPage />} />
-              <Route path="/reservation" element={<ReservationPage />} />
-              <Route path="/paiement" element={<PaiementPage />} />
-              <Route path="/suivi-commande/:missionId" element={<OrderTracking />} />
+                {/* 3. PARCOURS COMMANDE & SUIVI */}
+                <Route path="/panier" element={<PanierPage />} />
+                <Route path="/reservation" element={<ReservationPage />} />
+                <Route path="/paiement" element={<PaiementPage />} />
+                <Route path="/suivi-commande/:missionId" element={<OrderTracking />} />
 
-              {/* 4. AUTHENTIFICATION */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/register-utilisateur" element={<RegisterUtilisateur />} />
-              <Route path="/register-prestataire" element={<RegisterPrestataire />} />
+                {/* 4. AUTHENTIFICATION */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/register-utilisateur" element={<RegisterUtilisateur />} />
+                <Route path="/register-prestataire" element={<RegisterPrestataire />} />
 
-              {/* 5. ESPACE SÉCURISÉ - CLIENT */}
-              <Route
-                path="/dashboard-client"
-                element={
-                  <ProtectedRoute role="client">
-                    <DashboardClient />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/historique-paiements"
-                element={
-                  <ProtectedRoute role="client">
-                    <HistoriquePaiements />
-                  </ProtectedRoute>
-                }
-              />
-              <Route path="/dashboard/client" element={<Navigate to="/dashboard-client" replace />} />
+                {/* 5. ESPACE SÉCURISÉ - CLIENT */}
+                <Route
+                  path="/dashboard-client"
+                  element={
+                    <ProtectedRoute role="client">
+                      <DashboardClient />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/historique-paiements"
+                  element={
+                    <ProtectedRoute role="client">
+                      <HistoriquePaiements />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="/dashboard/client" element={<Navigate to="/dashboard-client" replace />} />
 
-              {/* 6. ESPACE SÉCURISÉ - PRESTATAIRE / FOURNISSEUR */}
-              <Route
-                path="/dashboard-fournisseur"
-                element={
-                  <ProtectedRoute role="fournisseur">
-                    <DashboardFournisseur />
-                  </ProtectedRoute>
-                }
-              />
-              <Route path="/dashboard/fournisseur" element={<Navigate to="/dashboard-fournisseur" replace />} />
+                {/* 6. ESPACE SÉCURISÉ - PRESTATAIRE / FOURNISSEUR */}
+                <Route
+                  path="/dashboard-fournisseur"
+                  element={
+                    <ProtectedRoute role="fournisseur">
+                      <DashboardFournisseur />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="/dashboard/fournisseur" element={<Navigate to="/dashboard-fournisseur" replace />} />
 
-              {/* 7. ESPACE SÉCURISÉ - ADMIN */}
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute role="admin">
-                    <DashboardAdmin />
-                  </ProtectedRoute>
-                }
-              />
+                {/* 7. ESPACE SÉCURISÉ - ADMIN */}
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute role="admin">
+                      <DashboardAdmin />
+                    </ProtectedRoute>
+                  }
+                />
 
-              {/* REDIRECTION PAR DÉFAUT */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+                {/* REDIRECTION PAR DÉFAUT */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </main>
           </div>
         </NavigationProvider>
       </PanierProvider>
