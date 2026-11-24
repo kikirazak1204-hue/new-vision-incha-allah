@@ -1,9 +1,9 @@
 // ============================================================
-// Fichier : frontend/src/App.jsx — Architecture Pro Premium
+// Fichier : frontend/src/App.jsx — Complet avec Connexion & Déconnexion
 // ============================================================
 
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, NavLink, Link, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Home, Briefcase, ShoppingBag, ShoppingCart, User, LogIn, LogOut,
   Menu, X, Download
@@ -48,13 +48,21 @@ import DashboardFournisseur from './pages/DashboardFournisseur';
 import DashboardAdmin from './pages/AdminDashboard';
 import HistoriquePaiements from './pages/HistoriquePaiements';
 
-function PremiumNavbar({ showInstallBtn, onInstallApp }) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const navigate = useNavigate();
+function useSessionState() {
   const auth = useAuth() || {};
-  const { panier } = usePanier() || {};
+  const location = useLocation();
+  const [tick, setTick] = useState(0);
 
-  // Détection fiable de l'utilisateur connecté (quelle que soit la clé du contexte ou du storage)
+  useEffect(() => {
+    const refresh = () => setTick(t => t + 1);
+    window.addEventListener('storage', refresh);
+    window.addEventListener('auth-change', refresh);
+    return () => {
+      window.removeEventListener('storage', refresh);
+      window.removeEventListener('auth-change', refresh);
+    };
+  }, [location.pathname, tick]);
+
   const storedUser = (() => {
     try {
       const raw = localStorage.getItem('user') || localStorage.getItem('utilisateur');
@@ -64,36 +72,52 @@ function PremiumNavbar({ showInstallBtn, onInstallApp }) {
     }
   })();
 
+  const storedToken = localStorage.getItem('token');
   const currentUser = auth.user || auth.utilisateur || auth.currentUser || storedUser;
-  const isAuthenticated = Boolean(currentUser || auth.token || localStorage.getItem('token'));
+  const isAuthenticated = Boolean(currentUser || auth.token || storedToken);
+
+  const role = currentUser?.role || currentUser?.type || '';
+  const dashboardPath =
+    role === 'admin'
+      ? '/admin'
+      : role === 'fournisseur' || role === 'prestataire'
+      ? '/dashboard-fournisseur'
+      : '/dashboard-client';
+
+  return { auth, currentUser, isAuthenticated, dashboardPath };
+}
+
+function performLogout(auth, navigate) {
+  try {
+    if (typeof auth.logout === 'function') auth.logout();
+    if (typeof auth.deconnexion === 'function') auth.deconnexion();
+    if (typeof auth.setUser === 'function') auth.setUser(null);
+  } catch (err) {
+    console.error('Erreur lors de la déconnexion :', err);
+  }
+
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  localStorage.removeItem('utilisateur');
+  sessionStorage.clear();
+  window.dispatchEvent(new Event('auth-change'));
+
+  navigate('/login', { replace: true });
+}
+
+function PremiumNavbar({ showInstallBtn, onInstallApp }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
+  const { auth, currentUser, isAuthenticated, dashboardPath } = useSessionState();
+  const { panier } = usePanier() || {};
 
   const nbArticles = Array.isArray(panier)
     ? panier.reduce((acc, item) => acc + (Number(item.quantite) || 1), 0)
     : 0;
 
-  const dashboardPath =
-    currentUser?.role === 'admin'
-      ? '/admin'
-      : currentUser?.role === 'fournisseur'
-      ? '/dashboard-fournisseur'
-      : '/dashboard-client';
-
   const handleLogout = () => {
-    try {
-      if (typeof auth.logout === 'function') auth.logout();
-      if (typeof auth.deconnexion === 'function') auth.deconnexion();
-      if (typeof auth.setUser === 'function') auth.setUser(null);
-    } catch (err) {
-      console.error('Erreur lors de la déconnexion :', err);
-    }
-
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('utilisateur');
-    sessionStorage.clear();
-
     setMobileMenuOpen(false);
-    navigate('/login', { replace: true });
+    performLogout(auth, navigate);
   };
 
   const navLinkClass = ({ isActive }) =>
@@ -104,10 +128,10 @@ function PremiumNavbar({ showInstallBtn, onInstallApp }) {
     }`;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#061A3A]/95 backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 py-2.5 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#061A3A]/95 backdrop-blur-md">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-2.5 sm:px-6 lg:px-8">
         {/* Marque Kanari Service */}
-        <Link to="/" className="flex shrink-0 items-center gap-2.5">
+        <Link to="/" className="flex shrink-0 items-center gap-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F2B632] font-black text-[#061A3A] shadow">
             K
           </span>
@@ -138,14 +162,10 @@ function PremiumNavbar({ showInstallBtn, onInstallApp }) {
         </nav>
 
         {/* Actions toujours visibles (Panier + Connexion / Espace + Déconnexion) */}
-        <div className="flex items-center gap-2">
-          <div className="hidden md:block">
-            <AutoTranslator />
-          </div>
-
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <Link
             to="/panier"
-            className="relative inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:border-[#F2B632] hover:bg-white/15 sm:text-sm"
+            className="relative inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-2.5 py-2 text-xs font-bold text-white transition hover:border-[#F2B632] hover:bg-white/15 sm:px-3 sm:text-sm"
             aria-label="Voir le panier"
           >
             <ShoppingCart size={17} className="text-[#F2B632]" />
@@ -161,10 +181,10 @@ function PremiumNavbar({ showInstallBtn, onInstallApp }) {
             <>
               <Link
                 to={dashboardPath}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#123D72] px-3 py-2 text-xs font-extrabold text-white transition hover:bg-[#1a5299] sm:text-sm"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#123D72] px-2.5 py-2 text-xs font-extrabold text-white transition hover:bg-[#1a5299] sm:px-3 sm:text-sm"
               >
                 <User size={16} className="text-[#F2B632]" />
-                <span className="hidden sm:inline">
+                <span>
                   {currentUser?.nom ? currentUser.nom.split(' ')[0] : 'Mon Espace'}
                 </span>
               </Link>
@@ -173,27 +193,31 @@ function PremiumNavbar({ showInstallBtn, onInstallApp }) {
                 type="button"
                 onClick={handleLogout}
                 title="Se déconnecter"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-500/15 px-3 py-2 text-xs font-extrabold text-rose-200 transition hover:bg-rose-600 hover:text-white sm:text-sm"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-400/50 bg-rose-600 px-2.5 py-2 text-xs font-extrabold text-white shadow-sm transition hover:bg-rose-700 sm:px-3 sm:text-sm"
               >
                 <LogOut size={16} />
-                <span className="hidden md:inline">Déconnexion</span>
+                <span>Déconnexion</span>
               </button>
             </>
           ) : (
             <Link
               to="/login"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#F2B632] px-3.5 py-2 text-xs font-extrabold text-[#061A3A] transition hover:bg-[#E5A91F] sm:text-sm"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#F2B632] px-3 py-2 text-xs font-extrabold text-[#061A3A] shadow-sm transition hover:bg-[#E5A91F] sm:px-3.5 sm:text-sm"
             >
               <LogIn size={16} />
               <span>Connexion</span>
             </Link>
           )}
 
+          <div className="hidden xl:block">
+            <AutoTranslator />
+          </div>
+
           {showInstallBtn && (
             <button
               type="button"
               onClick={onInstallApp}
-              className="hidden items-center gap-1.5 rounded-xl border border-[#F2B632]/50 bg-[#F2B632]/15 px-3 py-2 text-xs font-extrabold text-[#F2B632] transition hover:bg-[#F2B632]/25 xl:inline-flex"
+              className="hidden items-center gap-1.5 rounded-xl border border-[#F2B632]/50 bg-[#F2B632]/15 px-3 py-2 text-xs font-extrabold text-[#F2B632] transition hover:bg-[#F2B632]/25 2xl:inline-flex"
             >
               <Download size={14} /> Installer
             </button>
@@ -266,6 +290,43 @@ function PremiumNavbar({ showInstallBtn, onInstallApp }) {
         </div>
       )}
     </header>
+  );
+}
+
+function FloatingAuthDock() {
+  const navigate = useNavigate();
+  const { auth, isAuthenticated, dashboardPath } = useSessionState();
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-2xl border border-white/15 bg-[#061A3A]/95 p-1.5 shadow-2xl backdrop-blur-md">
+      {isAuthenticated ? (
+        <>
+          <Link
+            to={dashboardPath}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#123D72] px-3 py-2 text-xs font-extrabold text-white transition hover:bg-[#1a5299]"
+          >
+            <User size={14} className="text-[#F2B632]" />
+            <span>Espace</span>
+          </Link>
+          <button
+            type="button"
+            onClick={() => performLogout(auth, navigate)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-xs font-extrabold text-white transition hover:bg-rose-700"
+          >
+            <LogOut size={14} />
+            <span>Déconnexion</span>
+          </button>
+        </>
+      ) : (
+        <Link
+          to="/login"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-[#F2B632] px-3.5 py-2 text-xs font-extrabold text-[#061A3A] transition hover:bg-[#E5A91F]"
+        >
+          <LogIn size={14} />
+          <span>Connexion</span>
+        </Link>
+      )}
+    </div>
   );
 }
 
@@ -390,6 +451,8 @@ export default function App() {
               {/* REDIRECTION PAR DÉFAUT */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+
+            <FloatingAuthDock />
           </div>
         </NavigationProvider>
       </PanierProvider>
