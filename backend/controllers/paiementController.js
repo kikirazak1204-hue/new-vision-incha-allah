@@ -55,7 +55,7 @@ exports.getPaiementsClient = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// 2. Historique complet (admin) — filtres : ?statut= &typePaiement= &limit=
+// 2. Historique complet (admin)
 // ═══════════════════════════════════════════════════════════
 exports.getAllPaiements = async (req, res) => {
     try {
@@ -72,7 +72,7 @@ exports.getAllPaiements = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// 3. Vérification par transactionId (propriétaire ou admin)
+// 3. Vérification par transactionId
 // ═══════════════════════════════════════════════════════════
 exports.verifyPaiement = async (req, res) => {
     try {
@@ -89,7 +89,7 @@ exports.verifyPaiement = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// 4. Montant à payer (calculé serveur) — GET ?commandeId= ou ?reservationId=
+// 4. Montant à payer (calculé serveur)
 // ═══════════════════════════════════════════════════════════
 exports.getAPayer = async (req, res) => {
     try {
@@ -107,14 +107,13 @@ exports.getAPayer = async (req, res) => {
                     existant.statut === 'valide' ? 'DEJA_REGLE' : 'EN_ATTENTE');
             }
         }
-        const { parts, commission, net, tauxCommission, fournisseurId, ...visible } = du; // jamais exposés
+        const { parts, commission, net, tauxCommission, fournisseurId, ...visible } = du;
         return res.json({ success: true, data: { ...visible, devise: 'FCFA' } });
     } catch (e) { return reponseErreur(res, e, 'getAPayer'); }
 };
 
 // ═══════════════════════════════════════════════════════════
-// 5. Choix du mode de règlement d'une mission (avant le bon d'intervention)
-//    direct_prestataire = le client paiera le prestataire sur place
+// 5. Choix du mode de règlement d'une mission
 // ═══════════════════════════════════════════════════════════
 exports.definirModeReservation = async (req, res) => {
     try {
@@ -126,21 +125,14 @@ exports.definirModeReservation = async (req, res) => {
         if (!r) throw new ErreurPaiement(404, 'Mission introuvable.');
         if (r.clientId !== req.user.id) throw new ErreurPaiement(403, 'Cette mission ne vous appartient pas.');
 
-        const deja = await Paiement.count({
-            where: { reservationId, statut: { [Op.in]: ['en_attente', 'valide'] } }
-        });
-        if (deja > 0) throw new ErreurPaiement(409, 'Un paiement existe déjà pour cette mission.');
-
         await r.update({ modePaiement });
         return res.json({ success: true, message: 'Mode de règlement enregistré.' });
     } catch (e) { return reponseErreur(res, e, 'definirModeReservation'); }
 };
 
 // ═══════════════════════════════════════════════════════════
-// 6. Création d'un paiement (commande, mission ou dépôt de commission)
-//    Le montant n'est JAMAIS lu depuis le client.
+// 6. Création d'un paiement (Mobile Money / Carte / Dépôt)
 // ═══════════════════════════════════════════════════════════
-// Enregistre le paiement + sa ventilation par partenaire et marque la cible « en attente »
 async function creerPaiement(du, { commandeId, reservationId, user, mode, telephone, nom, messageClient, referenceClient, transactionId }, t) {
     const paiement = await Paiement.create({
         commandeId: commandeId || null,
@@ -167,8 +159,6 @@ async function creerPaiement(du, { commandeId, reservationId, user, mode, teleph
             commission: x.commission, net: x.net, taux: x.taux
         })), { transaction: t });
     }
-    if (du.typePaiement === 'MISSION') await Reservation.update({ statutPaiement: 'en_attente' }, { where: { id: reservationId }, transaction: t });
-    if (du.typePaiement === 'COMMANDE') await Commande.update({ statutPaiement: 'en_attente' }, { where: { id: commandeId }, transaction: t });
     return paiement;
 }
 
@@ -183,21 +173,13 @@ exports.createMobileMoneyPaiement = async (req, res) => {
         if (!referenceClient || !String(referenceClient).trim()) throw new ErreurPaiement(400, 'La référence de la transaction est obligatoire.');
 
         const mode = modePaiement || 'mobile_money';
-        if (!['mobile_money', 'carte_bancaire', 'depot_kanari', 'orange_money', 'moov_money', 'airtel_money', 'amanata', 'mynita', 'virement_bancaire'].includes(mode)) {
-            throw new ErreurPaiement(400, 'Mode de paiement non autorisé.');
-        }
-
         const du = await calculerDu({ commandeId, reservationId, depotMontant: depot, user: req.user, t });
         if (du.montant <= 0) throw new ErreurPaiement(409, 'Aucun montant à régler.');
 
-        if (du.typePaiement === 'DEPOT') {
-            const enCours = await Paiement.count({ where: { clientId: req.user.id, typePaiement: 'DEPOT', statut: 'en_attente' }, transaction: t });
-            if (enCours >= 3) throw new ErreurPaiement(409, 'Vous avez déjà 3 dépôts en attente de vérification.');
-        } else {
+        if (du.typePaiement !== 'DEPOT') {
             const existant = await paiementExistant(commandeId, reservationId, du.typePaiement, t);
             if (existant) {
-                throw new ErreurPaiement(409,
-                    existant.statut === 'valide' ? 'Déjà réglé.' : 'Un paiement est déjà en attente de validation.');
+                throw new ErreurPaiement(409, existant.statut === 'valide' ? 'Déjà réglé.' : 'Un paiement est déjà en attente de validation.');
             }
         }
 
@@ -216,8 +198,7 @@ exports.createMobileMoneyPaiement = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// 6 bis. Paiement avec le portefeuille (dépôt + récompenses + gains) : immédiat, sans attente de l'admin,
-//        car cet argent a déjà été vérifié. Même calcul serveur, mêmes commissions, même facture.
+// 6 bis. Paiement avec le portefeuille
 // ═══════════════════════════════════════════════════════════
 exports.payerParPortefeuille = async (req, res) => {
     const t = await sequelize.transaction();
@@ -237,7 +218,7 @@ exports.payerParPortefeuille = async (req, res) => {
             nom: req.user.nom, messageClient: 'Payé avec le portefeuille Kanari', referenceClient: ref, transactionId: ref
         }, t);
 
-        await PF.debiterPortefeuille(req.user.id, du.montant, paiement.id, t);       // échoue si solde insuffisant → tout est annulé
+        await PF.debiterPortefeuille(req.user.id, du.montant, paiement.id, t);
         const { notifications } = await appliquerStatut(paiement, 'valide', { motif: null }, t);
         await t.commit();
 
@@ -257,22 +238,15 @@ exports.updateStatutPaiement = async (req, res) => {
     try {
         const { statut, motif } = req.body;
         if (!['valide', 'rejete', 'rembourse'].includes(statut)) {
-            throw new ErreurPaiement(400, 'Statut invalide. Utilisez : valide, rejete, rembourse.');
+            throw new ErreurPaiement(400, 'Statut invalide.');
         }
         const p = await Paiement.findByPk(req.params.id, { transaction: t, lock: t.LOCK.UPDATE });
         if (!p) throw new ErreurPaiement(404, 'Paiement introuvable.');
 
-        if (p.statut === statut) {
-            await t.rollback();
-            return res.status(200).json({ success: true, message: 'Le paiement possède déjà ce statut.', data: p });
-        }
-
         const { notifications } = await appliquerStatut(p, statut, { motif }, t);
         await t.commit();
 
-        // Notifications APRÈS commit (non bloquantes) : un message par fournisseur concerné
         notifications.forEach((n) => notifierFournisseur(n.fournisseurId, n.title, n.body));
-
         return res.status(200).json({ success: true, message: `Paiement mis à jour : ${statut}.`, data: p });
     } catch (e) {
         if (!t.finished) await t.rollback();
@@ -282,7 +256,6 @@ exports.updateStatutPaiement = async (req, res) => {
 
 // ═══════════════════════════════════════════════════════════
 // 8. CLIENT : situation financière — missions ET commandes boutique
-//    1 mission = 1 bon (prix final) = 1 paiement. 1 commande = 1 paiement.
 // ═══════════════════════════════════════════════════════════
 const choisirPaiement = (liste) => {
     const pays = [...(liste || [])].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -366,9 +339,7 @@ exports.getClientMissions = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// 9. PRESTATAIRE : portefeuille (solde, encaissements, commissions dues + retard)
-//    Les encaissements viennent de la ventilation (paiement_parts) : un panier multi-fournisseurs
-//    donne à chacun SA part. Le retard est calculé à la lecture (aucun cron nécessaire).
+// 9. PRESTATAIRE : portefeuille
 // ═══════════════════════════════════════════════════════════
 exports.getPortefeuilleFournisseur = async (req, res) => {
     try {
@@ -386,7 +357,7 @@ exports.getPortefeuilleFournisseur = async (req, res) => {
         const avecParts = idsParts.length
             ? await Paiement.findAll({ where: { id: { [Op.in]: idsParts }, typePaiement: TYPES, statut: STATUTS } })
             : [];
-        const anciens = await Paiement.findAll({ // paiements d'avant la ventilation
+        const anciens = await Paiement.findAll({
             where: { fournisseurId: fid, typePaiement: TYPES, statut: STATUTS, ...(idsParts.length ? { id: { [Op.notIn]: idsParts } } : {}) }
         });
 
@@ -404,7 +375,6 @@ exports.getPortefeuilleFournisseur = async (req, res) => {
         const encaissements = toutes.filter((x) => x.statut === 'valide');
         const enAttente = toutes.filter((x) => x.statut === 'en_attente');
 
-        // Missions réglées directement au prestataire : il doit sa commission à Kanari
         const directes = await Reservation.findAll({
             where: { fournisseurId: fid, modePaiement: { [Op.in]: MODES_DIRECTS }, commissionStatut: { [Op.in]: ['en_attente', 'en_retard'] } },
             attributes: ['id', 'serviceNom', 'commissionStatut', 'commissionDateLimite'],
