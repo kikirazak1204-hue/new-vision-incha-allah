@@ -2,13 +2,14 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
-const path = require('path'); 
+const path = require('path');
 
 // Importation de la connexion Sequelize
 const { sequelize } = require('./models');
 
 // Job planifié : validation automatique des bons d'intervention après 24h
 const { runAutoValiderBonsIntervention } = require('./jobs/autoValiderBonsIntervention');
+const { runCreerVisitesAbonnements } = require('./jobs/creerVisitesAbonnements');
 
 // ==========================================
 // 🔥 INITIALISATION FIREBASE ADMIN SDK
@@ -16,7 +17,6 @@ const { runAutoValiderBonsIntervention } = require('./jobs/autoValiderBonsInterv
 let firebaseBucket = null;
 try {
     const admin = require('./config/firebase-admin');
-    // Récupération automatique du bucket Storage configuré dans Firebase Admin
     firebaseBucket = admin.storage().bucket();
     console.log('✅ Firebase Storage initialisé avec succès pour les images.');
 } catch (fbErr) {
@@ -78,6 +78,15 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/reservations', require('./routes/reservations'));
 app.use('/api/admin', require('./routes/admin'));
+
+// Route dédiée Dossiers 360°, KYC, Contrats, Recrutement & Audit
+const adminDossiersRoutePath = path.join(__dirname, 'routes', 'adminDossiers.js');
+if (fs.existsSync(adminDossiersRoutePath)) {
+    app.use('/api/admin/dossiers', require('./routes/adminDossiers'));
+} else {
+    console.warn('⚠️ Route ./routes/adminDossiers.js non trouvée : /api/admin/dossiers sera activée dès création du fichier.');
+}
+
 app.use('/api/paiements', require('./routes/paiement'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/produits', require('./routes/produits'));
@@ -134,13 +143,15 @@ app.use((err, req, res, next) => {
 });
 
 // ==========================================
-// 🛠️ RÉPARATION AUTOMATIQUE DE COLONNES
+// 🛠️ RÉPARATION AUTOMATIQUE DE COLONNES & TABLES
 // ==========================================
 const repairDatabase = async () => {
     const queries = [
         "ALTER TABLE produits ADD COLUMN categorie VARCHAR(255);",
         "ALTER TABLE produits ADD COLUMN quantite INT DEFAULT 0;",
         "ALTER TABLE users ADD COLUMN fcm_token TEXT;",
+        "ALTER TABLE users ADD COLUMN role_admin VARCHAR(255) NULL;",
+        "ALTER TABLE users ADD COLUMN statut_compte VARCHAR(50) NOT NULL DEFAULT 'ACTIF';",
         "ALTER TABLE reservations ADD COLUMN services JSON;",
         "ALTER TABLE reservations ADD COLUMN montantTotal DECIMAL(10,2) DEFAULT 0;",
         "ALTER TABLE reservations ADD COLUMN type VARCHAR(50) DEFAULT 'classique';",
@@ -251,7 +262,6 @@ const demarrerJobAutoValidation = () => {
 // 7. INITIALISATION ET DÉMARRAGE
 // ==========================================
 const PORT = process.env.PORT || 5000;
-const { runCreerVisitesAbonnements } = require('./jobs/creerVisitesAbonnements');
 
 const startServer = async () => {
     try {

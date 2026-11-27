@@ -5,7 +5,7 @@ const User = require('./User');
 const Service = require('./Service');
 const Fournisseur = require('./Fournisseur');
 const Produit = require('./Produit');
-const Commande = require('./Commande'); 
+const Commande = require('./Commande');
 const CommandeProduit = require('./CommandeProduit');
 const Facture = require('./Facture');
 const Paiement = require('./Paiement');
@@ -20,6 +20,13 @@ const { Abonnement, AbonnementPrestataire, AbonnementVersement, AbonnementReglem
 const { ServiceBranche, FournisseurBranche } = require('./BranchesModels');
 // Correction de la casse pour Render (h minuscule correspondant au fichier Git)
 const SettingHistory = require('./Settinghistory');
+
+// Nouveaux modèles : Dossier, KYC, Contrats, Recrutement & Audit
+const Dossier = require('./Dossier');
+const Document = require('./Document');
+const Contrat = require('./Contrat');
+const Recrutement = require('./Recrutement');
+const AuditLog = require('./AuditLog');
 
 // 2. Définition des associations
 
@@ -124,9 +131,31 @@ Service.hasMany(ServiceBranche, { foreignKey: 'serviceId', as: 'branches' });
 ServiceBranche.belongsTo(Service, { foreignKey: 'serviceId', as: 'service' });
 FournisseurBranche.belongsTo(ServiceBranche, { foreignKey: 'brancheId', as: 'branche' });
 FournisseurBranche.belongsTo(Fournisseur, { foreignKey: 'fournisseurId', as: 'fournisseur' });
-Fournisseur.hasMany(FournisseurBranche, { foreignKey: 'fournisseurId', as: 'branchesChoisies' }); 
+Fournisseur.hasMany(FournisseurBranche, { foreignKey: 'fournisseurId', as: 'branchesChoisies' });
 
-/// 3. Export global
+// Dossier & Documents (KYC)
+User.hasOne(Dossier, { foreignKey: 'userId', as: 'dossier' });
+Dossier.belongsTo(User, { foreignKey: 'userId', as: 'utilisateurDossier' });
+
+Dossier.hasMany(Document, { foreignKey: 'dossierId', as: 'documents' });
+Document.belongsTo(Dossier, { foreignKey: 'dossierId', as: 'dossier' });
+Document.belongsTo(User, { foreignKey: 'verifiePar', as: 'verificateur' });
+
+// Contrats
+User.hasMany(Contrat, { foreignKey: 'userId', as: 'contrats' });
+Contrat.belongsTo(User, { foreignKey: 'userId', as: 'utilisateurContrat' });
+
+// Recrutement
+User.hasMany(Recrutement, { foreignKey: 'userId', as: 'candidatures' });
+Recrutement.belongsTo(User, { foreignKey: 'userId', as: 'candidat' });
+Recrutement.belongsTo(User, { foreignKey: 'evaluePar', as: 'evaluateur' });
+
+// AuditLogs
+User.hasMany(AuditLog, { foreignKey: 'targetUserId', as: 'historiqueActions' });
+AuditLog.belongsTo(User, { foreignKey: 'targetUserId', as: 'utilisateurCible' });
+AuditLog.belongsTo(User, { foreignKey: 'adminId', as: 'administrateur' });
+
+// 3. Export global
 module.exports = {
   sequelize,
   User,
@@ -149,6 +178,11 @@ module.exports = {
   AbonnementPrestataire,
   AbonnementVersement,
   AbonnementReglement,
-  ServiceBranche,     // 👈 Ajouté ici
-  FournisseurBranche  // 👈 Ajouté ici
+  ServiceBranche,
+  FournisseurBranche,
+  Dossier,
+  Document,
+  Contrat,
+  Recrutement,
+  AuditLog,
 };

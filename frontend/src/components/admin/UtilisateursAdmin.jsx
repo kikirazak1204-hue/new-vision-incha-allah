@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 // On remonte deux fois pour atteindre la racine 'src'
 import { getAdminUtilisateurs, deleteUtilisateur } from '../../util/api';
 
@@ -21,15 +22,21 @@ export default function UtilisateursAdmin() {
 
     const supprimerUser = async (id, nom) => {
         if (!window.confirm(`⚠️ Action irréversible : Désactiver le compte de ${nom || 'cet utilisateur'} ?`)) return;
-        const res = await deleteUtilisateur(id);
-        if (res.success) {
-            setUsers(prev => prev.filter(u => u.id !== id));
+        try {
+            const res = await deleteUtilisateur(id);
+            if (res?.success) {
+                setUsers(prev => prev.filter(u => u.id !== id));
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Erreur lors de la révocation de l'accès.");
         }
     };
 
-    const filteredUsers = users.filter(u => 
-        u.nom?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        u.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredUsers = users.filter(u =>
+        u.nom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.dossier?.matricule?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     if (loading) {
@@ -55,9 +62,9 @@ export default function UtilisateursAdmin() {
                 </div>
 
                 <div className="w-full sm:w-72">
-                    <input 
-                        type="text" 
-                        placeholder="Rechercher un nom, un email..."
+                    <input
+                        type="text"
+                        placeholder="Rechercher nom, email, matricule..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500 transition"
@@ -68,51 +75,71 @@ export default function UtilisateursAdmin() {
             {/* Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredUsers.map(u => (
-                    <div 
-                        key={u.id} 
+                    <div
+                        key={u.id}
                         className="group bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 p-5 rounded-2xl flex flex-col justify-between transition-all duration-200 hover:shadow-xl hover:shadow-purple-500/5"
                     >
                         <div>
-                            <div className="flex justify-between items-start mb-4">
+                            <div className="flex justify-between items-start gap-2 mb-4">
                                 <div className="flex items-center gap-3">
                                     <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-lg font-bold shadow-inner ${
-                                        u.role === 'admin' 
-                                            ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white shadow-purple-900/50' 
+                                        u.role === 'admin' || u.roleAdmin
+                                            ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white shadow-purple-900/50'
                                             : 'bg-slate-800 text-slate-300 border border-slate-700'
                                     }`}>
                                         {u.nom?.charAt(0).toUpperCase() || '?'}
                                     </div>
                                     <div>
                                         <h3 className="font-bold text-white group-hover:text-purple-300 transition-colors">
-                                            {u.nom || 'Anonyme'}
+                                            {u.prenom ? `${u.prenom} ${u.nom}` : (u.nom || 'Anonyme')}
                                         </h3>
                                         <p className="text-xs text-slate-400">{u.email}</p>
                                     </div>
                                 </div>
 
-                                <span className={`text-[10px] uppercase font-black px-2.5 py-1 rounded-md tracking-wider border ${
-                                    u.role === 'admin'
-                                        ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
-                                        : u.role === 'fournisseur'
-                                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                        : 'bg-slate-800 text-slate-400 border-slate-700'
-                                }`}>
-                                    {u.role}
-                                </span>
+                                <div className="flex flex-col items-end gap-1">
+                                    <span className={`text-[10px] uppercase font-black px-2.5 py-1 rounded-md tracking-wider border ${
+                                        u.role === 'admin'
+                                            ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                                            : u.role === 'fournisseur'
+                                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                            : 'bg-slate-800 text-slate-400 border-slate-700'
+                                    }`}>
+                                        {u.role}
+                                    </span>
+                                    {u.roleAdmin && (
+                                        <span className="text-[9px] uppercase font-bold px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                                            Admin: {u.roleAdmin}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="mt-4 pt-3 border-t border-slate-800/80 flex justify-between items-center text-xs text-slate-400">
                                 <span>📞 {u.telephone || '—'}</span>
-                                <span className="font-mono text-[10px] text-slate-600">ID: #{u.id}</span>
+                                <span className="font-mono text-[10px] text-slate-500">
+                                    {u.dossier?.matricule ? u.dossier.matricule : `ID: #${u.id}`}
+                                </span>
                             </div>
                         </div>
 
-                        <button 
-                            onClick={() => supprimerUser(u.id, u.nom)} 
-                            className="mt-5 w-full py-2.5 bg-rose-500/5 hover:bg-rose-500 text-rose-400 hover:text-white rounded-xl border border-rose-500/10 hover:border-transparent transition-all text-xs font-bold tracking-wide cursor-pointer flex items-center justify-center gap-2"
-                        >
-                            <span>🔒</span> Révocations des accès
-                        </button>
+                        <div className="mt-5 flex items-center gap-2">
+                            <Link
+                                to={`/admin/utilisateurs/${u.id}/360`}
+                                className="flex-1 py-2.5 px-3 bg-indigo-500/15 hover:bg-indigo-500 text-indigo-300 hover:text-white rounded-xl border border-indigo-500/25 hover:border-transparent transition-all text-xs font-bold tracking-wide flex items-center justify-center gap-1.5"
+                            >
+                                <span>🗂️</span> Fiche 360°
+                            </Link>
+
+                            <button
+                                type="button"
+                                onClick={() => supprimerUser(u.id, u.nom)}
+                                className="py-2.5 px-3 bg-rose-500/5 hover:bg-rose-500 text-rose-400 hover:text-white rounded-xl border border-rose-500/10 hover:border-transparent transition-all text-xs font-bold tracking-wide cursor-pointer flex items-center justify-center gap-1.5"
+                                title="Révoquer / Supprimer"
+                            >
+                                <span>🔒</span>
+                            </button>
+                        </div>
                     </div>
                 ))}
             </div>

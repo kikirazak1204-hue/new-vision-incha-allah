@@ -1,5 +1,5 @@
 // ============================================================
-// Fichier : frontend/src/App.jsx — Complet avec Connexion & Déconnexion
+// Fichier : frontend/src/App.jsx — Complet, sans doublon & Cache maîtrisé
 // ============================================================
 
 import React, { useState, useEffect } from 'react';
@@ -48,6 +48,30 @@ import DashboardFournisseur from './pages/DashboardFournisseur';
 import DashboardAdmin from './pages/AdminDashboard';
 import HistoriquePaiements from './pages/HistoriquePaiements';
 
+let FicheUtilisateur360 = null;
+try {
+  // eslint-disable-next-line global-require
+  FicheUtilisateur360 = require('./components/admin/FicheUtilisateur360').default;
+} catch {
+  FicheUtilisateur360 = null;
+}
+
+function hasAdminPrivileges(user) {
+  if (!user) return false;
+  if (String(user.role || '').toLowerCase() === 'admin') return true;
+  return Boolean(user.roleAdmin || user.habilitationAdmin);
+}
+
+function resolveDashboardPath(user) {
+  if (hasAdminPrivileges(user)) return '/admin';
+
+  const role = String(user?.role || user?.type || '').toLowerCase();
+  if (role === 'fournisseur' || role === 'prestataire') {
+    return '/dashboard-fournisseur';
+  }
+  return '/dashboard-client';
+}
+
 function useSessionState() {
   const auth = useAuth() || {};
   const location = useLocation();
@@ -75,16 +99,10 @@ function useSessionState() {
   const storedToken = localStorage.getItem('token');
   const currentUser = auth.user || auth.utilisateur || auth.currentUser || storedUser;
   const isAuthenticated = Boolean(currentUser || auth.token || storedToken);
+  const isAdmin = hasAdminPrivileges(currentUser);
+  const dashboardPath = resolveDashboardPath(currentUser);
 
-  const role = currentUser?.role || currentUser?.type || '';
-  const dashboardPath =
-    role === 'admin'
-      ? '/admin'
-      : role === 'fournisseur' || role === 'prestataire'
-      ? '/dashboard-fournisseur'
-      : '/dashboard-client';
-
-  return { auth, currentUser, isAuthenticated, dashboardPath };
+  return { auth, currentUser, isAuthenticated, isAdmin, dashboardPath };
 }
 
 function performLogout(auth, navigate) {
@@ -99,16 +117,42 @@ function performLogout(auth, navigate) {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
   localStorage.removeItem('utilisateur');
-  sessionStorage.clear();
   window.dispatchEvent(new Event('auth-change'));
 
   navigate('/login', { replace: true });
 }
 
+function AdminRouteGuard({ children }) {
+  const { currentUser, isAuthenticated, isAdmin } = useSessionState();
+  const auth = useAuth() || {};
+
+  if (auth.loading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-sm font-bold text-slate-600">
+        Vérification des habilitations...
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !currentUser) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!isAdmin) {
+    return <Navigate to={resolveDashboardPath(currentUser)} replace />;
+  }
+
+  return (
+    <ProtectedRoute role="admin" isAdmin={true}>
+      {children}
+    </ProtectedRoute>
+  );
+}
+
 function PremiumNavbar({ showInstallBtn, onInstallApp }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
-  const { auth, currentUser, isAuthenticated, dashboardPath } = useSessionState();
+  const { auth, currentUser, isAuthenticated, isAdmin, dashboardPath } = useSessionState();
   const { panier } = usePanier() || {};
 
   const nbArticles = Array.isArray(panier)
@@ -127,10 +171,15 @@ function PremiumNavbar({ showInstallBtn, onInstallApp }) {
         : 'text-slate-200 hover:bg-white/10 hover:text-white'
     }`;
 
+  const displayName = currentUser?.nom
+    ? currentUser.nom.split(' ')[0]
+    : currentUser?.prenom
+    ? currentUser.prenom
+    : 'Mon Espace';
+
   return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#061A3A]/95 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#061A3A]/95 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-2.5 sm:px-6 lg:px-8">
-        {/* Marque Kanari Service */}
         <Link to="/" className="flex shrink-0 items-center gap-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F2B632] font-black text-[#061A3A] shadow">
             K
@@ -145,7 +194,6 @@ function PremiumNavbar({ showInstallBtn, onInstallApp }) {
           </div>
         </Link>
 
-        {/* Navigation principale desktop */}
         <nav className="hidden items-center gap-1.5 lg:flex" aria-label="Navigation principale">
           <NavLink to="/" end className={navLinkClass}>
             <Home size={16} /> Accueil
@@ -161,7 +209,6 @@ function PremiumNavbar({ showInstallBtn, onInstallApp }) {
           </NavLink>
         </nav>
 
-        {/* Actions toujours visibles (Panier + Connexion / Espace + Déconnexion) */}
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <Link
             to="/panier"
@@ -184,9 +231,7 @@ function PremiumNavbar({ showInstallBtn, onInstallApp }) {
                 className="inline-flex items-center gap-1.5 rounded-xl bg-[#123D72] px-2.5 py-2 text-xs font-extrabold text-white transition hover:bg-[#1a5299] sm:px-3 sm:text-sm"
               >
                 <User size={16} className="text-[#F2B632]" />
-                <span>
-                  {currentUser?.nom ? currentUser.nom.split(' ')[0] : 'Mon Espace'}
-                </span>
+                <span>{isAdmin ? `Admin • ${displayName}` : displayName}</span>
               </Link>
 
               <button
@@ -234,7 +279,6 @@ function PremiumNavbar({ showInstallBtn, onInstallApp }) {
         </div>
       </div>
 
-      {/* Menu mobile dépliable */}
       {mobileMenuOpen && (
         <div className="border-t border-white/10 bg-[#061A3A] px-4 py-4 lg:hidden">
           <div className="flex flex-col gap-2">
@@ -260,7 +304,7 @@ function PremiumNavbar({ showInstallBtn, onInstallApp }) {
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#123D72] px-4 py-2.5 text-sm font-black text-white"
                   >
                     <User size={17} className="text-[#F2B632]" />
-                    Accéder à mon espace
+                    {isAdmin ? 'Accéder à l’espace Admin' : 'Accéder à mon espace'}
                   </Link>
                   <button
                     type="button"
@@ -290,43 +334,6 @@ function PremiumNavbar({ showInstallBtn, onInstallApp }) {
         </div>
       )}
     </header>
-  );
-}
-
-function FloatingAuthDock() {
-  const navigate = useNavigate();
-  const { auth, isAuthenticated, dashboardPath } = useSessionState();
-
-  return (
-    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-2xl border border-white/15 bg-[#061A3A]/95 p-1.5 shadow-2xl backdrop-blur-md">
-      {isAuthenticated ? (
-        <>
-          <Link
-            to={dashboardPath}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[#123D72] px-3 py-2 text-xs font-extrabold text-white transition hover:bg-[#1a5299]"
-          >
-            <User size={14} className="text-[#F2B632]" />
-            <span>Espace</span>
-          </Link>
-          <button
-            type="button"
-            onClick={() => performLogout(auth, navigate)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-xs font-extrabold text-white transition hover:bg-rose-700"
-          >
-            <LogOut size={14} />
-            <span>Déconnexion</span>
-          </button>
-        </>
-      ) : (
-        <Link
-          to="/login"
-          className="inline-flex items-center gap-1.5 rounded-xl bg-[#F2B632] px-3.5 py-2 text-xs font-extrabold text-[#061A3A] transition hover:bg-[#E5A91F]"
-        >
-          <LogIn size={14} />
-          <span>Connexion</span>
-        </Link>
-      )}
-    </div>
   );
 }
 
@@ -374,6 +381,8 @@ export default function App() {
     }
   };
 
+  const fiche360Element = FicheUtilisateur360 ? <FicheUtilisateur360 /> : <DashboardAdmin />;
+
   return (
     <AuthProvider>
       <PanierProvider>
@@ -384,11 +393,9 @@ export default function App() {
             <NotificationsInit />
 
             <Routes>
-              {/* 1. PAGES INSTITUTIONNELLES & PUBLIQUES */}
               <Route path="/" element={<Accueil />} />
               <Route path="/a-propos" element={<AProposPage />} />
 
-              {/* 2. EXPLORATION & CATALOGUE */}
               <Route path="/selection" element={<ServiceSelectionPage />} />
               <Route path="/service/:id" element={<ServiceDetailPage />} />
               <Route path="/produits" element={<VoirProduits />} />
@@ -396,19 +403,16 @@ export default function App() {
               <Route path="/produits/service/:serviceId" element={<ProduitsParService />} />
               <Route path="/fournisseur-profil/:id?" element={<FournisseurProfilePage />} />
 
-              {/* 3. PARCOURS COMMANDE & SUIVI */}
               <Route path="/panier" element={<PanierPage />} />
               <Route path="/reservation" element={<ReservationPage />} />
               <Route path="/paiement" element={<PaiementPage />} />
               <Route path="/suivi-commande/:missionId" element={<OrderTracking />} />
 
-              {/* 4. AUTHENTIFICATION */}
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/register-utilisateur" element={<RegisterUtilisateur />} />
               <Route path="/register-prestataire" element={<RegisterPrestataire />} />
 
-              {/* 5. ESPACE SÉCURISÉ - CLIENT */}
               <Route
                 path="/dashboard-client"
                 element={
@@ -427,7 +431,6 @@ export default function App() {
               />
               <Route path="/dashboard/client" element={<Navigate to="/dashboard-client" replace />} />
 
-              {/* 6. ESPACE SÉCURISÉ - PRESTATAIRE / FOURNISSEUR */}
               <Route
                 path="/dashboard-fournisseur"
                 element={
@@ -438,21 +441,25 @@ export default function App() {
               />
               <Route path="/dashboard/fournisseur" element={<Navigate to="/dashboard-fournisseur" replace />} />
 
-              {/* 7. ESPACE SÉCURISÉ - ADMIN */}
               <Route
                 path="/admin"
                 element={
-                  <ProtectedRoute role="admin">
+                  <AdminRouteGuard>
                     <DashboardAdmin />
-                  </ProtectedRoute>
+                  </AdminRouteGuard>
+                }
+              />
+              <Route
+                path="/admin/utilisateurs/:id/360"
+                element={
+                  <AdminRouteGuard>
+                    {fiche360Element}
+                  </AdminRouteGuard>
                 }
               />
 
-              {/* REDIRECTION PAR DÉFAUT */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-
-            <FloatingAuthDock />
           </div>
         </NavigationProvider>
       </PanierProvider>

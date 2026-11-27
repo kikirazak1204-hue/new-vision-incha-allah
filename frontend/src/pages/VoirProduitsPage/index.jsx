@@ -7,12 +7,19 @@ import {
 } from 'lucide-react';
 import { usePanier } from '../../context/PanierContext';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://newvision-backend.onrender.com';
+const API_BASE = (
+  import.meta.env.VITE_API_URL || 'https://newvision-backend.onrender.com'
+).replace(/\/api\/?$/i, '').replace(/\/+$/, '');
 
 function getImageUrl(image) {
   if (!image) return '';
-  if (/^(https?:|data:|blob:)/i.test(image)) return image;
-  return `${API_BASE}/uploads/${String(image).replace(/^\/+/, '')}`;
+  const raw = String(image).trim();
+  if (/^(https?:|data:|blob:)/i.test(raw)) return raw;
+  const cleanPath = raw.replace(/^\/+/, '');
+  if (cleanPath.startsWith('uploads/')) {
+    return `${API_BASE}/${cleanPath}`;
+  }
+  return `${API_BASE}/uploads/${cleanPath}`;
 }
 
 function formatPrice(price) {
@@ -23,6 +30,10 @@ function formatPrice(price) {
 function ProductImage({ product, className = '' }) {
   const [failed, setFailed] = useState(false);
   const src = getImageUrl(product.image || product.photo || product.imageUrl);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
 
   if (!src || failed) {
     return (
@@ -40,7 +51,10 @@ function ProductImage({ product, className = '' }) {
       src={src}
       alt={product.nom || 'Produit Kanari'}
       loading="lazy"
-      onError={() => setFailed(true)}
+      onError={() => {
+        console.warn('Image produit introuvable :', src);
+        setFailed(true);
+      }}
       className={`object-cover transition-transform duration-700 ease-out group-hover:scale-105 ${className}`}
     />
   );

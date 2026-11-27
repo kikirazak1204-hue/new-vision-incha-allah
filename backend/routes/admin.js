@@ -1,13 +1,29 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
-const { Fournisseur, User, Reservation, Paiement, Produit, Commande } = require('../models');
+const {
+    Fournisseur,
+    User,
+    Reservation,
+    Paiement,
+    Produit,
+    Commande,
+    Dossier,
+    Contrat,
+    Recrutement
+} = require('../models');
 
 // ============================================================
-// 🛡️ MIDDLEWARE DE CONTRÔLE ADMIN
+// 🛡️ MIDDLEWARE DE CONTRÔLE ADMIN (RÔLE USER SÉPARÉ DU RÔLE ADMIN)
 // ============================================================
+const hasAdminAccess = (user) => {
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    return Boolean(user.roleAdmin || user.habilitationAdmin);
+};
+
 const adminOnly = (req, res, next) => {
-    if (req.user?.role !== 'admin') {
+    if (!hasAdminAccess(req.user)) {
         return res.status(403).json({ success: false, message: 'Accès réservé aux administrateurs.' });
     }
     next();
@@ -59,23 +75,65 @@ router.get('/stats', protect, adminOnly, async (req, res) => {
     }
 });
 
-// 🔍 Route utilisateurs enrichie avec les données pro et les pièces justificatives associées
+// 🔍 Route utilisateurs enrichie avec profilFournisseur, dossier, contrats et recrutement
 router.get('/utilisateurs', protect, adminOnly, async (req, res) => {
     try {
+        const includes = [];
+
+        if (Fournisseur && User.associations?.profilFournisseur) {
+            includes.push({ model: Fournisseur, as: 'profilFournisseur', required: false });
+        }
+        if (Dossier && User.associations?.dossier) {
+            includes.push({ model: Dossier, as: 'dossier', required: false });
+        }
+        if (Contrat && User.associations?.contrats) {
+            includes.push({ model: Contrat, as: 'contrats', required: false });
+        }
+        if (Recrutement && User.associations?.candidatures) {
+            includes.push({ model: Recrutement, as: 'candidatures', required: false });
+        }
+
         const users = await User.findAll({
-            attributes: ['id', 'nom', 'prenom', 'email', 'role', 'telephone', 'ville', 'createdAt'],
-            include: [
-                {
-                    model: Fournisseur,
-                    as: 'fournisseurProfil', // Liaison vers le profil pro / prestataire / fournisseur
-                    required: false
-                }
-            ],
+            attributes: { exclude: ['password'] },
+            include: includes,
             order: [['createdAt', 'DESC']]
         });
         res.json({ success: true, data: users });
     } catch (err) {
         console.error("❌ Erreur GET /utilisateurs :", err);
+        res.status(500).json({ success: false, message: 'Erreur serveur.', details: err.message });
+    }
+});
+
+// 🔑 Attribution / Séparation du rôle d'administration sur un utilisateur
+router.patch('/utilisateurs/:id/habilitation-admin', protect, adminOnly, async (req, res) => {
+    try {
+        const { roleAdmin } = req.body;
+        const user = await User.findByPk(req.params.id);
+        if (!user) return res.status(404).json({ success: false, message: 'Utilisateur introuvable.' });
+
+        const updates = {};
+        if ('roleAdmin' in User.rawAttributes) {
+            updates.roleAdmin = roleAdmin || null;
+        }
+        if ('habilitationAdmin' in User.rawAttributes) {
+            updates.habilitationAdmin = roleAdmin || null;
+        }
+
+        if (Object.keys(updates).length > 0) {
+            await user.update(updates);
+        }
+
+        const userResponse = user.toJSON();
+        delete userResponse.password;
+
+        res.json({
+            success: true,
+            message: 'Habilitation administrative mise à jour sans modifier le rôle métier.',
+            data: userResponse
+        });
+    } catch (err) {
+        console.error("❌ Erreur PATCH /utilisateurs/:id/habilitation-admin :", err);
         res.status(500).json({ success: false, message: 'Erreur serveur.' });
     }
 });
@@ -83,16 +141,25 @@ router.get('/utilisateurs', protect, adminOnly, async (req, res) => {
 // 🚫 Révocation / Suspension d'un utilisateur ou de son accès
 router.patch('/utilisateurs/:id/statut', protect, adminOnly, async (req, res) => {
     try {
-        const { statut } = req.body; // ex: 'SUSPENDU', 'ACTIF', 'CONFORME'
+        const { statut } = req.body;
         const user = await User.findByPk(req.params.id);
         if (!user) return res.status(404).json({ success: false, message: 'Utilisateur introuvable.' });
-        
+
         const fournisseur = await Fournisseur.findOne({ where: { userId: user.id } });
         if (fournisseur) {
-            await fournisseur.update({ statut: statut === 'SUSPENDU' ? 'SUSPENDU' : 'CONFORME' });
+            const statutsFournisseurValides = ['EN_ATTENTE', 'EN_EVALUATION', 'CONFORME', 'SUSPENDU'];
+            const nextStatut = statutsFournisseurValides.includes(statut)
+                ? statut
+                : (statut === 'ACTIF' ? 'CONFORME' : 'SUSPENDU');
+            await fournisseur.update({ statut: nextStatut });
         }
 
-        res.json({ success: true, message: `Statut de l'utilisateur mis à jour avec succès.` });
+        const dossier = Dossier ? await Dossier.findOne({ where: { userId: user.id } }) : null;
+        if (dossier && statut === 'ACTIF') {
+            await dossier.update({ statutDossier: 'VALIDE' });
+        }
+
+        res.json({ success: true, message: "Statut de l'utilisateur mis à jour avec succès." });
     } catch (err) {
         console.error("❌ Erreur PATCH /utilisateurs/:id/statut :", err);
         res.status(500).json({ success: false, message: 'Erreur serveur.' });
@@ -135,10 +202,10 @@ router.get('/fournisseurs/:id/dossier', protect, adminOnly, async (req, res) => 
     try {
         const fournisseur = await Fournisseur.findByPk(req.params.id, {
             include: [
-                { 
-                    model: User, 
-                    as: 'userFournisseur', 
-                    attributes: ['id', 'nom', 'prenom', 'email', 'telephone', 'ville', 'createdAt'] 
+                {
+                    model: User,
+                    as: 'userFournisseur',
+                    attributes: ['id', 'nom', 'prenom', 'email', 'telephone', 'ville', 'createdAt']
                 }
             ]
         });
@@ -265,7 +332,7 @@ router.put('/reservations/:id/refuser', protect, adminOnly, async (req, res) => 
 
         await reservation.update({
             statut: 'ANNULEE',
-            motifRefus: motif || 'Refusé par l\'administration'
+            motifRefus: motif || "Refusé par l'administration"
         });
 
         res.json({ success: true, message: 'Mission refusée/annulée.', data: reservation });
@@ -414,10 +481,10 @@ router.get('/live-locations', protect, adminOnly, async (req, res) => {
     try {
         const fournisseurs = await Fournisseur.findAll({
             include: [
-                { 
-                    model: User, 
-                    as: 'userFournisseur', 
-                    attributes: ['id', 'nom', 'prenom', 'telephone'] 
+                {
+                    model: User,
+                    as: 'userFournisseur',
+                    attributes: ['id', 'nom', 'prenom', 'telephone']
                 }
             ]
         });

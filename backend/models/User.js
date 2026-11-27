@@ -24,16 +24,36 @@ const User = sequelize.define('User', {
         type: DataTypes.STRING,
         allowNull: false
     },
-    telephone: DataTypes.STRING,
+    telephone: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    // Rôle métier de l'utilisateur (ex: 'utilisateur', 'client', 'fournisseur', 'prestataire', 'partenaire', 'candidat')
     role: {
         type: DataTypes.STRING,
         defaultValue: 'utilisateur'
     },
-    ville: DataTypes.STRING,
-    // 💡 CORRECTION ICI : Utilisation de fcmToken en JS, lié à fcm_token en BDD
+    // Habilitation d'administration séparée du rôle métier (ex: null, 'super_admin', 'rh_recrutement', 'conformite_kyc', 'contrats_finance')
+    roleAdmin: {
+        type: DataTypes.STRING,
+        field: 'role_admin',
+        allowNull: true,
+        defaultValue: null
+    },
+    statutCompte: {
+        type: DataTypes.STRING,
+        field: 'statut_compte',
+        allowNull: false,
+        defaultValue: 'ACTIF'
+    },
+    ville: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    // 💡 Conservation de fcmToken en JS, lié à fcm_token en BDD
     fcmToken: {
         type: DataTypes.TEXT,
-        field: 'fcm_token', 
+        field: 'fcm_token',
         allowNull: true
     }
 }, {

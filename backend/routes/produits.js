@@ -1,38 +1,63 @@
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
 const { Produit, Fournisseur, Service, User } = require('../models');
 const { protect, authorize } = require('../middleware/auth');
 const { Op } = require('sequelize');
 const multer = require('multer');
 
-// 🔥 CONFIGURATION MULTER EN MÉMOIRE (Pour envoyer direct vers Firebase Storage)
+// 🔥 CONFIGURATION MULTER EN MÉMOIRE (Pour envoyer vers Firebase Storage ou repli local)
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 } // Limite à 10 Mo
 });
 
-// Helper pour uploader un buffer vers Firebase Storage
+const saveBufferLocally = (file, folder, filename) => {
+    const targetDir = path.join(__dirname, '..', 'uploads', folder);
+    fs.mkdirSync(targetDir, { recursive: true });
+    const fullPath = path.join(__dirname, '..', 'uploads', filename);
+    fs.writeFileSync(fullPath, file.buffer);
+    return `/uploads/${filename}`;
+};
+
+// Helper pour uploader un buffer vers Firebase Storage avec repli local sécurisé
 const uploadBufferToFirebase = async (file, folder = 'produits') => {
+    const ext = file.originalname
+        ? String(file.originalname.split('.').pop() || 'jpg').replace(/[^a-zA-Z0-9]/g, '') || 'jpg'
+        : 'jpg';
+    const randomStr = Math.random().toString(36).substring(2, 8);
+    const filename = `${folder}/${Date.now()}-${randomStr}.${ext}`;
+
     try {
         const admin = require('../config/firebase-admin');
+        if (!admin || !admin.apps || admin.apps.length === 0) {
+            console.warn('⚠️ Firebase Admin non initialisé — repli vers stockage local /uploads');
+            return saveBufferLocally(file, folder, filename);
+        }
+
         const bucket = admin.storage().bucket();
-        
-       const ext = file.originalname ? file.originalname.split('.').pop() : 'jpg';
-        // Correction ici : .substring(2, 8) s'applique après .toString(36)
-        const randomStr = Math.random().toString(36).substring(2, 8);
-        const filename = `${folder}/${Date.now()}-${randomStr}.${ext}`;
+        if (!bucket || !bucket.name) {
+            console.warn('⚠️ Bucket Firebase introuvable — repli vers stockage local /uploads');
+            return saveBufferLocally(file, folder, filename);
+        }
+
         const fileRef = bucket.file(filename);
         await fileRef.save(file.buffer, {
-            metadata: { contentType: file.mimetype },
-            public: true
+            metadata: { contentType: file.mimetype || 'application/octet-stream' },
+            resumable: false
         });
 
-        // Récupération de l'URL publique permanente
-        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filename}`;
-        return publicUrl;
+        try {
+            await fileRef.makePublic();
+        } catch (aclErr) {
+            console.warn('⚠️ makePublic ignoré (vérifier règles IAM/Bucket si nécessaire) :', aclErr.message);
+        }
+
+        return `https://storage.googleapis.com/${bucket.name}/${filename}`;
     } catch (error) {
-        console.error('❌ Erreur upload Firebase Storage :', error);
-        throw new Error('Échec de l\'enregistrement de l\'image sur Firebase.');
+        console.error('❌ Erreur upload Firebase Storage (repli local activé) :', error.message);
+        return saveBufferLocally(file, folder, filename);
     }
 };
 
@@ -51,7 +76,8 @@ router.get('/', async (req, res) => {
             where,
             include: [
                 {
-                    model: Fournisseur, as: 'fournisseur',
+                    model: Fournisseur,
+                    as: 'fournisseur',
                     attributes: ['id', 'nomEntreprise', 'adresse'],
                     include: [{ model: User, as: 'userFournisseur', attributes: ['email', 'telephone'] }]
                 },
@@ -84,7 +110,7 @@ router.get('/fournisseur', protect, authorize('fournisseur'), async (req, res) =
     }
 });
 
-// ── POST /api/produits — créer un produit avec image sur Firebase Storage
+// ── POST /api/produits — créer un produit avec image
 router.post('/', protect, authorize('fournisseur', 'admin'), upload.single('image'), async (req, res) => {
     try {
         const fournisseur = await Fournisseur.findOne({ where: { userId: req.user.id } });
@@ -109,7 +135,7 @@ router.post('/', protect, authorize('fournisseur', 'admin'), upload.single('imag
             prix,
             categorie: categorie || null,
             quantite: quantite ? Number(quantite) : 0,
-            image: imageUrl // Stocke l'URL publique permanente Firebase
+            image: imageUrl
         });
 
         res.status(201).json({ success: true, message: 'Produit créé ✅', data: produit });
@@ -125,7 +151,8 @@ router.get('/:id', async (req, res) => {
         const produit = await Produit.findByPk(req.params.id, {
             include: [
                 {
-                    model: Fournisseur, as: 'fournisseur',
+                    model: Fournisseur,
+                    as: 'fournisseur',
                     attributes: ['id', 'nomEntreprise', 'adresse'],
                     include: [{ model: User, as: 'userFournisseur', attributes: ['email', 'telephone'] }]
                 },
@@ -149,7 +176,7 @@ router.put('/:id', protect, upload.single('image'), async (req, res) => {
             return res.status(403).json({ success: false, message: 'Non autorisé' });
         }
 
-        let updateData = { ...req.body };
+        const updateData = { ...req.body };
         if (req.file) {
             updateData.image = await uploadBufferToFirebase(req.file, 'kanari-produits');
         }
