@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getDashboardFournisseur, getProduitsFournisseur, deleteProduit, addProduit } from '../util/api';
 import { useNotification } from '../context/NotificationContext.jsx';
 import PortefeuilleFournisseur from '../components/paiements/PortefeuilleFournisseur';
@@ -640,6 +641,7 @@ function OngletDevis({ token }) {
 // COMPOSANT PRINCIPAL
 // ════════════════════════════════════════════════════════════════
 export default function DashboardFournisseur({ setCurrentView }) {
+     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('overview');
     const [data, setData] = useState(null);
     const [produits, setProduits] = useState([]);
