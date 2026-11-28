@@ -149,6 +149,7 @@ const repairDatabase = async () => {
     const queries = [
         "ALTER TABLE produits ADD COLUMN categorie VARCHAR(255);",
         "ALTER TABLE produits ADD COLUMN quantite INT DEFAULT 0;",
+        "ALTER TABLE produits ADD COLUMN images TEXT NULL;",
         "ALTER TABLE users ADD COLUMN fcm_token TEXT;",
         "ALTER TABLE users ADD COLUMN role_admin VARCHAR(255) NULL;",
         "ALTER TABLE users ADD COLUMN statut_compte VARCHAR(50) NOT NULL DEFAULT 'ACTIF';",
