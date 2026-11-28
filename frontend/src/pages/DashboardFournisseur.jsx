@@ -216,6 +216,55 @@ function BonInterventionModal({ mission, onClose, token, onSuccess }) {
 }
 
 // ════════════════════════════════════════════════════════════════
+// PRODUITS : photos (4 max), stock, affichage
+// ════════════════════════════════════════════════════════════════
+const MAX_PHOTOS = 4;
+const STOCK_MAX = 1000000;
+const urlImage = (src) => (!src ? '' : /^https?:\/\//.test(src) ? src : `${API}/uploads/${src}`);
+const imagesDuProduit = (p) => {
+    const liste = Array.isArray(p?.images) && p.images.length ? p.images : (p?.image ? [p.image] : []);
+    return liste.map(urlImage);
+};
+const formatNombre = (n) => Number(n || 0).toLocaleString('fr-FR');
+
+// Réduit une photo (1600 px max, JPEG) pour un envoi rapide, même avec une connexion lente
+function reduirePhoto(fichier) {
+    return new Promise((resolve) => {
+        const lecteur = new FileReader();
+        lecteur.onerror = () => resolve(fichier);
+        lecteur.onload = () => {
+            const img = new Image();
+            img.onerror = () => resolve(fichier);
+            img.onload = () => {
+                const ratio = Math.min(1, 1600 / Math.max(img.width, img.height));
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.round(img.width * ratio);
+                canvas.height = Math.round(img.height * ratio);
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                canvas.toBlob((blob) => {
+                    if (!blob || blob.size >= fichier.size) return resolve(fichier);
+                    resolve(new File([blob], fichier.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }));
+                }, 'image/jpeg', 0.86);
+            };
+            img.src = lecteur.result;
+        };
+        lecteur.readAsDataURL(fichier);
+    });
+}
+
+const IconePhoto = (props) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <rect x="3" y="4" width="18" height="16" rx="3" /><circle cx="9" cy="10" r="1.6" /><path d="M21 16l-5-5-8 8" />
+    </svg>
+);
+const IconeFermer = (props) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...props}><path d="M6 6l12 12M18 6L6 18" /></svg>
+);
+
+const CHAMP = 'w-full bg-white text-[#061a3a] placeholder:text-slate-400 px-4 py-3 rounded-xl border border-slate-200 outline-none transition focus:border-amber-400 focus:ring-4 focus:ring-amber-100';
+const ETIQUETTE = 'block text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 mb-2';
+
+// ════════════════════════════════════════════════════════════════
 // MODAL : AJOUTER UN PRODUIT
 // ════════════════════════════════════════════════════════════════
 function AjouterProduitModal({ onClose, onSuccess }) {
@@ -225,14 +274,53 @@ function AjouterProduitModal({ onClose, onSuccess }) {
     const [categorie, setCategorie] = useState('');
     const [quantite, setQuantite] = useState('');
     const [description, setDescription] = useState('');
-    const [fichier, setFichier] = useState(null);
+    const [photos, setPhotos] = useState([]); // [{ id, fichier, apercu }] — la première est la photo principale
+    const [survol, setSurvol] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const inputRef = useRef(null);
+
+    useEffect(() => () => photos.forEach((p) => URL.revokeObjectURL(p.apercu)), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const ajouterFichiers = async (liste) => {
+        setError('');
+        const fichiers = Array.from(liste || []);
+        if (!fichiers.length) return;
+        const place = MAX_PHOTOS - photos.length;
+        if (place <= 0) { setError(`${MAX_PHOTOS} photos maximum par produit.`); return; }
+        if (fichiers.length > place) setError(`Seules ${place} photo(s) supplémentaire(s) sont possibles : ${MAX_PHOTOS} photos maximum.`);
+
+        const valides = [];
+        for (const f of fichiers.slice(0, place)) {
+            if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { setError('Seules les images JPEG, PNG ou WebP sont acceptées.'); continue; }
+            if (f.size > 25 * 1024 * 1024) { setError('Une photo dépasse 25 Mo : choisissez une image plus légère.'); continue; }
+            const reduite = await reduirePhoto(f);
+            valides.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, fichier: reduite, apercu: URL.createObjectURL(reduite) });
+        }
+        if (valides.length) setPhotos((prev) => [...prev, ...valides].slice(0, MAX_PHOTOS));
+    };
+
+    const retirer = (id) => setPhotos((prev) => {
+        const cible = prev.find((p) => p.id === id);
+        if (cible) URL.revokeObjectURL(cible.apercu);
+        return prev.filter((p) => p.id !== id);
+    });
+    const rendrePrincipale = (id) => setPhotos((prev) => {
+        const cible = prev.find((p) => p.id === id);
+        return cible ? [cible, ...prev.filter((p) => p.id !== id)] : prev;
+    });
+
+    const changerStock = (valeur) => {
+        const n = Math.min(STOCK_MAX, Math.max(0, Math.floor(Number(String(valeur).replace(/\D/g, '')) || 0)));
+        setQuantite(valeur === '' ? '' : String(n));
+    };
+    const ajouterStock = (n) => setQuantite(String(Math.min(STOCK_MAX, (Number(quantite) || 0) + n)));
 
     const soumettre = async (e) => {
         e.preventDefault();
         setError('');
-        if (!nom.trim() || !prix) { setError('Le nom et le prix sont obligatoires.'); return; }
+        if (!nom.trim()) { setError('Le nom du produit est obligatoire.'); return; }
+        if (!(Number(prix) > 0)) { setError('Indiquez un prix supérieur à zéro.'); return; }
         setLoading(true);
         try {
             const fd = new FormData();
@@ -241,7 +329,7 @@ function AjouterProduitModal({ onClose, onSuccess }) {
             fd.append('categorie', categorie.trim());
             fd.append('quantite', quantite || 0);
             fd.append('description', description.trim());
-            if (fichier) fd.append('image', fichier);
+            photos.forEach((p) => fd.append('images', p.fichier));
 
             const res = await addProduit(fd);
             if (res && res.success !== false) {
@@ -259,34 +347,175 @@ function AjouterProduitModal({ onClose, onSuccess }) {
         }
     };
 
+    const emplacementsVides = Math.max(0, MAX_PHOTOS - photos.length);
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-            <div className="w-full max-w-lg bg-white border border-amber-200 rounded-3xl p-6 shadow-2xl">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-black text-[#061a3a]"> Ajouter un produit</h3>
-                    <button onClick={onClose} className="text-slate-500 hover:text-[#061a3a] text-sm font-bold">×</button>
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-md overflow-y-auto">
+            <div className="w-full max-w-2xl bg-white rounded-[28px] shadow-2xl shadow-slate-950/30 border border-slate-200 overflow-hidden my-auto">
+
+                <div className="relative px-7 pt-7 pb-6 bg-gradient-to-br from-[#061a3a] to-[#0b2a57] text-white">
+                    <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
+                    <button onClick={onClose} aria-label="Fermer" className="absolute top-5 right-5 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition">
+                        <IconeFermer className="w-4 h-4" />
+                    </button>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-300">Catalogue</p>
+                    <h3 className="text-2xl font-black tracking-tight mt-1">Nouveau produit</h3>
+                    <p className="text-sm text-slate-300 mt-1">Présentez votre article avec jusqu'à {MAX_PHOTOS} photos.</p>
                 </div>
 
-                {error && (
-                    <div className="mb-4 bg-red-50 border border-red-200 rounded-2xl p-3 text-red-700 text-xs font-semibold text-center">{error}</div>
-                )}
+                <form onSubmit={soumettre} className="p-7 space-y-6">
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-700 text-xs font-semibold">{error}</div>
+                    )}
 
-                <form onSubmit={soumettre} className="space-y-4">
-                    <input type="text" placeholder="Nom du produit *" value={nom} onChange={(e) => setNom(e.target.value)} className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] w-full bg-white text-[#061a3a] p-3 rounded-xl border border-white/10 outline-none focus:border-amber-400" />
-                    <input type="number" placeholder="Prix (FCFA) *" value={prix} onChange={(e) => setPrix(e.target.value)} className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] w-full bg-white text-[#061a3a] p-3 rounded-xl border border-white/10 outline-none focus:border-amber-400" />
-                    <div className="flex gap-2">
-                        <input type="text" placeholder="Catégorie" value={categorie} onChange={(e) => setCategorie(e.target.value)} className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] flex-1 bg-white text-[#061a3a] p-3 rounded-xl border border-white/10 outline-none focus:border-amber-400" />
-                        <input type="number" placeholder="Qté" min="0" value={quantite} onChange={(e) => setQuantite(e.target.value)} className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] w-24 bg-white text-[#061a3a] p-3 rounded-xl border border-white/10 outline-none focus:border-amber-400" />
-                    </div>
-                    <textarea placeholder="Description..." rows="3" value={description} onChange={(e) => setDescription(e.target.value)} className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] w-full bg-white text-[#061a3a] p-3 rounded-xl border border-white/10 outline-none focus:border-amber-400" />
+                    {/* Photos */}
                     <div>
-                        <label className="block text-[10px] text-amber-600 font-bold uppercase mb-1">Photo / fichier (optionnel)</label>
-                        <input type="file" onChange={(e) => setFichier(e.target.files?.[0] || null)} className="!text-[#061a3a] placeholder:!text-slate-400 caret-[#061a3a] w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:bg-[#061a3a] file:text-white file:rounded-xl file:border-0 cursor-pointer" />
+                        <div className="flex items-end justify-between mb-2">
+                            <span className={ETIQUETTE + ' !mb-0'}>Photos</span>
+                            <span className="text-xs font-semibold text-slate-500">{photos.length} / {MAX_PHOTOS}</span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            {photos.map((p, i) => (
+                                <div key={p.id} className={`group relative aspect-square rounded-2xl overflow-hidden border ${i === 0 ? 'border-amber-400 ring-2 ring-amber-200' : 'border-slate-200'}`}>
+                                    <img src={p.apercu} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                                    {i === 0 && <span className="absolute top-2 left-2 text-[10px] font-black uppercase tracking-wider bg-amber-400 text-[#061a3a] px-2 py-0.5 rounded-full">Principale</span>}
+                                    <button type="button" onClick={() => retirer(p.id)} aria-label="Retirer la photo"
+                                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-950/70 hover:bg-red-600 text-white flex items-center justify-center transition">
+                                        <IconeFermer className="w-3.5 h-3.5" />
+                                    </button>
+                                    {i !== 0 && (
+                                        <button type="button" onClick={() => rendrePrincipale(p.id)}
+                                            className="absolute inset-x-0 bottom-0 py-1.5 text-[11px] font-bold text-white bg-slate-950/70 opacity-0 group-hover:opacity-100 focus:opacity-100 transition">
+                                            Définir comme principale
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                            {emplacementsVides > 0 && (
+                                <button type="button" onClick={() => inputRef.current?.click()}
+                                    onDragOver={(e) => { e.preventDefault(); setSurvol(true); }}
+                                    onDragLeave={() => setSurvol(false)}
+                                    onDrop={(e) => { e.preventDefault(); setSurvol(false); ajouterFichiers(e.dataTransfer.files); }}
+                                    className={`aspect-square rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5 text-center px-2 transition ${survol ? 'border-amber-400 bg-amber-50' : 'border-slate-300 hover:border-amber-400 hover:bg-amber-50/50 bg-slate-50'}`}>
+                                    <IconePhoto className="w-7 h-7 text-slate-400" />
+                                    <span className="text-[11px] font-bold text-slate-600 leading-tight">Ajouter<br />une photo</span>
+                                </button>
+                            )}
+                            {/* emplacements restants, purement visuels */}
+                            {Array.from({ length: Math.max(0, emplacementsVides - 1) }).map((_, i) => (
+                                <div key={`vide-${i}`} className="aspect-square rounded-2xl border border-dashed border-slate-200 bg-slate-50/60" />
+                            ))}
+                        </div>
+                        <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden"
+                            onChange={(e) => { ajouterFichiers(e.target.files); e.target.value = ''; }} />
+                        <p className="text-[11px] text-slate-500 mt-2">La première photo sert de vitrine. Les images sont allégées automatiquement avant l'envoi.</p>
                     </div>
-                    <button type="submit" disabled={loading} className="w-full py-3 bg-[#061a3a] text-white rounded-xl font-bold hover:bg-[#0b2a57] transition-all disabled:opacity-50">
-                        {loading ? 'Traitement...' : 'Ajouter au catalogue'}
-                    </button>
+
+                    {/* Informations */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="sm:col-span-2">
+                            <label className={ETIQUETTE}>Nom du produit *</label>
+                            <input type="text" maxLength={150} placeholder="Ex : Robinet mitigeur chromé" value={nom} onChange={(e) => setNom(e.target.value)} className={CHAMP} />
+                        </div>
+                        <div>
+                            <label className={ETIQUETTE}>Prix *</label>
+                            <div className="relative">
+                                <input type="number" inputMode="numeric" min="1" placeholder="0" value={prix} onChange={(e) => setPrix(e.target.value)} className={CHAMP + ' pr-16'} />
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">FCFA</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label className={ETIQUETTE}>Catégorie</label>
+                            <input type="text" list="categories-produit" placeholder="Ex : Plomberie" value={categorie} onChange={(e) => setCategorie(e.target.value)} className={CHAMP} />
+                            <datalist id="categories-produit">
+                                {['Plomberie', 'Électricité', 'Peinture', 'Outillage', 'Quincaillerie', 'Climatisation', 'Sanitaire', 'Éclairage'].map((c) => <option key={c} value={c} />)}
+                            </datalist>
+                        </div>
+                        <div className="sm:col-span-2">
+                            <label className={ETIQUETTE}>Quantité en stock</label>
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <input type="text" inputMode="numeric" placeholder="0" value={quantite === '' ? '' : formatNombre(quantite)}
+                                    onChange={(e) => changerStock(e.target.value)} className={CHAMP + ' sm:max-w-[220px] font-mono font-bold'} />
+                                <div className="flex flex-wrap gap-2">
+                                    {[10, 100, 1000, 10000].map((n) => (
+                                        <button key={n} type="button" onClick={() => ajouterStock(n)}
+                                            className="px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 text-xs font-bold text-slate-700 transition">
+                                            + {formatNombre(n)}
+                                        </button>
+                                    ))}
+                                    {quantite !== '' && (
+                                        <button type="button" onClick={() => setQuantite('')} className="px-3 py-2 text-xs font-bold text-slate-500 hover:text-red-600 transition">Remettre à zéro</button>
+                                    )}
+                                </div>
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-2">Jusqu'à {formatNombre(STOCK_MAX)} unités par produit.</p>
+                        </div>
+                        <div className="sm:col-span-2">
+                            <label className={ETIQUETTE}>Description</label>
+                            <textarea rows="4" placeholder="Matière, dimensions, garantie, conseils d'utilisation..." value={description} onChange={(e) => setDescription(e.target.value)} className={CHAMP + ' resize-none'} />
+                        </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+                        <span className="mt-1 w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+                        <p className="text-[11px] text-slate-600 leading-relaxed">Une commission Kanari de 3 % est prélevée sur chaque vente. Vous recevez le reste dans votre portefeuille dès que le paiement est validé.</p>
+                    </div>
+
+                    <div className="flex flex-col-reverse sm:flex-row gap-3">
+                        <button type="button" onClick={onClose} className="sm:w-40 py-3.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition">Annuler</button>
+                        <button type="submit" disabled={loading}
+                            className="flex-1 py-3.5 bg-gradient-to-r from-[#061a3a] to-[#0b2a57] text-white rounded-xl text-sm font-black tracking-wide shadow-lg shadow-slate-900/20 hover:shadow-xl transition disabled:opacity-50 active:scale-[0.99]">
+                            {loading ? 'Envoi des photos et enregistrement...' : 'Ajouter au catalogue'}
+                        </button>
+                    </div>
                 </form>
+            </div>
+        </div>
+    );
+}
+
+// ════════════════════════════════════════════════════════════════
+// CARTE PRODUIT : galerie + stock
+// ════════════════════════════════════════════════════════════════
+function CarteProduit({ produit: p, onSupprimer }) {
+    const images = imagesDuProduit(p);
+    const [actuelle, setActuelle] = useState(0);
+    const stock = Number(p.quantite) || 0;
+    const niveau = stock === 0 ? { texte: 'Rupture de stock', classe: 'bg-red-50 text-red-700 border-red-200' }
+        : stock <= 5 ? { texte: `Stock faible : ${formatNombre(stock)}`, classe: 'bg-amber-50 text-amber-700 border-amber-200' }
+        : { texte: `En stock : ${formatNombre(stock)}`, classe: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+
+    return (
+        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col shadow-xl shadow-slate-200/60 hover:shadow-2xl transition-shadow">
+            <div className="relative w-full h-48 bg-slate-100 overflow-hidden">
+                {images.length > 0 ? (
+                    <img key={images[actuelle]} src={images[actuelle]} alt={p.nom} className="w-full h-full object-cover"
+                        onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-300"><IconePhoto className="w-12 h-12" /></div>
+                )}
+                {images.length > 1 && (
+                    <span className="absolute top-3 right-3 text-[10px] font-bold bg-slate-950/70 text-white px-2.5 py-1 rounded-full">{actuelle + 1} / {images.length}</span>
+                )}
+            </div>
+            {images.length > 1 && (
+                <div className="flex gap-2 px-4 pt-3">
+                    {images.map((src, i) => (
+                        <button key={src + i} type="button" onClick={() => setActuelle(i)} aria-label={`Photo ${i + 1}`}
+                            className={`w-12 h-12 rounded-lg overflow-hidden border-2 transition ${i === actuelle ? 'border-amber-400' : 'border-transparent opacity-70 hover:opacity-100'}`}>
+                            <img src={src} alt="" className="w-full h-full object-cover" />
+                        </button>
+                    ))}
+                </div>
+            )}
+            <div className="p-5 flex flex-col justify-between gap-4 flex-1">
+                <div>
+                    {p.categorie && <p className="text-[10px] text-slate-500 uppercase font-bold tracking-[0.14em]">{p.categorie}</p>}
+                    <h4 className="font-extrabold text-base text-[#061a3a] mt-1 leading-snug">{p.nom}</h4>
+                    <p className="text-lg text-[#061a3a] font-black mt-1.5">{formatNombre(p.prix)} <span className="text-xs font-bold text-amber-600">FCFA</span></p>
+                    <span className={`inline-block mt-3 text-[11px] font-bold px-2.5 py-1 rounded-full border ${niveau.classe}`}>{niveau.texte}</span>
+                </div>
+                <button onClick={onSupprimer} className="w-full py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition">Supprimer l'article</button>
             </div>
         </div>
     );
@@ -641,7 +870,7 @@ function OngletDevis({ token }) {
 // COMPOSANT PRINCIPAL
 // ════════════════════════════════════════════════════════════════
 export default function DashboardFournisseur({ setCurrentView }) {
-     const navigate = useNavigate();
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('overview');
     const [data, setData] = useState(null);
     const [produits, setProduits] = useState([]);
@@ -1037,30 +1266,8 @@ export default function DashboardFournisseur({ setCurrentView }) {
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 text-left">
                                 {produits.map(p => (
-                                    <div key={p.id} className="bg-white border border-slate-200 rounded-3xl overflow-hidden flex flex-col justify-between shadow-xl">
-                                        <div className="w-full h-36 bg-slate-50 flex items-center justify-center overflow-hidden">
-                                            {p.image ? (
-                                                <img
-                                                    src={`${API}/uploads/${p.image}`}
-                                                    alt={p.nom}
-                                                    className="w-full h-full object-cover"
-                                                    onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.style.display = 'none'; e.currentTarget.parentElement.innerHTML = '<span class="text-3xl"></span>'; }}
-                                                />
-                                            ) : (
-                                                <span className="text-3xl"></span>
-                                            )}
-                                        </div>
-                                        <div className="p-5 flex flex-col justify-between space-y-4 flex-1">
-                                            <div>
-                                                <h4 className="font-extrabold text-base text-[#061a3a]">{p.nom}</h4>
-                                                <p className="text-xs text-amber-600 font-black mt-1">{Number(p.prix).toLocaleString()} FCFA</p>
-                                                {p.categorie && <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mt-1">{p.categorie}</p>}
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <button onClick={() => { if (window.confirm('Supprimer cet article ?')) deleteProduit(p.id).then(() => setProduits(prev => prev.filter(x => x.id !== p.id))); }} className="w-full py-2 bg-red-50 hover:bg-rose-500/20 text-red-600 rounded-xl text-xs font-bold transition-all">Supprimer l'article</button>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <CarteProduit key={p.id} produit={p}
+                                        onSupprimer={() => { if (window.confirm('Supprimer cet article ?')) deleteProduit(p.id).then(() => setProduits(prev => prev.filter(x => x.id !== p.id))); }} />
                                 ))}
                             </div>
                         )}

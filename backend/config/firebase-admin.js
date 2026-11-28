@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const admin = require('firebase-admin');
 
 let firebaseReady = false;
@@ -16,31 +18,35 @@ try {
     let serviceAccount = null;
 
     if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-        // 🌐 MODE PRODUCTION (Render)
         serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
     } else {
-        // 💻 MODE LOCAL (Ton PC)
-        serviceAccount = require('./serviceAccountKey.json');
+        const localKeyPath = path.join(__dirname, 'serviceAccountKey.json');
+        if (fs.existsSync(localKeyPath)) {
+            serviceAccount = require(localKeyPath);
+        }
     }
 
-    if (serviceAccount && serviceAccount.private_key) {
-        serviceAccount.private_key = String(serviceAccount.private_key).replace(/\\n/g, '\n');
+    if (serviceAccount) {
+        if (serviceAccount.private_key) {
+            serviceAccount.private_key = String(serviceAccount.private_key).replace(/\\n/g, '\n');
+        }
+
+        const storageBucket = resolveStorageBucket(serviceAccount);
+
+        if (!admin.apps.length) {
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount),
+                ...(storageBucket ? { storageBucket } : {})
+            });
+        }
+
+        firebaseReady = true;
+        console.log('✅ Firebase Admin & Storage initialisés. Bucket :', storageBucket || '(défaut projet)');
+    } else {
+        console.warn('⚠️ Aucune clé Firebase trouvée (FIREBASE_SERVICE_ACCOUNT absent et serviceAccountKey.json inexistant) — stockage cloud inactif.');
     }
-
-    const storageBucket = resolveStorageBucket(serviceAccount);
-
-    if (!admin.apps.length) {
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-            ...(storageBucket ? { storageBucket } : {})
-        });
-    }
-
-    firebaseReady = true;
-    console.log('✅ Firebase Admin & Storage initialisés avec succès. Bucket :', storageBucket || '(défaut projet)');
 } catch (err) {
-    console.warn('⚠️ Firebase non configuré ou erreur d\'initialisation — notifications et storage cloud désactivés.');
-    console.log('💡 Raison :', err.message);
+    console.warn('⚠️ Erreur initialisation Firebase :', err.message);
 }
 
 if (!firebaseReady) {

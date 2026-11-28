@@ -19,34 +19,56 @@ const Produit = sequelize.define('Produit', {
         type: DataTypes.FLOAT,
         allowNull: false
     },
+
+    // Photo principale (première image). Gardée pour que la boutique et les anciens écrans continuent de fonctionner.
     image: {
         type: DataTypes.STRING,
         allowNull: true
     },
 
-    // ➕ AJOUTÉ : catégorie du produit (texte libre, ex: "Plomberie", "Électricité")
+    // Galerie : jusqu'à 4 photos (liste d'URL stockée en JSON). Les anciens produits n'ont que « image ».
+    images: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        get() {
+            const brut = this.getDataValue('images');
+            if (!brut) return this.getDataValue('image') ? [this.getDataValue('image')] : [];
+            try {
+                const liste = JSON.parse(brut);
+                return Array.isArray(liste) ? liste : [];
+            } catch (e) {
+                return this.getDataValue('image') ? [this.getDataValue('image')] : [];
+            }
+        },
+        set(valeur) {
+            const liste = Array.isArray(valeur) ? valeur.filter(Boolean).slice(0, 4) : [];
+            this.setDataValue('images', liste.length ? JSON.stringify(liste) : null);
+        }
+    },
+
+    // Catégorie du produit (texte libre, ex: "Plomberie", "Électricité")
     categorie: {
         type: DataTypes.STRING,
         allowNull: true
     },
 
-    // ➕ AJOUTÉ : quantité en stock, 0 par défaut si non renseignée
+    // Quantité en stock, 0 par défaut si non renseignée
     quantite: {
         type: DataTypes.INTEGER,
         allowNull: true,
         defaultValue: 0
     },
 
-    // 🔗 Clé étrangère vers Fournisseur
+    // Clé étrangère vers Fournisseur
     fournisseurId: {
         type: DataTypes.INTEGER,
         allowNull: false
     },
 
-    // 🔗 Clé étrangère vers Service
+    // Clé étrangère vers Service (peut être null si le produit ne dépend pas d'un service)
     serviceId: {
         type: DataTypes.INTEGER,
-        allowNull: true // ✅ important : peut être null si le produit ne dépend pas d’un service
+        allowNull: true
     }
 }, {
     tableName: 'produits',
